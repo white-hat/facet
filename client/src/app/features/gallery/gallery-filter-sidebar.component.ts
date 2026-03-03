@@ -11,20 +11,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { GalleryStore, GalleryFilters } from './gallery.store';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { FilterDisplayPipe } from '../../shared/pipes/filter-display.pipe';
-
-interface AdditionalFilterDef {
-  id: string;
-  labelKey: string;
-  sectionKey: string;
-  minKey: keyof GalleryFilters;
-  maxKey: keyof GalleryFilters;
-  sliderMin: number;
-  sliderMax: number;
-  step: number;
-  displaySuffix?: string;
-  displayPrefix?: string;
-  spanWidth: string;
-}
+import { AdditionalFilterDef } from '../../shared/models/filter-def.model';
 
 const ADDITIONAL_FILTERS: AdditionalFilterDef[] = [
   // Quality
@@ -148,7 +135,7 @@ function saveActiveFilterIds(ids: Set<string>): void {
 
     <div #filterScrollArea data-scroll class="overflow-y-auto p-4 flex flex-col gap-1 max-h-[calc(100vh-120px)]">
       <!-- Date Range -->
-      <details [open]="sectionStates()['date']" (toggle)="onSectionToggle('date', $event)" class="group/section">
+      <details [open]="sectionStates()['date'] !== false" (toggle)="onSectionToggle('date', $event)" class="group/section">
         <summary class="flex items-center justify-between py-2.5 text-xs font-medium uppercase tracking-wider opacity-70 cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
           {{ 'gallery.sidebar.date' | translate }}
           <mat-icon class="!text-xl transition-transform group-open/section:rotate-180">expand_more</mat-icon>
@@ -381,11 +368,9 @@ export class GalleryFilterSidebarComponent implements OnInit {
   onDynamicRangeChange(def: AdditionalFilterDef, side: 'min' | 'max', value: number): void {
     // When min is still at default, redirect max thumb interaction to set min instead.
     // Users typically want to set a minimum threshold first.
-    if (side === 'max' && !(this.store.filters()[def.minKey] as string)) {
-      side = 'min';
-    }
-    const key = side === 'min' ? def.minKey : def.maxKey;
-    const boundary = side === 'min' ? def.sliderMin : def.sliderMax;
+    const effectiveSide = (side === 'max' && !(this.store.filters()[def.minKey] as string)) ? 'min' : side;
+    const key = effectiveSide === 'min' ? def.minKey : def.maxKey;
+    const boundary = effectiveSide === 'min' ? def.sliderMin : def.sliderMax;
     const filterValue = value === boundary ? '' : String(value);
     this.store.updateFilter(key as 'min_score', filterValue);
   }
@@ -397,8 +382,7 @@ export class GalleryFilterSidebarComponent implements OnInit {
 
   private initActiveFilters(): void {
     const f = this.store.filters();
-    const stored = new Set(loadActiveFilterIds());
-    const active = new Set<string>(stored);
+    const active = new Set(loadActiveFilterIds());
 
     // Also auto-activate any filters that have non-default values from URL params
     for (const def of ADDITIONAL_FILTERS) {

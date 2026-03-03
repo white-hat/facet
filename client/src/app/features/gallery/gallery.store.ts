@@ -473,7 +473,13 @@ export class GalleryStore {
 
   /** Update multiple filters at once and reload */
   async updateFilters(updates: Partial<GalleryFilters>): Promise<void> {
-    this.filters.update(current => ({ ...current, ...updates, page: 1 }));
+    const extra: Partial<GalleryFilters> = {};
+    if (updates.hide_rejected) extra.favorites_only = false;
+    if (updates.favorites_only) extra.hide_rejected = false;
+    this.filters.update(current => ({ ...current, ...updates, ...extra, page: 1 }));
+    if (Object.keys(updates).some(k => (DISPLAY_OPTION_KEYS as string[]).includes(k))) {
+      saveDisplayOptionsToStorage(this.filters());
+    }
     this.syncUrl();
     await this.loadPhotos();
   }

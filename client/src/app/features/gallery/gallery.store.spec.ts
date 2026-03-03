@@ -587,6 +587,24 @@ describe('GalleryStore', () => {
       expect(routerNavigate).toHaveBeenCalled();
       expect(apiGet).toHaveBeenCalledWith('/photos', expect.any(Object));
     });
+
+    it('should clear favorites_only when hide_rejected is enabled', async () => {
+      store.filters.set({ ...DEFAULT_FILTERS, favorites_only: true, hide_rejected: false });
+
+      await store.updateFilters({ hide_rejected: true });
+
+      expect(store.filters().hide_rejected).toBe(true);
+      expect(store.filters().favorites_only).toBe(false);
+    });
+
+    it('should clear hide_rejected when favorites_only is enabled', async () => {
+      store.filters.set({ ...DEFAULT_FILTERS, favorites_only: false, hide_rejected: true });
+
+      await store.updateFilters({ favorites_only: true });
+
+      expect(store.filters().favorites_only).toBe(true);
+      expect(store.filters().hide_rejected).toBe(false);
+    });
   });
 
   describe('resetFilters()', () => {
