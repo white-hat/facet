@@ -129,6 +129,7 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
         [photo]="tooltipPhoto()"
         [x]="tooltipX()"
         [y]="tooltipY()"
+        [flipped]="tooltipFlipped()"
       />
     }
 
@@ -175,6 +176,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   readonly tooltipPhoto = signal<Photo | null>(null);
   readonly tooltipX = signal(0);
   readonly tooltipY = signal(0);
+  readonly tooltipFlipped = signal(false);
 
   // Selection state
   readonly selectedPaths = signal<Set<string>>(new Set());
@@ -314,12 +316,14 @@ export class GalleryComponent implements OnInit, OnDestroy {
       const imgH = Math.min(tooltipNatH, vh * 0.35);
       const imgW = imgH * thumbAspect;
       tooltipWidth = Math.ceil(imgW) + 24;
-      tooltipHeight = Math.ceil(imgH) + 140;
+      // 260 = scoring panel (~160) + tech/EXIF row (~60) + tags row (~40)
+      tooltipHeight = Math.ceil(imgH) + 260;
     } else {
       const imgH = Math.min(tooltipNatH, vh * 0.5);
       const imgW = imgH * thumbAspect;
       tooltipWidth = Math.ceil(imgW) + 260 + 12 + 24;
-      tooltipHeight = Math.max(Math.ceil(imgH), 300) + 24;
+      // 100 = tech/EXIF row (~60) + tags row (~40)
+      tooltipHeight = Math.max(Math.ceil(imgH), 300) + 100;
     }
 
     const wouldOverflowRight = rect.right + padding + tooltipWidth > vw - padding;
@@ -333,6 +337,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     let y = rect.top + rect.height / 2 - tooltipHeight / 2;
     y = Math.max(padding, Math.min(y, vh - tooltipHeight - padding));
 
+    this.tooltipFlipped.set(wouldOverflowRight);
     this.tooltipX.set(x);
     this.tooltipY.set(y);
     this.tooltipPhoto.set(photo);
@@ -341,12 +346,17 @@ export class GalleryComponent implements OnInit, OnDestroy {
       if (this.tooltipPhoto() !== photo) return;
       const el = document.querySelector('app-photo-tooltip > div') as HTMLElement | null;
       if (!el) return;
-      const { width: actualWidth } = el.getBoundingClientRect();
+      const { width: actualWidth, height: actualHeight } = el.getBoundingClientRect();
       const wouldOverflowRightActual = rect.right + padding + actualWidth > vw - padding;
       const newX = wouldOverflowRightActual
         ? rect.left - actualWidth - padding
         : rect.right + padding;
       if (Math.abs(newX - this.tooltipX()) > 1) this.tooltipX.set(newX);
+      if (wouldOverflowRightActual !== this.tooltipFlipped()) this.tooltipFlipped.set(wouldOverflowRightActual);
+
+      let newY = rect.top + rect.height / 2 - actualHeight / 2;
+      newY = Math.max(padding, Math.min(newY, vh - actualHeight - padding));
+      if (Math.abs(newY - this.tooltipY()) > 1) this.tooltipY.set(newY);
     }, 0);
   }
 

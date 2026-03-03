@@ -56,6 +56,13 @@ const makePhoto = (overrides: Partial<Photo> = {}): Photo => ({
   star_rating: null,
   is_favorite: null,
   is_rejected: null,
+  aesthetic_iaa: null,
+  face_quality_iqa: null,
+  liqe_score: null,
+  subject_sharpness: null,
+  subject_prominence: null,
+  subject_placement: null,
+  bg_separation: null,
   ...overrides,
 });
 

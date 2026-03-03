@@ -200,7 +200,7 @@ describe('SlideshowComponent', () => {
   describe('fullscreen', () => {
     it('toggleFullscreen() calls requestFullscreen when not fullscreen', () => {
       const mockEl = { requestFullscreen: jest.fn() };
-      component['container'] = (() => ({ nativeElement: mockEl })) as any;
+      Object.defineProperty(component, 'container', { value: () => ({ nativeElement: mockEl }), writable: true, configurable: true });
       Object.defineProperty(document, 'fullscreenElement', { value: null, writable: true, configurable: true });
       component.toggleFullscreen();
       expect(mockEl.requestFullscreen).toHaveBeenCalled();

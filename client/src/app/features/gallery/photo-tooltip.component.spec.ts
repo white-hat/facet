@@ -69,10 +69,11 @@ const makePhoto = (overrides: Partial<Photo> = {}): Photo => ({
 @Component({
   selector: 'test-host',
   imports: [PhotoTooltipComponent],
-  template: `<app-photo-tooltip [photo]="photo()" [x]="0" [y]="0" />`,
+  template: `<app-photo-tooltip [photo]="photo()" [x]="0" [y]="0" [flipped]="flipped()" />`,
 })
 class TestHostComponent {
   photo = signal<Photo | null>(null);
+  flipped = signal(false);
 }
 
 describe('PhotoTooltipComponent', () => {
@@ -159,6 +160,73 @@ describe('PhotoTooltipComponent', () => {
       fixture.componentInstance.photo.set(makePhoto({ aesthetic_iaa: null }));
       fixture.detectChanges();
       expect(fixture.nativeElement.textContent).not.toContain('tooltip.aesthetic_iaa');
+    });
+  });
+
+  describe('flipped input', () => {
+    it('defaults to false', () => {
+      fixture.componentInstance.photo.set(makePhoto({ image_width: 1080, image_height: 1920 }));
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.flipped()).toBe(false);
+    });
+
+    it('reflects host value when set to true', () => {
+      fixture.componentInstance.photo.set(makePhoto({ image_width: 1080, image_height: 1920 }));
+      fixture.componentInstance.flipped.set(true);
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.flipped()).toBe(true);
+    });
+  });
+
+  describe('hasExif computed', () => {
+    it('returns false when no EXIF fields', () => {
+      fixture.componentInstance.photo.set(makePhoto());
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.hasExif()).toBe(false);
+    });
+
+    it('returns true when camera_model is present', () => {
+      fixture.componentInstance.photo.set(makePhoto({ camera_model: 'Canon EOS R5' }));
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.hasExif()).toBe(true);
+    });
+
+    it('returns true when lens_model is present', () => {
+      fixture.componentInstance.photo.set(makePhoto({ lens_model: 'RF 50mm f/1.2' }));
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.hasExif()).toBe(true);
+    });
+
+    it('returns true when iso is present', () => {
+      fixture.componentInstance.photo.set(makePhoto({ iso: 400 }));
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.hasExif()).toBe(true);
+    });
+
+    it('returns true when focal_length is present', () => {
+      fixture.componentInstance.photo.set(makePhoto({ focal_length: 85 }));
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.hasExif()).toBe(true);
+    });
+
+    it('returns true when shutter_speed is present', () => {
+      fixture.componentInstance.photo.set(makePhoto({ shutter_speed: 0.004 }));
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.hasExif()).toBe(true);
+    });
+
+    it('returns false when no photo', () => {
+      fixture.detectChanges();
+      const tooltip = fixture.debugElement.children[0].componentInstance as PhotoTooltipComponent;
+      expect(tooltip.hasExif()).toBe(false);
     });
   });
 
