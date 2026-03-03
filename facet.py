@@ -44,7 +44,7 @@ from config import ScoringConfig, PercentileNormalizer
 # ============================================
 # EXECUTION
 # ============================================
-if __name__ == '__main__':
+def main():
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -1128,3 +1128,7 @@ Configuration:
         print("All photos already have tags.")
 
     print("All tasks complete.")
+
+
+if __name__ == '__main__':
+    main()

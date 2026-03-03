@@ -134,7 +134,7 @@ def migrate_user_preferences(username, db_path=DEFAULT_DB_PATH):
 
     print(f"Done. {migrated} preference(s) migrated for '{username}'.")
 
-if __name__ == '__main__':
+def main():
     import argparse
 
     parser = argparse.ArgumentParser(
@@ -288,3 +288,7 @@ if __name__ == '__main__':
         print(f"  - persons: {info['persons_columns']} columns")
         print(f"  - photo_tags: {info['photo_tags_columns']} columns")
         print(f"  - {info['indexes']} indexes")
+
+
+if __name__ == '__main__':
+    main()

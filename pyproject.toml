@@ -1,0 +1,112 @@
+[build-system]
+requires = ["setuptools>=70.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "facet-photo"
+version = "1.0.0"
+description = "AI-powered photo analysis engine using an ensemble of vision models to score, categorize, and surface your best photos"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Nicolas Coevoet", email = "nicolas@coevoet.fr" },
+]
+keywords = [
+    "photo", "photography", "image-quality", "computer-vision", "aesthetic",
+    "face-recognition", "photo-scoring", "self-hosted", "topiq", "clip",
+    "image-analysis", "composition", "saliency", "face-clustering",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Framework :: FastAPI",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "open-clip-torch>=2.20.0",
+    "opencv-python>=4.8.0",
+    "pillow>=10.0.0",
+    "imagehash>=4.3.0",
+    "rawpy>=0.18.0",
+    "insightface>=0.7.0",
+    "pyiqa>=0.1.10",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "hdbscan>=0.8.40",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "pyjwt>=2.8.0",
+    "tqdm>=4.65.0",
+    "exifread>=3.0.0",
+    "psutil>=5.9.0",
+]
+
+[project.optional-dependencies]
+vlm = [
+    "transformers>=5.0.0",
+    "accelerate>=0.25.0",
+]
+saliency = [
+    "transparent-background>=2.0.0",
+]
+gpu-clustering = [
+    "cuml",
+    "cupy",
+]
+all = [
+    "facet-photo[vlm,saliency]",
+]
+
+[project.urls]
+Homepage = "https://github.com/ncoevoet/facet"
+Repository = "https://github.com/ncoevoet/facet"
+Documentation = "https://github.com/ncoevoet/facet/tree/master/docs"
+Issues = "https://github.com/ncoevoet/facet/issues"
+Discussions = "https://github.com/ncoevoet/facet/discussions"
+
+[project.scripts]
+facet = "facet:main"
+facet-viewer = "viewer:main"
+facet-db = "database:main"
+facet-tag = "tag_existing:main"
+
+[tool.setuptools]
+py-modules = ["facet", "viewer", "database", "tag_existing", "calibrate", "validate_db"]
+
+[tool.setuptools.packages.find]
+include = [
+    "analyzers*",
+    "api*",
+    "comparison*",
+    "config*",
+    "db*",
+    "exiftool*",
+    "faces*",
+    "i18n*",
+    "models*",
+    "optimization*",
+    "processing*",
+    "utils*",
+    "validation*",
+]
+exclude = ["venv*", "client*", "docs*", "photos_all*", "pretrained_models*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.json"]
+"i18n" = ["*.json"]
