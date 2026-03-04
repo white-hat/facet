@@ -950,6 +950,7 @@
     "face_quality_range": "Rango de calidad facial",
     "composition_range": "Rango de composición",
     "hide_details": "Ocultar detalles",
+    "hide_tooltip": "Ocultar tooltip",
     "hide_blinks": "Ocultar parpadeos",
     "hide_bursts": "Mejor de ráfaga",
     "hide_duplicates": "Ocultar duplicados",

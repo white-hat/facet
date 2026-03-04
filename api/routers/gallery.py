@@ -644,7 +644,7 @@ def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_
             JOIN photos p ON p.path = f.photo_path
             WHERE f.person_id IN ({placeholders})
               AND f.photo_path != ?
-              AND {vis_sql.replace('photos.path', 'p.path')}
+              AND {vis_sql.replace('photos.path', 'p.path')}  -- get_visibility_clause() references photos.path
         """, person_ids + [photo_path] + vis_params).fetchall()
 
         results = [_similar_result(dict(r), 1.0) for r in rows]
@@ -667,7 +667,7 @@ def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_
         SELECT f.photo_path as path, f.embedding, p.filename, p.date_taken, p.aggregate, p.aesthetic
         FROM faces f
         JOIN photos p ON p.path = f.photo_path
-        WHERE f.photo_path != ? AND f.embedding IS NOT NULL AND {vis_sql.replace('photos.path', 'p.path')}
+        WHERE f.photo_path != ? AND f.embedding IS NOT NULL AND {vis_sql.replace('photos.path', 'p.path')}  -- get_visibility_clause() references photos.path
         LIMIT 50000
     """, [photo_path] + vis_params).fetchall()
 

@@ -322,7 +322,6 @@ export class App implements OnInit {
   }
 
   lockEdition(): void {
-    // Drop edition privileges by logging out
-    this.auth.logout();
+    this.auth.dropEdition();
   }
 }

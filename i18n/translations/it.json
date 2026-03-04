@@ -950,6 +950,7 @@
     "face_quality_range": "Intervallo qualita volto",
     "composition_range": "Intervallo composizione",
     "hide_details": "Nascondi dettagli",
+    "hide_tooltip": "Nascondi tooltip",
     "hide_blinks": "Nascondi occhi chiusi",
     "hide_bursts": "Migliore della raffica",
     "hide_duplicates": "Nascondi duplicati",

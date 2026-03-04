@@ -81,11 +81,26 @@ export class AuthService {
     }
   }
 
-  /** Logout */
+  /** Logout and navigate to login */
   logout(): void {
     localStorage.removeItem(this.TOKEN_KEY);
     this.status.set(null);
     this.router.navigate(['/login']);
+  }
+
+  /** Drop edition privileges without navigating away */
+  async dropEdition(): Promise<void> {
+    try {
+      const res = await firstValueFrom(
+        this.http.post<LoginResponse>('/api/auth/edition/logout', {}),
+      );
+      if (res?.access_token) {
+        localStorage.setItem(this.TOKEN_KEY, res.access_token);
+      }
+    } catch {
+      // Network error — keep existing token rather than destroying the session
+    }
+    this.status.update(s => s ? { ...s, edition_authenticated: false } : s);
   }
 
   /** Check if a feature is enabled */

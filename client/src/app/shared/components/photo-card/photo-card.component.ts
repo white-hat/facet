@@ -70,8 +70,10 @@ interface AppConfig {
           </div>
         }
 
-        <!-- Hover overlay (image area only, md+ only) -->
-        <div class="absolute inset-0 bg-black/50 opacity-0 md:group-hover/img:opacity-100 transition-opacity flex flex-col justify-between pointer-events-none md:group-hover/img:pointer-events-auto z-10">
+        <!-- Hover overlay (image area only, md+ only, disabled when tooltip hidden) -->
+        <div class="absolute inset-0 bg-black/50 opacity-0 transition-opacity flex flex-col justify-between pointer-events-none z-10"
+             [class.md:group-hover/img:opacity-100]="!hideTooltip()"
+             [class.md:group-hover/img:pointer-events-auto]="!hideTooltip()">
           <!-- Top row: action buttons + star badge -->
           <div class="flex justify-end items-center gap-1 p-1.5">
             @if (photo().star_rating && config()?.features?.show_rating_badge) {
@@ -230,6 +232,7 @@ export class PhotoCardComponent {
   // Display state
   readonly isSelected = input(false);
   readonly hideDetails = input(false);
+  readonly hideTooltip = input(false);
   readonly mosaicMode = input(false);
   readonly currentSort = input('aggregate');
   readonly thumbSize = input(240);

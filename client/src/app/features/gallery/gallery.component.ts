@@ -68,6 +68,7 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
                   [config]="store.config()"
                   [isSelected]="selectedPaths().has(photo.path)"
                   [hideDetails]="effectiveHideDetails()"
+                  [hideTooltip]="effectiveHideTooltip()"
                   [currentSort]="store.filters().sort"
                   [thumbSize]="thumbSize()"
                   [isEditionMode]="auth.isEdition()"
@@ -98,6 +99,7 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
                       [style.width.px]="row.widths[i]"
                       [style.height.px]="row.height"
                       [hideDetails]="true"
+                      [hideTooltip]="effectiveHideTooltip()"
                       [mosaicMode]="true"
                       [config]="store.config()"
                       [isSelected]="selectedPaths().has(photo.path)"
@@ -161,7 +163,7 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
     }
 
     <!-- Photo details tooltip (single instance, repositioned on hover, hidden on small/touch devices) -->
-    @if (!isTouchDevice() && isDesktop()) {
+    @if (!isTouchDevice() && isDesktop() && !effectiveHideTooltip()) {
       <app-photo-tooltip
         [photo]="tooltipPhoto()"
         [x]="tooltipX()"
@@ -243,6 +245,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
   readonly effectiveHideDetails = computed(() =>
     this.isDesktop() ? this.store.filters().hide_details : false,
   );
+
+  /** Cached hide_tooltip signal — avoids re-reading store.filters() per card in @for */
+  readonly effectiveHideTooltip = computed(() => this.store.filters().hide_tooltip);
 
   /** Container width for mosaic layout (updated via ResizeObserver) */
   readonly containerWidth = signal(0);
@@ -398,7 +403,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   }
 
   showTooltip(event: MouseEvent, photo: Photo): void {
-    if (this.isTouchDevice()) return;
+    if (this.isTouchDevice() || this.effectiveHideTooltip()) return;
     const card = (event.currentTarget as HTMLElement)?.closest('.relative.rounded-lg') as HTMLElement ?? event.currentTarget as HTMLElement;
     const rect = card.getBoundingClientRect();
     const padding = 16;

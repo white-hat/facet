@@ -233,6 +233,10 @@ function saveActiveFilterIds(ids: Set<string>): void {
               (change)="store.updateFilter('hide_details', $event.checked)"
             >{{ 'gallery.hide_details' | translate }}</mat-checkbox>
           }
+          <mat-checkbox class="hidden md:block"
+            [checked]="store.filters().hide_tooltip"
+            (change)="store.updateFilter('hide_tooltip', $event.checked)"
+          >{{ 'gallery.hide_tooltip' | translate }}</mat-checkbox>
           <mat-checkbox
             [checked]="store.filters().hide_blinks"
             (change)="store.updateFilter('hide_blinks', $event.checked)"

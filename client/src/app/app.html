@@ -25,12 +25,20 @@
           <a mat-icon-button class="lg:!hidden" routerLink="/stats" routerLinkActive #rlStatsM="routerLinkActive" [style.color]="rlStatsM.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.stats' | translate">
             <mat-icon>bar_chart</mat-icon>
           </a>
-          <a mat-button class="!hidden lg:!inline-flex" routerLink="/" routerLinkActive #rlGallery="routerLinkActive" [routerLinkActiveOptions]="{exact:true}" [style.color]="rlGallery.isActive ? 'var(--mat-sys-primary)' : ''">{{ 'nav.gallery' | translate }}</a>
-          <a mat-button class="!hidden lg:!inline-flex" routerLink="/persons" routerLinkActive #rlPersons="routerLinkActive" [style.color]="rlPersons.isActive ? 'var(--mat-sys-primary)' : ''">{{ 'nav.persons' | translate }}</a>
+          <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/" routerLinkActive #rlGallery="routerLinkActive" [routerLinkActiveOptions]="{exact:true}" [style.color]="rlGallery.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.gallery' | translate">
+            <mat-icon>photo_library</mat-icon>
+          </a>
+          <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/persons" routerLinkActive #rlPersons="routerLinkActive" [style.color]="rlPersons.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.persons' | translate">
+            <mat-icon>people</mat-icon>
+          </a>
           @if (auth.isEdition()) {
-            <a mat-button class="!hidden lg:!inline-flex" routerLink="/compare" routerLinkActive #rlCompare="routerLinkActive" [style.color]="rlCompare.isActive ? 'var(--mat-sys-primary)' : ''">{{ 'nav.compare' | translate }}</a>
+            <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/compare" routerLinkActive #rlCompare="routerLinkActive" [style.color]="rlCompare.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.compare' | translate">
+              <mat-icon>tune</mat-icon>
+            </a>
           }
-          <a mat-button class="!hidden lg:!inline-flex" routerLink="/stats" routerLinkActive #rlStats="routerLinkActive" [style.color]="rlStats.isActive ? 'var(--mat-sys-primary)' : ''">{{ 'nav.stats' | translate }}</a>
+          <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/stats" routerLinkActive #rlStats="routerLinkActive" [style.color]="rlStats.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.stats' | translate">
+            <mat-icon>bar_chart</mat-icon>
+          </a>
         </nav>
       }
 

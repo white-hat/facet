@@ -950,6 +950,7 @@
     "face_quality_range": "Gesichtsqualitätsbereich",
     "composition_range": "Kompositionsbereich",
     "hide_details": "Details ausblenden",
+    "hide_tooltip": "Tooltip ausblenden",
     "hide_blinks": "Blinzler ausblenden",
     "hide_bursts": "Beste aus Serie",
     "hide_duplicates": "Duplikate ausblenden",

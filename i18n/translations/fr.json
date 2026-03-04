@@ -973,6 +973,7 @@
     "face_quality_range": "Plage qualite visage",
     "composition_range": "Plage composition",
     "hide_details": "Masquer details",
+    "hide_tooltip": "Masquer l'infobulle",
     "hide_blinks": "Masquer clignements",
     "hide_bursts": "Meilleure de la rafale",
     "hide_duplicates": "Masquer doublons",

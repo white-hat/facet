@@ -85,6 +85,17 @@ async def edition_login(body: EditionLoginRequest):
     return LoginResponse(access_token=token)
 
 
+@router.post("/edition/logout", response_model=LoginResponse)
+async def edition_logout(user: CurrentUser = Depends(require_authenticated)):
+    """Drop edition privileges and return a non-edition token."""
+    token = create_access_token({
+        'sub': user.user_id or '_legacy',
+        'role': user.role,
+        'display_name': user.display_name,
+    })
+    return LoginResponse(access_token=token)
+
+
 @router.get("/status", response_model=AuthStatusResponse)
 async def auth_status(user: Optional[CurrentUser] = Depends(get_optional_user)):
     """Get current authentication status and available features."""

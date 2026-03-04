@@ -174,18 +174,23 @@ Filter by SAMP-Net detected patterns:
 
 ### Display Options
 
+- **Layout Mode** - Switch between **Grid** (uniform cards) and **Mosaic** (justified rows preserving aspect ratios). Mosaic is desktop-only; mobile always uses grid.
+- **Thumbnail Size** - Slider to adjust card/row height (120–400px, persisted in localStorage)
+- **Hide Details** - Hide photo metadata on cards (grid mode only)
+- **Hide Tooltip** - Disable the hover tooltip that shows photo details on desktop
 - **Hide Blinks** - Filter out photos with detected blinks
 - **Best of Burst** - Show only top-scored photo from each burst
 - **Infinite Scroll** - Photos load as you scroll
 
 ### Similar Photos
 
-Click the "Similar" button on any photo to open the similar photos panel. Results use a two-pass algorithm:
-- **Pass 1** - Perceptual hash (pHash) hamming distance for fast visual similarity
-- **Pass 2** - CLIP embedding cosine similarity for semantic matching
-- Blended score: `pHash × 0.7 + CLIP × 0.3`
+Click the "Similar" button on any photo to choose a similarity mode:
 
-Use the **similarity threshold slider** (0–90%) to control how strict the matching is. The panel supports infinite scroll for large result sets.
+- **Visual** (default) — pHash hamming distance (70%) + CLIP/SigLIP cosine similarity (30%). Falls back to CLIP-only when no pHash is available.
+- **Color** — Histogram intersection (70%) + saturation distance (10%) + luminance distance (10%) + monochrome bonus (10%). Pre-filters by monochrome flag and saturation range.
+- **Person** — Finds photos containing the same person(s). Uses `person_id` when available (fast), otherwise falls back to face embedding cosine similarity.
+
+Use the **similarity threshold slider** (0–90%) to control how strict the matching is (not shown in person mode). The panel supports infinite scroll for large result sets.
 
 ### Filter Chips
 
@@ -468,7 +473,7 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 |----------|-------------|
 | `GET /api/photos` | Paginated photo list with filters |
 | `GET /api/type_counts` | Photo counts per type |
-| `GET /api/similar_photos/{path}` | Similar photos by embedding |
+| `GET /api/similar_photos/{path}` | Similar photos (modes: `visual`, `color`, `person`) |
 | `GET /api/config` | Viewer configuration |
 
 ### Authentication
@@ -476,6 +481,8 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 | Endpoint | Description |
 |----------|-------------|
 | `POST /api/auth/login` | Authenticate and receive token |
+| `POST /api/auth/edition/login` | Unlock edition mode |
+| `POST /api/auth/edition/logout` | Lock edition mode (drop privileges, stay authenticated) |
 | `GET /api/auth/status` | Check authentication status |
 
 ### Thumbnails and Images

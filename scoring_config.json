@@ -2140,7 +2140,13 @@
     "display": {
       "tags_per_photo": 4,
       "card_width_px": 168,
-      "image_width_px": 160
+      "image_width_px": 160,
+      "thumbnail_slider": {
+        "min_px": 120,
+        "max_px": 400,
+        "default_px": 168,
+        "step_px": 8
+      }
     },
     "face_thumbnails": {
       "output_size_px": 64,
@@ -2170,10 +2176,12 @@
       "hide_bursts": true,
       "hide_duplicates": true,
       "hide_details": true,
+      "hide_tooltip": false,
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
-      "type": ""
+      "type": "",
+      "gallery_mode": "mosaic"
     },
     "features": {
       "show_similar_button": true,

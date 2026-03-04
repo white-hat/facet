@@ -46,7 +46,9 @@ export interface ViewerConfig {
     hide_bursts: boolean;
     hide_duplicates: boolean;
     hide_details: boolean;
+    hide_tooltip: boolean;
     hide_rejected: boolean;
+    gallery_mode: GalleryMode;
   };
   display: {
     tags_per_photo: number;
@@ -175,6 +177,7 @@ export interface GalleryFilters {
   min_similarity: string;
   // Display
   hide_details: boolean;
+  hide_tooltip: boolean;
   hide_blinks: boolean;
   hide_bursts: boolean;
   hide_duplicates: boolean;
@@ -269,6 +272,7 @@ const DEFAULT_FILTERS: GalleryFilters = {
   similarity_mode: 'visual',
   min_similarity: '70',
   hide_details: true,
+  hide_tooltip: false,
   hide_blinks: true,
   hide_bursts: true,
   hide_duplicates: true,
@@ -285,10 +289,10 @@ const DRAWER_STATE_KEY = 'facet_filter_drawer_open';
 const DISPLAY_OPTIONS_KEY = 'facet_display_options';
 const CARD_WIDTH_KEY = 'facet_card_width';
 type DisplayOptions = Pick<GalleryFilters,
-  'hide_details' | 'hide_blinks' | 'hide_bursts' | 'hide_duplicates' |
+  'hide_details' | 'hide_tooltip' | 'hide_blinks' | 'hide_bursts' | 'hide_duplicates' |
   'hide_rejected' | 'favorites_only' | 'is_monochrome'>;
 const DISPLAY_OPTION_KEYS: (keyof DisplayOptions)[] = [
-  'hide_details', 'hide_blinks', 'hide_bursts', 'hide_duplicates',
+  'hide_details', 'hide_tooltip', 'hide_blinks', 'hide_bursts', 'hide_duplicates',
   'hide_rejected', 'favorites_only', 'is_monochrome',
 ];
 
@@ -384,6 +388,11 @@ export class GalleryStore {
         this.cardWidth.set(defaultPx);
       }
 
+      // Initialize gallery mode from localStorage or config default
+      if (!localStorage.getItem(GALLERY_MODE_KEY) && cfg.defaults?.gallery_mode) {
+        this.galleryMode.set(cfg.defaults.gallery_mode);
+      }
+
       // Apply config defaults to filters, then overlay localStorage display options, then URL params
       const defaults = cfg.defaults;
       const storedDisplay = loadDisplayOptionsFromStorage();
@@ -394,6 +403,7 @@ export class GalleryStore {
         sort_direction: defaults?.sort_direction ?? 'DESC',
         type: defaults?.type ?? '',
         hide_details: storedDisplay.hide_details ?? (defaults?.hide_details ?? true),
+        hide_tooltip: storedDisplay.hide_tooltip ?? (defaults?.hide_tooltip ?? false),
         hide_blinks: storedDisplay.hide_blinks ?? (defaults?.hide_blinks ?? true),
         hide_bursts: storedDisplay.hide_bursts ?? (defaults?.hide_bursts ?? true),
         hide_duplicates: storedDisplay.hide_duplicates ?? (defaults?.hide_duplicates ?? true),
@@ -475,6 +485,11 @@ export class GalleryStore {
     }
   }
 
+  /** Display-only keys that never affect the API query */
+  private static readonly DISPLAY_ONLY_KEYS: ReadonlySet<keyof GalleryFilters> = new Set([
+    'hide_details', 'hide_tooltip',
+  ]);
+
   /** Update a single filter and reload photos from page 1 */
   async updateFilter<K extends keyof GalleryFilters>(
     key: K,
@@ -488,7 +503,9 @@ export class GalleryStore {
       saveDisplayOptionsToStorage(this.filters());
     }
     this.syncUrl();
-    await this.loadPhotos();
+    if (!GalleryStore.DISPLAY_ONLY_KEYS.has(key)) {
+      await this.loadPhotos();
+    }
   }
 
   /** Update multiple filters at once and reload */
@@ -514,12 +531,14 @@ export class GalleryStore {
       sort: defaults?.sort ?? 'aggregate',
       sort_direction: defaults?.sort_direction ?? 'DESC',
       hide_details: defaults?.hide_details ?? true,
+      hide_tooltip: defaults?.hide_tooltip ?? false,
       hide_blinks: defaults?.hide_blinks ?? true,
       hide_bursts: defaults?.hide_bursts ?? true,
       hide_duplicates: defaults?.hide_duplicates ?? true,
       hide_rejected: defaults?.hide_rejected ?? true,
     });
     this.resetCardWidth();
+    this.setGalleryMode(defaults?.gallery_mode ?? 'grid');
     saveDisplayOptionsToStorage(this.filters());
     this.syncUrl();
     await this.loadPhotos();

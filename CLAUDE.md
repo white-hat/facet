@@ -365,5 +365,7 @@ For quick reference, here are the actual defaults from the config file:
 | `viewer.defaults` | `hide_bursts` | `true` |
 | `viewer.defaults` | `hide_duplicates` | `true` |
 | `viewer.defaults` | `hide_details` | `true` |
+| `viewer.defaults` | `hide_tooltip` | `false` |
+| `viewer.defaults` | `gallery_mode` | `"mosaic"` |
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the complete reference.

@@ -973,6 +973,7 @@
     "face_quality_range": "Face Quality Range",
     "composition_range": "Composition Range",
     "hide_details": "Hide Details",
+    "hide_tooltip": "Hide Tooltip",
     "hide_blinks": "Hide Blinks",
     "hide_bursts": "Best of Burst",
     "hide_duplicates": "Hide Duplicates",

@@ -926,7 +926,13 @@ Web gallery display and behavior.
     "display": {
       "tags_per_photo": 4,
       "card_width_px": 168,
-      "image_width_px": 160
+      "image_width_px": 160,
+      "thumbnail_slider": {
+        "min_px": 120,
+        "max_px": 400,
+        "default_px": 168,
+        "step_px": 8
+      }
     },
     "face_thumbnails": {
       "output_size_px": 64,
@@ -956,10 +962,12 @@ Web gallery display and behavior.
       "hide_bursts": true,
       "hide_duplicates": true,
       "hide_details": true,
+      "hide_tooltip": false,
       "hide_rejected": true,
       "sort": "aggregate",
       "sort_direction": "DESC",
-      "type": ""
+      "type": "",
+      "gallery_mode": "mosaic"
     },
     "cache_ttl_seconds": 60,
     "notification_duration_ms": 2000
@@ -987,6 +995,10 @@ Web gallery display and behavior.
 | `tags_per_photo` | `4` | Tags shown on cards |
 | `card_width_px` | `168` | Card width |
 | `image_width_px` | `160` | Image width |
+| `thumbnail_slider.min_px` | `120` | Minimum thumbnail size (px) |
+| `thumbnail_slider.max_px` | `400` | Maximum thumbnail size (px) |
+| `thumbnail_slider.default_px` | `168` | Default thumbnail size (px) |
+| `thumbnail_slider.step_px` | `8` | Slider step increment (px) |
 | **face_thumbnails** | | |
 | `output_size_px` | `64` | Thumbnail size |
 | `jpeg_quality` | `80` | JPEG quality |
@@ -1009,7 +1021,9 @@ Web gallery display and behavior.
 | `hide_bursts` | `true` | Show only best of burst by default |
 | `hide_duplicates` | `true` | Hide non-lead duplicate photos by default |
 | `hide_details` | `true` | Hide photo details on cards by default |
+| `hide_tooltip` | `false` | Hide hover tooltip on cards by default |
 | `hide_rejected` | `true` | Hide rejected photos by default |
+| `gallery_mode` | `"mosaic"` | Default gallery layout (`"grid"` or `"mosaic"`) |
 | **Other** | | |
 | `cache_ttl_seconds` | `60` | Query cache TTL |
 | `notification_duration_ms` | `2000` | Toast duration |
