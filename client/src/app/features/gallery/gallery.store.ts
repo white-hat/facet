@@ -52,6 +52,12 @@ export interface ViewerConfig {
     tags_per_photo: number;
     card_width_px: number;
     image_width_px: number;
+    thumbnail_slider?: {
+      min_px: number;
+      max_px: number;
+      default_px: number;
+      step_px: number;
+    };
   };
   sort_options_grouped: Record<string, SortOption[]> | null;
   features: {
@@ -270,8 +276,12 @@ const DEFAULT_FILTERS: GalleryFilters = {
   search: '',
 };
 
+export type GalleryMode = 'grid' | 'mosaic';
+const GALLERY_MODE_KEY = 'facet_gallery_mode';
+
 const DRAWER_STATE_KEY = 'facet_filter_drawer_open';
 const DISPLAY_OPTIONS_KEY = 'facet_display_options';
+const CARD_WIDTH_KEY = 'facet_card_width';
 type DisplayOptions = Pick<GalleryFilters,
   'hide_details' | 'hide_blinks' | 'hide_bursts' | 'hide_duplicates' |
   'hide_rejected' | 'favorites_only' | 'is_monochrome'>;
@@ -313,6 +323,8 @@ export class GalleryStore {
   readonly config = signal<ViewerConfig | null>(null);
   readonly filterDrawerOpen = signal(localStorage.getItem(DRAWER_STATE_KEY) === 'true');
   readonly slideshowActive = signal(false);
+  readonly cardWidth = signal(parseInt(localStorage.getItem(CARD_WIDTH_KEY) ?? '', 10) || 0);
+  readonly galleryMode = signal<GalleryMode>((localStorage.getItem(GALLERY_MODE_KEY) as GalleryMode) || 'grid');
 
   // Filter options
   readonly types = signal<TypeCount[]>([]);
@@ -363,6 +375,12 @@ export class GalleryStore {
     try {
       const cfg = await firstValueFrom(this.api.get<ViewerConfig>('/config'));
       this.config.set(cfg);
+
+      // Initialize card width from localStorage or config default
+      if (!this.cardWidth()) {
+        const defaultPx = cfg.display?.thumbnail_slider?.default_px ?? cfg.display?.card_width_px ?? 168;
+        this.cardWidth.set(defaultPx);
+      }
 
       // Apply config defaults to filters, then overlay localStorage display options, then URL params
       const defaults = cfg.defaults;
@@ -499,6 +517,7 @@ export class GalleryStore {
       hide_duplicates: defaults?.hide_duplicates ?? true,
       hide_rejected: defaults?.hide_rejected ?? true,
     });
+    this.resetCardWidth();
     saveDisplayOptionsToStorage(this.filters());
     this.syncUrl();
     await this.loadPhotos();
@@ -507,6 +526,23 @@ export class GalleryStore {
   setFilterDrawerOpen(open: boolean): void {
     this.filterDrawerOpen.set(open);
     try { localStorage.setItem(DRAWER_STATE_KEY, String(open)); } catch { /* ignore */ }
+  }
+
+  setCardWidth(px: number): void {
+    this.cardWidth.set(px);
+    try { localStorage.setItem(CARD_WIDTH_KEY, String(px)); } catch { /* ignore */ }
+  }
+
+  resetCardWidth(): void {
+    const cfg = this.config();
+    const defaultPx = cfg?.display?.thumbnail_slider?.default_px ?? cfg?.display?.card_width_px ?? 168;
+    this.cardWidth.set(defaultPx);
+    try { localStorage.removeItem(CARD_WIDTH_KEY); } catch { /* ignore */ }
+  }
+
+  setGalleryMode(mode: GalleryMode): void {
+    this.galleryMode.set(mode);
+    try { localStorage.setItem(GALLERY_MODE_KEY, mode); } catch { /* ignore */ }
   }
 
   /** Load type counts (for the type toggle bar) */

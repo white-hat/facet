@@ -55,38 +55,75 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
 
       <!-- Main content -->
       <mat-sidenav-content>
-        <!-- Photo grid -->
+        <!-- Photo grid / mosaic -->
         @if (store.photos().length) {
-          <div
-            class="grid grid-cols-1 gap-2 p-2 md:p-4 gallery-grid"
-            [style.--gallery-cols]="'repeat(auto-fill, minmax(' + cardWidth() + 'px, 1fr))'"
-          >
-            @for (photo of store.photos(); track photo.path) {
-              <app-photo-card
-                [photo]="photo"
-                [config]="store.config()"
-                [isSelected]="selectedPaths().has(photo.path)"
-                [hideDetails]="store.filters().hide_details"
-                [currentSort]="store.filters().sort"
-                [thumbSize]="thumbSize()"
-                [isEditionMode]="auth.isEdition()"
-                [hoverStar]="hoverStars()[photo.path]"
-                [personFilterId]="store.filters().person_id"
-                (selectionChange)="toggleSelection($event)"
-                (tooltipShow)="showTooltip($event.event, $event.photo)"
-                (tooltipHide)="hideTooltip(); clearHoverStar(photo.path)"
-                (tagClicked)="store.updateFilter('tag', $event)"
-                (personFilterClicked)="filterByPerson($event)"
-                (personRemoveClicked)="removePerson($event.photo, $event.personId)"
-                (openSimilarClicked)="openSimilar($event)"
-                (openAddPersonClicked)="openAddPerson($event)"
-                (favoriteToggled)="store.toggleFavorite($event)"
-                (rejectedToggled)="store.toggleRejected($event)"
-                (starHoverChanged)="$event.star !== null ? setHoverStar($event.path, $event.star) : clearHoverStar($event.path)"
-                (starClicked)="onStarClick($event.photo, $event.star)"
-              />
-            }
-          </div>
+          @if (effectiveGalleryMode() === 'grid') {
+            <div
+              class="grid grid-cols-1 gap-2 p-2 md:p-4 gallery-grid"
+              [style.--gallery-cols]="'repeat(auto-fill, minmax(' + cardWidth() + 'px, 1fr))'"
+            >
+              @for (photo of store.photos(); track photo.path) {
+                <app-photo-card
+                  [photo]="photo"
+                  [config]="store.config()"
+                  [isSelected]="selectedPaths().has(photo.path)"
+                  [hideDetails]="effectiveHideDetails()"
+                  [currentSort]="store.filters().sort"
+                  [thumbSize]="thumbSize()"
+                  [isEditionMode]="auth.isEdition()"
+                  [hoverStar]="hoverStars()[photo.path]"
+                  [personFilterId]="store.filters().person_id"
+                  (selectionChange)="toggleSelection($event)"
+                  (tooltipShow)="showTooltip($event.event, $event.photo)"
+                  (tooltipHide)="hideTooltip(); clearHoverStar(photo.path)"
+                  (tagClicked)="store.updateFilter('tag', $event)"
+                  (personFilterClicked)="filterByPerson($event)"
+                  (personRemoveClicked)="removePerson($event.photo, $event.personId)"
+                  (openSimilarClicked)="openSimilar($event)"
+                  (openAddPersonClicked)="openAddPerson($event)"
+                  (favoriteToggled)="store.toggleFavorite($event)"
+                  (rejectedToggled)="store.toggleRejected($event)"
+                  (starHoverChanged)="$event.star !== null ? setHoverStar($event.path, $event.star) : clearHoverStar($event.path)"
+                  (starClicked)="onStarClick($event.photo, $event.star)"
+                />
+              }
+            </div>
+          } @else {
+            <div #mosaicContainer class="flex flex-col gap-2 p-2 md:p-4">
+              @for (row of mosaicRows(); track $index) {
+                <div class="flex gap-2">
+                  @for (photo of row.photos; track photo.path; let i = $index) {
+                    <app-photo-card
+                      [photo]="photo"
+                      [style.width.px]="row.widths[i]"
+                      [style.height.px]="row.height"
+                      [hideDetails]="true"
+                      [mosaicMode]="true"
+                      [config]="store.config()"
+                      [isSelected]="selectedPaths().has(photo.path)"
+                      [currentSort]="store.filters().sort"
+                      [thumbSize]="thumbSize()"
+                      [isEditionMode]="auth.isEdition()"
+                      [hoverStar]="hoverStars()[photo.path]"
+                      [personFilterId]="store.filters().person_id"
+                      (selectionChange)="toggleSelection($event)"
+                      (tooltipShow)="showTooltip($event.event, $event.photo)"
+                      (tooltipHide)="hideTooltip(); clearHoverStar(photo.path)"
+                      (tagClicked)="store.updateFilter('tag', $event)"
+                      (personFilterClicked)="filterByPerson($event)"
+                      (personRemoveClicked)="removePerson($event.photo, $event.personId)"
+                      (openSimilarClicked)="openSimilar($event)"
+                      (openAddPersonClicked)="openAddPerson($event)"
+                      (favoriteToggled)="store.toggleFavorite($event)"
+                      (rejectedToggled)="store.toggleRejected($event)"
+                      (starHoverChanged)="$event.star !== null ? setHoverStar($event.path, $event.star) : clearHoverStar($event.path)"
+                      (starClicked)="onStarClick($event.photo, $event.star)"
+                    />
+                  }
+                </div>
+              }
+            </div>
+          }
         }
 
         <!-- Loading spinner -->
@@ -123,8 +160,8 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
       />
     }
 
-    <!-- Photo details tooltip (single instance, repositioned on hover, hidden on touch devices) -->
-    @if (!isTouchDevice()) {
+    <!-- Photo details tooltip (single instance, repositioned on hover, hidden on small/touch devices) -->
+    @if (!isTouchDevice() && isDesktop()) {
       <app-photo-tooltip
         [photo]="tooltipPhoto()"
         [x]="tooltipX()"
@@ -165,6 +202,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   private dialog = inject(MatDialog);
 
   private observer: IntersectionObserver | null = null;
+  private resizeObserver: ResizeObserver | null = null;
   readonly scrollSentinel = viewChild<ElementRef<HTMLDivElement>>('scrollSentinel');
   private readonly filterDrawer = viewChild<MatSidenav>('filterDrawer');
 
@@ -184,25 +222,93 @@ export class GalleryComponent implements OnInit, OnDestroy {
   /** True when the device has no hover capability (touch device) */
   readonly isTouchDevice = signal(false);
 
-  /** Thumbnail request size derived from config (2x for retina, capped at 640). Returns 640 on mobile (full-width cards). */
+  /** Thumbnail request size derived from card width (2x for retina, capped at 640). Returns 640 on mobile (full-width cards). */
   readonly thumbSize = computed(() => {
     if (this.isTouchDevice()) return 640;
-    const imgWidth = this.store.config()?.display?.image_width_px ?? 160;
-    return Math.min(imgWidth * 2, 640);
+    return Math.min(this.store.cardWidth() * 2, 640);
   });
 
-  /** Card min-width from config for the responsive grid */
-  readonly cardWidth = computed(() => {
-    return this.store.config()?.display?.card_width_px ?? 168;
+  /** Card min-width from store for the responsive grid */
+  readonly cardWidth = computed(() => this.store.cardWidth() || 168);
+
+  /** Whether the viewport is md+ (768px) — mosaic is only available on desktop */
+  readonly isDesktop = signal(false);
+
+  /** Effective gallery mode: force grid on small viewports */
+  readonly effectiveGalleryMode = computed(() =>
+    this.isDesktop() ? this.store.galleryMode() : 'grid',
+  );
+
+  /** On mobile, always show details regardless of the hide_details preference */
+  readonly effectiveHideDetails = computed(() =>
+    this.isDesktop() ? this.store.filters().hide_details : false,
+  );
+
+  /** Container width for mosaic layout (updated via ResizeObserver) */
+  readonly containerWidth = signal(0);
+
+  /** Mosaic row layout: justified rows of photos preserving aspect ratios */
+  readonly mosaicRows = computed(() => {
+    const photos = this.store.photos();
+    const width = this.containerWidth();
+    const targetHeight = this.store.cardWidth() || 168;
+    const gap = 8;
+
+    if (!photos.length || width <= 0) return [];
+
+    const rows: { photos: Photo[]; widths: number[]; height: number }[] = [];
+    let rowPhotos: Photo[] = [];
+    let rowAspects: number[] = [];
+
+    for (const photo of photos) {
+      const aspect = (photo.image_width && photo.image_height)
+        ? photo.image_width / photo.image_height
+        : 4 / 3;
+      rowPhotos.push(photo);
+      rowAspects.push(aspect);
+
+      const totalAspect = rowAspects.reduce((a, b) => a + b, 0);
+      const availableWidth = width - (rowPhotos.length - 1) * gap;
+      const rowHeight = availableWidth / totalAspect;
+
+      if (rowHeight <= targetHeight) {
+        // Finalize this row
+        const widths = rowAspects.map(a => Math.floor(a * rowHeight));
+        // Distribute rounding remainder to last photo
+        const usedWidth = widths.reduce((a, b) => a + b, 0) + (widths.length - 1) * gap;
+        widths[widths.length - 1] += width - usedWidth;
+        rows.push({ photos: [...rowPhotos], widths, height: Math.floor(rowHeight) });
+        rowPhotos = [];
+        rowAspects = [];
+      }
+    }
+
+    // Last incomplete row: use target height, left-aligned
+    if (rowPhotos.length) {
+      const widths = rowAspects.map(a => Math.floor(a * targetHeight));
+      rows.push({ photos: [...rowPhotos], widths, height: targetHeight });
+    }
+
+    return rows;
   });
 
   private isBrowser = false;
+  private desktopMql: MediaQueryList | null = null;
+  private desktopMqlHandler: ((e: MediaQueryListEvent) => void) | null = null;
 
   constructor() {
     afterNextRender(() => {
       this.isBrowser = true;
       this.isTouchDevice.set(window.matchMedia('(hover: none)').matches);
+
+      const mql = window.matchMedia('(min-width: 768px)');
+      this.isDesktop.set(mql.matches);
+      this.desktopMql = mql;
+      this.desktopMqlHandler = (e: MediaQueryListEvent) => this.isDesktop.set(e.matches);
+      mql.addEventListener('change', this.desktopMqlHandler);
+
       this.setupIntersectionObserver();
+      this.setupResizeObserver();
     });
 
     // Sync store.filterDrawerOpen signal → mat-sidenav
@@ -214,9 +320,11 @@ export class GalleryComponent implements OnInit, OnDestroy {
       else drawer.close();
     });
 
-    // Re-check sentinel whenever photos change (filter change, page load, etc.)
+    // Re-check sentinel whenever photos, card width, or gallery mode change
     effect(() => {
       this.store.photos(); // track dependency
+      this.store.cardWidth(); // track dependency
+      this.store.galleryMode(); // track dependency
       this.recheckSentinel();
     });
   }
@@ -230,6 +338,10 @@ export class GalleryComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.observer?.disconnect();
+    this.resizeObserver?.disconnect();
+    if (this.desktopMql && this.desktopMqlHandler) {
+      this.desktopMql.removeEventListener('change', this.desktopMqlHandler);
+    }
   }
 
   /** Save/restore sidebar scroll position on drawer open/close */
@@ -420,6 +532,21 @@ export class GalleryComponent implements OnInit, OnDestroy {
 
   filterByPerson(personId: number): void {
     this.store.updateFilter('person_id', String(personId));
+  }
+
+  private setupResizeObserver(): void {
+    this.resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const padding = 32; // p-4 on each side at md+
+        this.containerWidth.set(Math.floor(entry.contentRect.width) - padding);
+      }
+    });
+
+    // Observe the sidenav-content area for width changes
+    const content = document.querySelector('mat-sidenav-content');
+    if (content) {
+      this.resizeObserver.observe(content);
+    }
   }
 
   private setupIntersectionObserver(): void {

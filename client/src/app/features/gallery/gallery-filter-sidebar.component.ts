@@ -227,10 +227,12 @@ function saveActiveFilterIds(ids: Set<string>): void {
           <mat-icon class="!text-xl transition-transform group-open/section:rotate-180">expand_more</mat-icon>
         </summary>
         <div class="flex flex-col gap-2 pb-2">
-          <mat-checkbox
-            [checked]="store.filters().hide_details"
-            (change)="store.updateFilter('hide_details', $event.checked)"
-          >{{ 'gallery.hide_details' | translate }}</mat-checkbox>
+          @if (store.galleryMode() === 'grid') {
+            <mat-checkbox
+              [checked]="store.filters().hide_details"
+              (change)="store.updateFilter('hide_details', $event.checked)"
+            >{{ 'gallery.hide_details' | translate }}</mat-checkbox>
+          }
           <mat-checkbox
             [checked]="store.filters().hide_blinks"
             (change)="store.updateFilter('hide_blinks', $event.checked)"
@@ -255,6 +257,32 @@ function saveActiveFilterIds(ids: Set<string>): void {
             [checked]="store.filters().is_monochrome"
             (change)="store.updateFilter('is_monochrome', $event.checked)"
           >{{ 'gallery.monochrome_only' | translate }}</mat-checkbox>
+          <div class="hidden md:flex items-center gap-2 mt-2">
+            <label class="text-sm opacity-70 shrink-0">{{ 'gallery.layout_mode' | translate }}</label>
+            <div class="flex gap-1 ml-auto">
+              <button mat-icon-button class="!w-8 !h-8 !p-0 inline-flex items-center justify-center"
+                [class.!bg-[var(--mat-sys-primary-container)]]="store.galleryMode() === 'grid'"
+                [matTooltip]="'gallery.layout_grid' | translate"
+                (click)="store.setGalleryMode('grid')">
+                <mat-icon class="!text-lg !w-5 !h-5 !leading-5">grid_view</mat-icon>
+              </button>
+              <button mat-icon-button class="!w-8 !h-8 !p-0 inline-flex items-center justify-center"
+                [class.!bg-[var(--mat-sys-primary-container)]]="store.galleryMode() === 'mosaic'"
+                [matTooltip]="'gallery.layout_mosaic' | translate"
+                (click)="store.setGalleryMode('mosaic')">
+                <mat-icon class="!text-lg !w-5 !h-5 !leading-5">auto_awesome_mosaic</mat-icon>
+              </button>
+            </div>
+          </div>
+          @if (sliderConfig(); as sc) {
+            <div class="hidden md:flex items-center gap-2 mt-2">
+              <label class="text-sm opacity-70 shrink-0">{{ 'gallery.thumbnail_size' | translate }}</label>
+              <mat-slider [min]="sc.min_px" [max]="sc.max_px" [step]="sc.step_px" class="flex-1">
+                <input matSliderThumb [value]="store.cardWidth()" (valueChange)="store.setCardWidth($event)" />
+              </mat-slider>
+              <span class="text-xs opacity-60 w-10 text-right">{{ store.cardWidth() }}px</span>
+            </div>
+          }
         </div>
       </details>
 
@@ -306,6 +334,8 @@ export class GalleryFilterSidebarComponent implements OnInit {
 
   readonly activeAdditionalFilters = signal<Set<string>>(new Set());
   readonly sectionStates = signal<Record<string, boolean>>(loadSectionStates());
+
+  readonly sliderConfig = computed(() => this.store.config()?.display?.thumbnail_slider ?? null);
 
   readonly activeFilterDefs = computed(() => {
     const activeIds = this.activeAdditionalFilters();
