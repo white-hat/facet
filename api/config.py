@@ -12,6 +12,7 @@ import secrets
 
 # --- CONFIG & SHARE SECRET (single parse of scoring_config.json) ---
 _CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'scoring_config.json')
+FACET_SCRIPT = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'facet.py')
 
 
 def _load_and_ensure_share_secret():

@@ -15,7 +15,8 @@ from api.db_helpers import (
     get_art_tags_from_config, HIDE_BLINKS_SQL, HIDE_BURSTS_SQL, HIDE_DUPLICATES_SQL,
     PHOTO_BASE_COLS, PHOTO_OPTIONAL_COLS,
     split_photo_tags, attach_person_data,
-    get_visibility_clause, get_photos_from_clause, get_preference_columns
+    get_visibility_clause, get_photos_from_clause, get_preference_columns,
+    format_date,
 )
 from api.top_picks import get_top_picks_score_sql, get_top_picks_threshold
 from api.types import (
@@ -23,23 +24,6 @@ from api.types import (
 )
 
 router = APIRouter(tags=["gallery"])
-
-
-def _format_date(date_str):
-    """Format EXIF date string to DD/MM/YYYY HH:MM."""
-    if not date_str or not isinstance(date_str, str):
-        return ''
-    try:
-        parts = date_str.split(' ')
-        date_part = parts[0].replace(':', '/')
-        # Rearrange from YYYY/MM/DD to DD/MM/YYYY
-        date_components = date_part.split('/')
-        if len(date_components) == 3:
-            date_part = f"{date_components[2]}/{date_components[1]}/{date_components[0]}"
-        time_part = parts[1][:5] if len(parts) > 1 else ''
-        return f"{date_part} {time_part}".strip()
-    except (IndexError, AttributeError):
-        return str(date_str)
 
 
 def _build_gallery_where(params, conn=None, user_id=None):
@@ -391,7 +375,7 @@ async def api_photos(
         photos = split_photo_tags(rows, tags_limit)
 
         for photo in photos:
-            photo['date_formatted'] = _format_date(photo.get('date_taken'))
+            photo['date_formatted'] = format_date(photo.get('date_taken'))
 
         attach_person_data(photos, conn)
 
@@ -468,17 +452,13 @@ def _find_similar_visual(conn, source, photo_path, min_similarity, vis_sql, vis_
     """Find visually similar photos using pHash hamming distance (primary) + CLIP cosine (secondary)."""
     import numpy as np
     from utils.duplicate import _POPCOUNT_TABLE
+    from utils.embedding import bytes_to_normalized_embedding
     PHASH_W = 0.7
     CLIP_W = 0.3
 
     source_phash = np.uint64(int(source['phash'], 16)) if source.get('phash') else None
 
-    source_embedding = None
-    if source.get('clip_embedding'):
-        e = np.frombuffer(source['clip_embedding'], dtype=np.float32).copy()
-        norm = np.linalg.norm(e)
-        if norm > 0:
-            source_embedding = e / norm
+    source_embedding = bytes_to_normalized_embedding(source.get('clip_embedding'))
 
     if source_phash is None and source_embedding is None:
         return [], None
@@ -502,11 +482,10 @@ def _find_similar_visual(conn, source, photo_path, min_similarity, vis_sql, vis_
             return [], None
         results = []
         for r in rows:
-            e = np.frombuffer(r['clip_embedding'], dtype=np.float32).copy()
-            n = np.linalg.norm(e)
-            if n == 0:
+            e = bytes_to_normalized_embedding(r['clip_embedding'])
+            if e is None:
                 continue
-            sim = max(0.0, float(np.dot(source_embedding, e / n)))
+            sim = max(0.0, float(np.dot(source_embedding, e)))
             if sim >= min_similarity:
                 results.append(_similar_result(r, sim))
         results.sort(key=lambda x: x['similarity'], reverse=True)
@@ -539,10 +518,9 @@ def _find_similar_visual(conn, source, photo_path, min_similarity, vis_sql, vis_
                 chunk,
             ).fetchall()
             for cr in clip_rows:
-                e = np.frombuffer(cr['clip_embedding'], dtype=np.float32).copy()
-                n = np.linalg.norm(e)
-                if n > 0:
-                    clip_by_path[cr['path']] = e / n
+                e = bytes_to_normalized_embedding(cr['clip_embedding'])
+                if e is not None:
+                    clip_by_path[cr['path']] = e
 
     results = []
     for i in candidate_indices:
@@ -623,6 +601,7 @@ def _find_similar_color(conn, source, photo_path, min_similarity, vis_sql, vis_p
 def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_params):
     """Find photos containing the same person(s) via person_id or face embedding cosine."""
     import numpy as np
+    from utils.embedding import bytes_to_normalized_embedding
 
     # Get faces for source photo
     faces = conn.execute(
@@ -654,11 +633,9 @@ def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_
     # Slow path: cosine similarity on face embeddings
     src_embeddings = []
     for f in faces:
-        if f['embedding']:
-            e = np.frombuffer(f['embedding'], dtype=np.float32).copy()
-            n = np.linalg.norm(e)
-            if n > 0:
-                src_embeddings.append(e / n)
+        e = bytes_to_normalized_embedding(f['embedding'])
+        if e is not None:
+            src_embeddings.append(e)
 
     if not src_embeddings:
         return [], 'no_faces'
@@ -675,11 +652,9 @@ def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_
     photo_sims: dict = {}
     for r in all_faces:
         r = dict(r)
-        e = np.frombuffer(r['embedding'], dtype=np.float32).copy()
-        n = np.linalg.norm(e)
-        if n == 0:
+        cand_emb = bytes_to_normalized_embedding(r['embedding'])
+        if cand_emb is None:
             continue
-        cand_emb = e / n
         best = max(float(np.dot(src_e, cand_emb)) for src_e in src_embeddings)
         best = max(0.0, best)
         path = r['path']

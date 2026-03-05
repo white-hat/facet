@@ -44,3 +44,19 @@ def bytes_to_embedding(data, dim=None):
         return None
 
     return embedding
+
+
+def bytes_to_normalized_embedding(data, dim=None):
+    """Convert bytes to a unit-normalized numpy embedding array.
+
+    Returns:
+        numpy.ndarray: L2-normalized float32 embedding, or None if invalid/zero-norm
+    """
+    embedding = bytes_to_embedding(data, dim)
+    if embedding is None:
+        return None
+    embedding = embedding.copy()
+    norm = np.linalg.norm(embedding)
+    if norm < 1e-10:
+        return None
+    return embedding / norm

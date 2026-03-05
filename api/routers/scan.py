@@ -3,7 +3,6 @@ Scan router — trigger and monitor photo scanning.
 
 """
 
-import os
 import subprocess
 import sys
 import threading
@@ -14,11 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from api.auth import CurrentUser, require_superadmin
-from api.config import VIEWER_CONFIG, get_all_scan_directories, get_user_directories
+from api.config import VIEWER_CONFIG, FACET_SCRIPT, get_all_scan_directories, get_user_directories
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
-
-_FACET_SCRIPT = os.path.join(os.path.dirname(__file__), '..', '..', 'facet.py')
 
 # Global scan state (only one scan at a time)
 _scan_lock = threading.Lock()
@@ -78,7 +75,7 @@ async def start_scan(
 
         # Rebuild from canonical server-side list so subprocess args are provably server-origin
         validated_dirs = [d for d in get_all_scan_directories() if d in set(directories)]
-        cmd = [sys.executable, _FACET_SCRIPT] + validated_dirs
+        cmd = [sys.executable, FACET_SCRIPT] + validated_dirs
 
         proc = subprocess.Popen(
             cmd,

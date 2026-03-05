@@ -8,35 +8,10 @@ import os
 import json
 import hashlib
 
-# Valid filter fields for v4.0 category-centric config
-VALID_NUMERIC_FILTERS = [
-    "face_ratio_min", "face_ratio_max",
-    "face_count_min", "face_count_max",
-    "iso_min", "iso_max",
-    "shutter_speed_min", "shutter_speed_max",
-    "luminance_min", "luminance_max",
-    "focal_length_min", "focal_length_max",
-    "f_stop_min", "f_stop_max",
-]
-
-VALID_BOOLEAN_FILTERS = [
-    "has_face", "is_monochrome", "is_silhouette", "is_group_portrait"
-]
-
-VALID_TAG_FILTERS = [
-    "required_tags", "excluded_tags", "tag_match_mode"
-]
-
-# All valid weight column names (without _percent suffix)
-VALID_WEIGHT_COLUMNS = [
-    "aesthetic", "face_quality", "eye_sharpness", "tech_sharpness",
-    "exposure", "composition", "color", "quality", "contrast",
-    "dynamic_range", "isolation", "leading_lines",
-    # Supplementary PyIQA metrics
-    "aesthetic_iaa", "face_quality_iqa", "liqe",
-    # Subject saliency metrics (InSPyReNet)
-    "subject_sharpness", "subject_prominence", "subject_placement", "bg_separation",
-]
+from config.category_filter import (
+    VALID_NUMERIC_FILTERS, VALID_BOOLEAN_FILTERS, VALID_TAG_FILTERS,
+    VALID_WEIGHT_COLUMNS,
+)
 
 # Tolerance for weight normalization - weights within this range of 100% are not auto-normalized
 # This preserves targeted changes from recommendations

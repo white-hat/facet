@@ -14,6 +14,24 @@ from api.config import (
 )
 from api.database import get_db_connection
 
+# --- DATE FORMATTING ---
+
+def format_date(date_str):
+    """Format EXIF date string (YYYY:MM:DD HH:MM:SS) to DD/MM/YYYY HH:MM."""
+    if not date_str or not isinstance(date_str, str):
+        return ''
+    try:
+        parts = date_str.split(' ')
+        date_part = parts[0].replace(':', '/')
+        date_components = date_part.split('/')
+        if len(date_components) == 3:
+            date_part = f"{date_components[2]}/{date_components[1]}/{date_components[0]}"
+        time_part = parts[1][:5] if len(parts) > 1 else ''
+        return f"{date_part} {time_part}".strip()
+    except (IndexError, AttributeError):
+        return str(date_str)
+
+
 # --- SQL FRAGMENT CONSTANTS ---
 HIDE_BLINKS_SQL = "(is_blink = 0 OR is_blink IS NULL)"
 HIDE_BURSTS_SQL = "(is_burst_lead = 1 OR is_burst_lead IS NULL)"

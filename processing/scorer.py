@@ -471,16 +471,9 @@ class Facet:
 
                 # Try to load SAMP-Net for composition (8GB profile)
                 samp_config = self.config.get_samp_net_config()
-                print(f"[SAMP-Net Debug] Config check: is_using_samp_net={self.config.is_using_samp_net()}")
-                print(f"[SAMP-Net Debug] Model path: {samp_config.get('model_path', 'NOT SET')}")
                 if self.config.is_using_samp_net():
                     try:
-                        import os
                         model_path = samp_config['model_path']
-                        if os.path.exists(model_path):
-                            print(f"[SAMP-Net Debug] Weights file exists: {os.path.getsize(model_path)} bytes")
-                        else:
-                            print(f"[SAMP-Net Debug] WARNING: Weights file NOT FOUND at {model_path}")
                         _load_samp_net_module()
                         self.samp_scorer = SAMPNetScorer(
                             model_path=model_path,
@@ -488,16 +481,11 @@ class Facet:
                         )
                         # Eagerly load U2-Net-P saliency model to avoid loading during batch workers
                         self.samp_scorer.ensure_loaded()
-                        print(f"[SAMP-Net Debug] Scorer initialized successfully on device: {self.device}")
                         print("SAMP-Net composition scorer initialized")
                     except Exception as e:
-                        import traceback
-                        print(f"[SAMP-Net Debug] FAILED to initialize: {e}")
-                        print(f"[SAMP-Net Debug] Traceback:\n{traceback.format_exc()}")
                         print(f"SAMP-Net not available: {e}")
                         self.samp_scorer = None
                 else:
-                    print("[SAMP-Net Debug] Skipped - not configured in current VRAM profile")
                     self.samp_scorer = None
             else:
                 self.vlm_composition = None

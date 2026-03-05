@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from api.auth import CurrentUser, get_optional_user, require_edition
 from api.config import (
-    VIEWER_CONFIG, _FULL_CONFIG, _CONFIG_PATH,
+    VIEWER_CONFIG, _FULL_CONFIG, _CONFIG_PATH, FACET_SCRIPT,
     get_comparison_mode_settings, map_disk_path,
     reload_config, _stats_cache, get_all_scan_directories,
 )
@@ -27,8 +27,6 @@ from api.database import get_db_connection
 from api.db_helpers import get_visibility_clause
 from api.types import TYPE_TO_CATEGORY
 from db import DEFAULT_DB_PATH
-
-_FACET_SCRIPT = os.path.join(os.path.dirname(__file__), '..', '..', 'facet.py')
 
 router = APIRouter(tags=["comparison"])
 
@@ -272,7 +270,7 @@ async def api_recalculate(
         config_path = str(_CONFIG_PATH)
 
         result = subprocess.run(
-            [sys.executable, _FACET_SCRIPT, '--recompute-average', '--config', config_path],
+            [sys.executable, FACET_SCRIPT, '--recompute-average', '--config', config_path],
             capture_output=True,
             text=True,
             timeout=300,
@@ -358,7 +356,7 @@ async def api_update_weights(
         if body.recalculate:
             try:
                 recalc_result = subprocess.run(
-                    [sys.executable, _FACET_SCRIPT, '--recompute-category', body.category,
+                    [sys.executable, FACET_SCRIPT, '--recompute-category', body.category,
                      '--config', config_path],
                     capture_output=True,
                     text=True,

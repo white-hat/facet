@@ -13,7 +13,7 @@ from api.auth import CurrentUser, require_edition, require_authenticated, get_op
 from api.config import VIEWER_CONFIG
 from api.database import get_db_connection
 from api.db_helpers import (
-    get_existing_columns, split_photo_tags,
+    get_existing_columns, split_photo_tags, format_date,
     PHOTO_BASE_COLS, PHOTO_OPTIONAL_COLS,
     HIDE_BLINKS_SQL, HIDE_BURSTS_SQL, get_visibility_clause,
 )
@@ -46,19 +46,6 @@ class DeleteBatchRequest(BaseModel):
 
 
 # --- Helpers ---
-
-def _format_date(date_str):
-    """Format EXIF date string to DD/MM/YYYY HH:MM."""
-    if not date_str or not isinstance(date_str, str):
-        return ""
-    try:
-        parts = date_str[:19].split(" ")
-        date_parts = parts[0].split(":")
-        time_parts = parts[1].split(":") if len(parts) > 1 else ["00", "00"]
-        return f"{date_parts[2]}/{date_parts[1]}/{date_parts[0]} {time_parts[0]}:{time_parts[1]}"
-    except (ValueError, TypeError, IndexError):
-        return date_str.split(" ")[0].replace(":", "/")
-
 
 def _get_person_info(person_id: int):
     """Fetch person details including photo count."""
@@ -426,7 +413,7 @@ async def person_photos(
 
     # Add formatted date for client rendering
     for photo in photos:
-        photo["date_formatted"] = _format_date(photo.get("date_taken"))
+        photo["date_formatted"] = format_date(photo.get("date_taken"))
 
     return {
         "person": person_info,
