@@ -1,7 +1,7 @@
-"""InSPyReNet-based subject saliency detection for Facet.
+"""BiRefNet-based subject saliency detection for Facet.
 
-Uses the transparent-background library (InSPyReNet) to generate binary
-subject masks, then derives subject-aware quality metrics:
+Uses BiRefNet (Bilateral Reference Network) via HuggingFace transformers
+to generate binary subject masks, then derives subject-aware quality metrics:
   - subject_sharpness: Laplacian variance on subject vs background
   - subject_prominence: Subject area as fraction of total frame
   - subject_placement: Rule-of-thirds score for subject centroid
@@ -26,49 +26,65 @@ def _ensure_imports():
 
 
 class SaliencyScorer:
-    """Wrapper around InSPyReNet for subject saliency detection."""
+    """Wrapper around BiRefNet for subject saliency detection."""
 
-    def __init__(self, device: Optional[str] = None):
+    DEFAULT_MODEL = 'ZhengPeng7/BiRefNet'
+    DEFAULT_RESOLUTION = 1024
+
+    def __init__(self, device: Optional[str] = None, model_name: Optional[str] = None,
+                 resolution: Optional[int] = None):
         """Initialize saliency scorer.
 
         Args:
             device: Device to use ('cuda', 'cpu', or None for auto)
+            model_name: HuggingFace model ID (default: ZhengPeng7/BiRefNet)
+            resolution: Input resolution for BiRefNet (default: 1024)
         """
         _ensure_imports()
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
-        self.remover = None
+        self.model_name = model_name or self.DEFAULT_MODEL
+        self.resolution = resolution or self.DEFAULT_RESOLUTION
+        self.model = None
+        self.transform = None
         self._loaded = False
 
     def load(self):
-        """Load InSPyReNet model."""
+        """Load BiRefNet model."""
         if self._loaded:
             return
 
-        try:
-            from transparent_background import Remover
-            self.remover = Remover(mode='base', device=self.device)
-            self._loaded = True
-            print(f"InSPyReNet saliency model loaded on {self.device}")
-        except ImportError:
-            raise ImportError(
-                "transparent-background is required for saliency detection. "
-                "Install with: pip install transparent-background"
-            )
+        from transformers import AutoModelForImageSegmentation
+        import torchvision.transforms as T
+
+        self.model = AutoModelForImageSegmentation.from_pretrained(
+            self.model_name, trust_remote_code=True
+        )
+        self.model.to(self.device).eval()
+
+        self.transform = T.Compose([
+            T.Resize((self.resolution, self.resolution)),
+            T.ToTensor(),
+            T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        ])
+
+        self._loaded = True
+        print(f"BiRefNet saliency model loaded on {self.device}: {self.model_name}")
 
     def unload(self):
         """Unload model to free VRAM."""
         if not self._loaded:
             return
 
-        if self.remover is not None:
-            del self.remover
-            self.remover = None
+        if self.model is not None:
+            del self.model
+            self.model = None
+        self.transform = None
 
         self._loaded = False
         _ensure_imports()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        print("  InSPyReNet unloaded")
+        print("  BiRefNet unloaded")
 
     def get_saliency_mask(self, pil_img):
         """Generate binary saliency mask from PIL image.
@@ -79,19 +95,44 @@ class SaliencyScorer:
         Returns:
             numpy.ndarray: Binary mask (H, W) with values 0 or 255
         """
+        return self.get_saliency_masks([pil_img])[0]
+
+    def get_saliency_masks(self, pil_images, batch_size=8):
+        """Generate binary saliency masks for a batch of PIL images.
+
+        Args:
+            pil_images: List of PIL Images (RGB)
+            batch_size: Max images per GPU forward pass
+
+        Returns:
+            List of numpy.ndarray: Binary masks (H, W) with values 0 or 255
+        """
         if not self._loaded:
             self.load()
 
-        # transparent-background returns RGBA image with alpha as mask
-        result = self.remover.process(pil_img, type='map')
-        # result is a PIL Image in grayscale (saliency map)
-        mask = np.array(result)
-        if mask.ndim == 3:
-            mask = mask[:, :, 0]  # Take first channel if RGB
+        orig_sizes = [(img.size[0], img.size[1]) for img in pil_images]
+        results = []
 
-        # Binarize at 128 threshold
-        binary_mask = (mask > 128).astype(np.uint8) * 255
-        return binary_mask
+        for start in range(0, len(pil_images), batch_size):
+            chunk = pil_images[start:start + batch_size]
+            batch_tensor = torch.stack([self.transform(img) for img in chunk]).to(self.device)
+
+            with torch.no_grad():
+                preds = self.model(batch_tensor)[-1].sigmoid()
+
+            for i, pred in enumerate(preds):
+                idx = start + i
+                orig_w, orig_h = orig_sizes[idx]
+                mask = pred.squeeze().cpu().numpy()
+                binary_mask = (mask > 0.5).astype(np.uint8) * 255
+
+                if binary_mask.shape[0] != orig_h or binary_mask.shape[1] != orig_w:
+                    binary_mask = cv2.resize(binary_mask, (orig_w, orig_h), interpolation=cv2.INTER_LINEAR)
+                    binary_mask = (binary_mask > 128).astype(np.uint8) * 255
+
+                results.append(binary_mask)
+
+        return results
 
     def score_image(self, pil_img, img_cv):
         """Compute all saliency-derived metrics for an image.
@@ -104,9 +145,22 @@ class SaliencyScorer:
             dict with keys: subject_sharpness, subject_prominence,
                           subject_placement, bg_separation
         """
+        mask = self.get_saliency_mask(pil_img)
+        return self._score_from_mask(mask, img_cv)
+
+    def _score_from_mask(self, mask, img_cv):
+        """Compute saliency metrics from a pre-computed binary mask.
+
+        Args:
+            mask: Binary mask (H, W) with values 0 or 255
+            img_cv: OpenCV BGR image array
+
+        Returns:
+            dict with keys: subject_sharpness, subject_prominence,
+                          subject_placement, bg_separation
+        """
         _ensure_imports()
 
-        mask = self.get_saliency_mask(pil_img)
         h, w = mask.shape[:2]
         total_pixels = h * w
 
@@ -154,8 +208,8 @@ class SaliencyScorer:
         # Higher ratio = better bokeh/subject isolation
         if bg_variance > 0:
             separation_ratio = subject_variance / (bg_variance + 1e-6)
-            # Multiplier 2.0: ratio >= 5× subject/bg sharpness → score 10.0.
-            # Portraits with shallow DoF typically reach 3-8× ratio; landscapes 0.5-2×.
+            # Multiplier 2.0: ratio >= 5x subject/bg sharpness -> score 10.0.
+            # Portraits with shallow DoF typically reach 3-8x ratio; landscapes 0.5-2x.
             # Adjust multiplier here if scores cluster at the ceiling after calibration runs.
             bg_separation = min(10.0, separation_ratio * 2.0)
         else:
@@ -212,7 +266,7 @@ class SaliencyScorer:
         return score
 
     def score_batch(self, pil_images, cv_images):
-        """Score a batch of images.
+        """Score a batch of images using batched GPU inference.
 
         Args:
             pil_images: List of PIL Images
@@ -224,19 +278,28 @@ class SaliencyScorer:
         if not self._loaded:
             self.load()
 
+        default_scores = {
+            'subject_sharpness': 5.0,
+            'subject_prominence': 0.0,
+            'subject_placement': 5.0,
+            'bg_separation': 5.0,
+        }
+
+        # Batch mask generation (single GPU forward pass per sub-batch)
+        try:
+            masks = self.get_saliency_masks(pil_images)
+        except Exception as e:
+            print(f"  Warning: Batch saliency mask generation failed: {e}")
+            return [dict(default_scores) for _ in pil_images]
+
         results = []
-        for pil_img, img_cv in zip(pil_images, cv_images):
+        for mask, img_cv in zip(masks, cv_images):
             try:
-                result = self.score_image(pil_img, img_cv)
+                result = self._score_from_mask(mask, img_cv)
                 results.append(result)
             except Exception as e:
                 print(f"  Warning: Saliency scoring failed: {e}")
-                results.append({
-                    'subject_sharpness': 5.0,
-                    'subject_prominence': 0.0,
-                    'subject_placement': 5.0,
-                    'bg_separation': 5.0,
-                })
+                results.append(dict(default_scores))
 
         return results
 

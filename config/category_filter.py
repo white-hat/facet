@@ -31,7 +31,7 @@ VALID_WEIGHT_COLUMNS = [
     "dynamic_range", "isolation", "leading_lines",
     # Supplementary PyIQA metrics
     "aesthetic_iaa", "face_quality_iqa", "liqe",
-    # Subject saliency metrics (InSPyReNet)
+    # Subject saliency metrics (BiRefNet)
     "subject_sharpness", "subject_prominence", "subject_placement", "bg_separation",
 ]
 

@@ -445,6 +445,10 @@ class Facet:
             # Check if we should use advanced models (non-legacy profile)
             self.use_advanced_models = not self.model_manager.is_legacy_mode()
 
+            # Default CLIP config (updated below if not multi_pass)
+            self._clip_model_name = 'ViT-L-14'
+            self._clip_backend = 'open_clip'
+
             if multi_pass:
                 # Multi-pass mode: skip heavy GPU models, they'll be loaded per-pass
                 print(f"Multi-pass mode: skipping eager GPU model loading (profile: {self.model_manager.profile})")
@@ -495,17 +499,29 @@ class Facet:
                 # Load CLIP/SigLIP model from config (profile selects model variant)
                 clip_config = self.config.get_clip_config()
                 self._clip_model_name = clip_config.get('model_name', 'ViT-L-14')
-                clip_pretrained = clip_config.get('pretrained', 'laion2b_s32b_b82k')
+                self._clip_backend = clip_config.get('backend', 'open_clip')
 
-                self.model, _, self.preprocess = open_clip.create_model_and_transforms(
-                    self._clip_model_name, pretrained=clip_pretrained
-                )
-                self.model = self.model.to(self.device).eval()
+                if self._clip_backend == 'transformers':
+                    from transformers import AutoModel, AutoProcessor
+                    self.model = AutoModel.from_pretrained(
+                        self._clip_model_name, trust_remote_code=True
+                    )
+                    self.model = self.model.to(self.device).eval()
+                    self.preprocess = AutoProcessor.from_pretrained(
+                        self._clip_model_name, trust_remote_code=True
+                    )
+                    print(f"SigLIP 2 NaFlex loaded: {self._clip_model_name}")
+                else:
+                    clip_pretrained = clip_config.get('pretrained', 'laion2b_s32b_b82k')
+                    self.model, _, self.preprocess = open_clip.create_model_and_transforms(
+                        self._clip_model_name, pretrained=clip_pretrained
+                    )
+                    self.model = self.model.to(self.device).eval()
 
-                # Enable FP16 mode on CUDA for ~20% faster inference and ~2GB VRAM savings
-                if self.device == 'cuda':
-                    self.model = self.model.half()
-                    print(f"CLIP model converted to FP16: {self._clip_model_name}")
+                    # Enable FP16 mode on CUDA for ~20% faster inference and ~2GB VRAM savings
+                    if self.device == 'cuda':
+                        self.model = self.model.half()
+                        print(f"CLIP model converted to FP16: {self._clip_model_name}")
 
             self._load_aesthetic_head()
 
@@ -543,7 +559,8 @@ class Facet:
                     from models.tagger import CLIPTagger
                     self.tagger = CLIPTagger(
                         self.model, self.device, config=self.config,
-                        model_name=getattr(self, '_clip_model_name', 'ViT-L-14')
+                        model_name=self._clip_model_name,
+                        backend=self._clip_backend
                     )
                 else:
                     self.tagger = None
@@ -570,7 +587,7 @@ class Facet:
         TOPIQ for aesthetics instead.
         """
         # Check if current CLIP model is compatible with the MLP head (768-dim only)
-        clip_model_name = getattr(self, '_clip_model_name', 'ViT-L-14')
+        clip_model_name = self._clip_model_name
         clip_config = self.config.get_clip_config()
         embedding_dim = clip_config.get('embedding_dim', 768)
 
@@ -593,6 +610,43 @@ class Facet:
         self.aesthetic_head.load_state_dict(torch.load(weights_path, map_location=self.device), strict=False)
         self.aesthetic_head = self.aesthetic_head.to(self.device).eval()
 
+    @property
+    def uses_transformers_backend(self):
+        """Check if using transformers backend for CLIP/SigLIP."""
+        return self._clip_backend == 'transformers'
+
+    def _encode_images(self, pil_images, clip_inputs=None):
+        """Encode one or more images through the CLIP/SigLIP model.
+
+        Args:
+            pil_images: Single PIL Image or list of PIL Images
+            clip_inputs: Optional pre-processed CLIP tensors (open_clip only)
+
+        Returns:
+            Tuple of (features, features_normalized) tensors
+        """
+        if self.uses_transformers_backend:
+            imgs = pil_images if isinstance(pil_images, list) else [pil_images]
+            inputs = self.preprocess(images=imgs, return_tensors="pt", padding=True)
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            with torch.no_grad():
+                features = self.model.get_image_features(**inputs)
+                features_normalized = F.normalize(features, dim=-1)
+            return features, features_normalized
+
+        if clip_inputs is not None:
+            inputs = clip_inputs
+        elif isinstance(pil_images, list):
+            inputs = torch.stack([self.preprocess(img) for img in pil_images]).to(self.device)
+        else:
+            inputs = self.preprocess(pil_images).unsqueeze(0).to(self.device)
+        if self.device == 'cuda' and next(self.model.parameters()).dtype == torch.float16:
+            inputs = inputs.half()
+        with torch.no_grad():
+            features = self.model.encode_image(inputs)
+            features_normalized = F.normalize(features, dim=-1)
+        return features, features_normalized
+
     def get_aesthetic_score(self, image_pil):
         """Calculate aesthetic score using CLIP and the MLP aesthetic head.
 
@@ -601,37 +655,22 @@ class Facet:
         if self.aesthetic_head is None:
             return 5.0  # No MLP head — aesthetic comes from TOPIQ in multi-pass
 
-        # Preprocess once and move to device
-        image = self.preprocess(image_pil).unsqueeze(0).to(self.device)
-        # Convert to FP16 if model is in half precision
-        if self.device == 'cuda' and next(self.model.parameters()).dtype == torch.float16:
-            image = image.half()
-        with torch.no_grad():
-            features = self.model.encode_image(image)
-            # Convert to float32 for MLP head (CLIP may output float16)
-            raw_score = float(self.aesthetic_head(features.float()).cpu().numpy()[0][0])
-            aesthetic_score = max(0.0, min(10.0, (raw_score + 1) * 5))
+        features, _ = self._encode_images(image_pil)
+        raw_score = float(self.aesthetic_head(features.float()).cpu().numpy()[0][0])
+        aesthetic_score = max(0.0, min(10.0, (raw_score + 1) * 5))
         return aesthetic_score
 
     def get_aesthetic_with_embedding(self, image_pil):
         """Calculate aesthetic score and return CLIP/SigLIP embedding for storage."""
-        image = self.preprocess(image_pil).unsqueeze(0).to(self.device)
-        # Convert to FP16 if model is in half precision
-        if self.device == 'cuda' and next(self.model.parameters()).dtype == torch.float16:
-            image = image.half()
-        with torch.no_grad():
-            features = self.model.encode_image(image)
-            # Normalize features for storage
-            features_normalized = F.normalize(features, dim=-1)
+        features, features_normalized = self._encode_images(image_pil)
 
-            if self.aesthetic_head is not None:
-                # Convert to float32 for MLP head (CLIP may output float16)
-                raw_score = float(self.aesthetic_head(features.float()).cpu().numpy()[0][0])
-                aesthetic_score = max(0.0, min(10.0, (raw_score + 1) * 5))
-            else:
-                aesthetic_score = 5.0  # Aesthetic comes from TOPIQ, not CLIP MLP
+        if self.aesthetic_head is not None:
+            raw_score = float(self.aesthetic_head(features.float()).cpu().numpy()[0][0])
+            aesthetic_score = max(0.0, min(10.0, (raw_score + 1) * 5))
+        else:
+            aesthetic_score = 5.0  # Aesthetic comes from TOPIQ, not CLIP MLP
 
-            embedding_bytes = features_normalized.cpu().numpy()[0].astype(np.float32).tobytes()
+        embedding_bytes = features_normalized.cpu().numpy()[0].astype(np.float32).tobytes()
         return aesthetic_score, embedding_bytes
 
     def score_from_embedding(self, embedding_bytes):
@@ -670,32 +709,29 @@ class Facet:
 
         Args:
             pil_images: List of PIL Images
-            clip_inputs: Optional pre-processed CLIP tensors (from batch_processor)
+            clip_inputs: Optional pre-processed CLIP tensors (from batch_processor, open_clip only)
 
         Returns: List of (aesthetic, clip_embedding_bytes, quality_score, scoring_model) tuples
         """
         n = len(pil_images)
 
-        # Batch CLIP inference
-        if clip_inputs is not None:
-            inputs = clip_inputs
-        else:
-            inputs = torch.stack([self.preprocess(img) for img in pil_images]).to(self.device)
-
-        if self.device == 'cuda' and next(self.model.parameters()).dtype == torch.float16:
-            inputs = inputs.half()
+        features, features_normalized = self._encode_images(pil_images, clip_inputs)
 
         with torch.no_grad():
-            features = self.model.encode_image(inputs)
-            features_normalized = F.normalize(features, dim=-1)
-            clip_scores = self.aesthetic_head(features.float()).cpu().numpy().flatten()
             embeddings = features_normalized.cpu().numpy()
 
-        results = []
-        for i in range(n):
-            clip_aesthetic = max(0.0, min(10.0, (float(clip_scores[i]) + 1) * 5))
-            clip_embedding = embeddings[i].astype(np.float32).tobytes()
-            results.append((clip_aesthetic, clip_embedding, None, 'clip-mlp'))
+            if self.aesthetic_head is not None:
+                clip_scores = self.aesthetic_head(features.float()).cpu().numpy().flatten()
+                results = []
+                for i in range(n):
+                    clip_aesthetic = max(0.0, min(10.0, (float(clip_scores[i]) + 1) * 5))
+                    clip_embedding = embeddings[i].astype(np.float32).tobytes()
+                    results.append((clip_aesthetic, clip_embedding, None, 'clip-mlp'))
+            else:
+                results = []
+                for i in range(n):
+                    clip_embedding = embeddings[i].astype(np.float32).tobytes()
+                    results.append((5.0, clip_embedding, None, 'topiq'))
 
         return results
 

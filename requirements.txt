@@ -7,10 +7,10 @@ torch>=2.0.0
 torchvision>=0.15.0
 open-clip-torch>=2.20.0
 
-# Advanced VLM Models - only needed for 16gb/24gb VRAM profiles
-# Uncomment if using "vram_profile": "16gb" or "24gb":
-# transformers>=5.0.0              # Required for Qwen3-VL / Qwen2.5-VL taggers
-# accelerate>=0.25.0
+# HuggingFace Transformers - required for BiRefNet saliency, SigLIP 2 NaFlex embeddings,
+# and VLM taggers (Qwen3-VL / Qwen2.5-VL on 16gb/24gb profiles)
+transformers>=4.57.0
+# accelerate>=0.25.0              # Optional: needed for VLM taggers with device_map="auto"
 
 # Image Processing
 opencv-python>=4.8.0
@@ -45,8 +45,7 @@ exifread>=3.0.0
 # System Monitoring (for batch processing auto-tuning)
 psutil>=5.9.0
 
-# Subject Saliency (optional, requires GPU)
-# transparent-background>=2.0.0  # InSPyReNet saliency model
+# Subject Saliency: BiRefNet loaded via transformers (see above)
 
 # GPU Face Clustering (optional, requires conda + CUDA)
 # cuml

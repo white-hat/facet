@@ -1,7 +1,7 @@
 """
 Facet Tagger Module
 
-Uses CLIP embeddings to generate semantic tags for images based on
+Uses CLIP/SigLIP embeddings to generate semantic tags for images based on
 similarity to predefined tag vocabulary.
 """
 
@@ -12,25 +12,28 @@ from utils import bytes_to_embedding
 
 class CLIPTagger:
     """
-    Generates semantic tags for images using stored CLIP embeddings.
+    Generates semantic tags for images using stored CLIP/SigLIP embeddings.
     Compares image embeddings against precomputed text embeddings for tag vocabulary.
     Tag vocabulary is loaded from config's weights.*.tags - no hardcoded defaults.
     """
 
-    def __init__(self, clip_model=None, device='cuda', config=None, model_name=None):
+    def __init__(self, clip_model=None, device='cuda', config=None, model_name=None,
+                 backend='open_clip'):
         """
         Initialize the tagger.
 
         Args:
-            clip_model: CLIP model instance (from open_clip)
+            clip_model: CLIP/SigLIP model instance
             device: torch device ('cuda' or 'cpu')
             config: ScoringConfig instance for loading vocabulary dynamically
-            model_name: CLIP model name for tokenizer (e.g. 'ViT-L-14', 'ViT-SO400M-16-SigLIP2-384')
+            model_name: Model name for tokenizer (e.g. 'ViT-L-14', 'google/siglip2-...')
+            backend: 'open_clip' or 'transformers'
         """
         self.model = clip_model
         self.device = device
         self.config = config
         self.model_name = model_name
+        self.backend = backend
         self.text_embeddings = None
         self.tag_names = None
 
@@ -53,7 +56,6 @@ class CLIPTagger:
     def _precompute_text_embeddings(self):
         """Precompute text embeddings for all tag vocabulary."""
         import torch
-        import open_clip
 
         if self.model is None:
             return
@@ -67,13 +69,33 @@ class CLIPTagger:
                 self.tag_names.append(tag_name)
                 all_texts.append(f"a photo of {desc}")
 
-        # Tokenize and encode all text prompts
+        if self.backend == 'transformers':
+            self._precompute_text_transformers(all_texts)
+        else:
+            self._precompute_text_open_clip(all_texts)
+
+    def _precompute_text_open_clip(self, all_texts):
+        """Precompute text embeddings using open_clip."""
+        import torch
+        import open_clip
+
         tokenizer = open_clip.get_tokenizer(self.model_name or 'ViT-L-14')
         text_tokens = tokenizer(all_texts).to(self.device)
 
         with torch.no_grad():
             text_features = self.model.encode_text(text_tokens)
-            # Normalize for cosine similarity
+            self.text_embeddings = text_features / text_features.norm(dim=-1, keepdim=True)
+
+    def _precompute_text_transformers(self, all_texts):
+        """Precompute text embeddings using transformers AutoProcessor."""
+        import torch
+        from transformers import AutoTokenizer
+
+        tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        inputs = tokenizer(all_texts, padding=True, return_tensors="pt").to(self.device)
+
+        with torch.no_grad():
+            text_features = self.model.get_text_features(**inputs)
             self.text_embeddings = text_features / text_features.norm(dim=-1, keepdim=True)
 
     def get_tags_from_embedding(self, clip_embedding_bytes, threshold=0.25, max_tags=5):
@@ -81,7 +103,7 @@ class CLIPTagger:
         Get tags from a stored CLIP embedding (bytes).
 
         Args:
-            clip_embedding_bytes: CLIP embedding as bytes (768 floats)
+            clip_embedding_bytes: CLIP embedding as bytes (768 or 1152 floats)
             threshold: Minimum similarity threshold for a tag (default: 0.25)
             max_tags: Maximum number of tags to return (default: 5)
 
@@ -150,7 +172,7 @@ class CLIPTagger:
         Check if image contains artwork (painting/statue/sculpture/drawing/cartoon).
 
         Args:
-            clip_embedding_bytes: CLIP embedding as bytes (768 floats)
+            clip_embedding_bytes: CLIP embedding as bytes
             threshold: Minimum similarity threshold for art detection (default: 0.24)
 
         Returns:

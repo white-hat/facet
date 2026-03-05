@@ -122,10 +122,10 @@ All weights use `_percent` suffix and must sum to 100 per category.
 | `aesthetic_iaa_percent` | Artistic aesthetic merit | TOPIQ IAA (AVA-trained) | Art, creative |
 | `face_quality_iqa_percent` | Face quality (IQA) | TOPIQ NR-Face | Portraits |
 | `liqe_percent` | LIQE quality score | LIQE | Diagnostics |
-| `subject_sharpness_percent` | Subject region sharpness | InSPyReNet + Laplacian | Portraits, wildlife |
-| `subject_prominence_percent` | Subject area ratio | InSPyReNet | Macro, wildlife |
-| `subject_placement_percent` | Subject rule-of-thirds | InSPyReNet | All |
-| `bg_separation_percent` | Background separation | InSPyReNet | Portraits, macro |
+| `subject_sharpness_percent` | Subject region sharpness | BiRefNet + Laplacian | Portraits, wildlife |
+| `subject_prominence_percent` | Subject area ratio | BiRefNet | Macro, wildlife |
+| `subject_placement_percent` | Subject rule-of-thirds | BiRefNet | All |
+| `bg_separation_percent` | Background separation | BiRefNet | Portraits, macro |
 
 ## Modifiers
 
@@ -182,12 +182,12 @@ Default weights are optimized for **TOPIQ** (0.93 SRCC), the aesthetic model for
 
 | Profile | Aesthetic Model | Embeddings | Tagger | Recommendations |
 |---------|-----------------|-----------|--------|-----------------|
-| `24gb` | TOPIQ (0.93 SRCC) | SigLIP 2 SO400M | Qwen2.5-VL-7B | Best accuracy, default weights |
-| `16gb` | TOPIQ (0.93 SRCC) | SigLIP 2 SO400M | Qwen3-VL-2B | Default weights |
+| `24gb` | TOPIQ (0.93 SRCC) | SigLIP 2 NaFlex SO400M | Qwen2.5-VL-7B | Best accuracy, default weights |
+| `16gb` | TOPIQ (0.93 SRCC) | SigLIP 2 NaFlex SO400M | Qwen3-VL-2B | Default weights |
 | `8gb` | CLIP+MLP (0.76 SRCC) | CLIP ViT-L-14 | CLIP similarity | Default weights work well |
 | `legacy` | CLIP+MLP on CPU | CLIP ViT-L-14 | CLIP similarity | Default weights, slower |
 
-All profiles additionally run supplementary PyIQA models (TOPIQ IAA, TOPIQ NR-Face, LIQE) and optionally InSPyReNet for subject saliency.
+All profiles additionally run supplementary PyIQA models (TOPIQ IAA, TOPIQ NR-Face, LIQE) and optionally BiRefNet for subject saliency.
 
 Run `--compute-recommendations` after switching profiles to analyze score distributions.
 

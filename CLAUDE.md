@@ -64,7 +64,7 @@ python facet.py /path/to/photos --pass tags          # Configured tagger only
 python facet.py /path/to/photos --pass composition   # SAMP-Net only
 python facet.py /path/to/photos --pass faces         # InsightFace only
 python facet.py /path/to/photos --pass embeddings    # CLIP/SigLIP embeddings only
-python facet.py /path/to/photos --pass saliency      # InSPyReNet subject saliency
+python facet.py /path/to/photos --pass saliency      # BiRefNet subject saliency
 
 # Force re-scan of already processed files
 python facet.py /path/to/photos --force
@@ -109,7 +109,7 @@ python facet.py --recompute-burst                # Recompute burst detection gro
 python facet.py --detect-duplicates              # Detect duplicate photos via pHash
 
 # Saliency commands
-python facet.py --recompute-saliency  # Recompute subject saliency metrics (InSPyReNet, GPU)
+python facet.py --recompute-saliency  # Recompute subject saliency metrics (BiRefNet, GPU)
 
 # Composition commands
 python facet.py --recompute-composition-cpu  # Rule-based (CPU only, fast)
@@ -145,11 +145,7 @@ python viewer.py
 
 ## Dependencies
 
-Python packages: `torch`, `torchvision`, `open-clip-torch`, `opencv-python`, `pillow`, `imagehash`, `rawpy`, `fastapi`, `uvicorn`, `pyjwt`, `numpy`, `tqdm`, `exifread`, `insightface`, `scipy`, `scikit-learn`, `hdbscan`, `pyiqa`, `psutil`
-
-For VLM tagging: `transformers>=4.57.0`, `accelerate>=0.25.0` (Qwen VLMs for 16gb/24gb)
-
-For subject saliency (optional): `transparent-background` (InSPyReNet)
+Python packages: `torch`, `torchvision`, `open-clip-torch`, `opencv-python`, `pillow`, `imagehash`, `rawpy`, `fastapi`, `uvicorn`, `pyjwt`, `numpy`, `tqdm`, `exifread`, `insightface`, `scipy`, `scikit-learn`, `hdbscan`, `pyiqa`, `psutil`, `transformers>=4.57.0`, `accelerate>=0.25.0`
 
 For GPU face clustering (optional): `cuml`, `cupy` (requires conda + CUDA)
 
@@ -184,10 +180,10 @@ External tool: `exiftool` (command-line)
 |---------|------------|-----------|--------|----------|
 | `legacy` | CLIP ViT-L-14 | CLIP+MLP | CLIP similarity | No GPU, 8GB+ RAM |
 | `8gb` | CLIP ViT-L-14 | CLIP+MLP | CLIP similarity | 6-14GB VRAM |
-| `16gb` | SigLIP 2 SO400M | TOPIQ | Qwen3-VL-2B | Best accuracy (~14GB) |
-| `24gb` | SigLIP 2 SO400M | TOPIQ | Qwen2.5-VL-7B | Largest models (~18GB) |
+| `16gb` | SigLIP 2 NaFlex SO400M | TOPIQ | Qwen3-VL-2B | Best accuracy (~14GB) |
+| `24gb` | SigLIP 2 NaFlex SO400M | TOPIQ | Qwen2.5-VL-7B | Largest models (~18GB) |
 
-All profiles additionally run: SAMP-Net (composition), InsightFace (faces), supplementary PyIQA models (TOPIQ IAA, TOPIQ NR-Face, LIQE), and optionally InSPyReNet (subject saliency).
+All profiles additionally run: SAMP-Net (composition), InsightFace (faces), supplementary PyIQA models (TOPIQ IAA, TOPIQ NR-Face, LIQE), and optionally BiRefNet (subject saliency).
 
 ### Data Flow
 
@@ -329,11 +325,11 @@ See [docs/FACE_RECOGNITION.md](docs/FACE_RECOGNITION.md) for the complete workfl
 
 ### Key Implementation Details
 
-- **Embeddings:** SigLIP 2 SO400M (1152-dim, 16gb/24gb) or CLIP ViT-L-14 (768-dim, legacy/8gb)
+- **Embeddings:** SigLIP 2 NaFlex SO400M (1152-dim, 16gb/24gb, native aspect ratio via `transformers`) or CLIP ViT-L-14 (768-dim, legacy/8gb via `open_clip`)
 - **Quality:** TOPIQ (0.93 SRCC), HyperIQA (0.90), DBCNN (0.90), MUSIQ (0.87)
 - **Supplementary PyIQA:** TOPIQ IAA (aesthetic merit), TOPIQ NR-Face (face quality), LIQE (quality + distortion diagnosis)
 - **Composition:** SAMP-Net for pattern detection (14 patterns including rule_of_thirds, golden_ratio, vanishing_point)
-- **Subject saliency:** InSPyReNet via `transparent-background` — subject sharpness, prominence, placement, background separation
+- **Subject saliency:** BiRefNet (`ZhengPeng7/BiRefNet`) via `transformers` — subject sharpness, prominence, placement, background separation
 - **Faces:** InsightFace buffalo_l for detection with 106-point landmarks and recognition embeddings
 - **Tagging:** CLIP similarity (legacy/8gb), Qwen3-VL-2B (16gb), Qwen2.5-VL-7B (24gb)
 - Face recognition uses HDBSCAN clustering on embeddings (standalone hdbscan library)

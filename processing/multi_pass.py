@@ -231,9 +231,10 @@ class ChunkedMultiPassProcessor:
             if supp_model not in models:
                 models.append(supp_model)
 
-        # Saliency model (InSPyReNet) if configured
-        if self.config.get('models', {}).get('inspyrenet', {}).get('enabled', False):
-            models.append('inspyrenet')
+        # Saliency model (BiRefNet) if configured
+        saliency_config = self.config.get('models', {}).get('saliency', {})
+        if saliency_config.get('enabled', False):
+            models.append('saliency')
 
         # Tagging model (from profile)
         profile = self.model_manager.get_active_profile()
@@ -514,8 +515,8 @@ class ChunkedMultiPassProcessor:
             self._pass_insightface(model, images, results)
         elif model_name in ('vlm_tagger', 'qwen3_vl_tagger', 'florence_tagger'):
             self._pass_vlm_tagger(model, images, results)
-        elif model_name == 'inspyrenet':
-            self._pass_inspyrenet(model, images, results)
+        elif model_name == 'saliency':
+            self._pass_saliency(model, images, results)
         elif model_name in self.PYIQA_MODELS:
             self._pass_pyiqa(model, model_name, images, results)
 
@@ -525,19 +526,23 @@ class ChunkedMultiPassProcessor:
 
         clip_model = model_dict['model']
         preprocess = model_dict['preprocess']
+        backend = model_dict.get('backend', 'open_clip')
         device = self.model_manager.device
 
-        # Batch process
         pil_imgs = [img['pil'] for img in images.values()]
         paths = list(images.keys())
 
-        # Preprocess batch
-        inputs = torch.stack([preprocess(img) for img in pil_imgs]).to(device)
-        if device == 'cuda' and next(clip_model.parameters()).dtype == torch.float16:
-            inputs = inputs.half()
-
         with torch.no_grad():
-            features = clip_model.encode_image(inputs)
+            if backend == 'transformers':
+                inputs = preprocess(images=pil_imgs, return_tensors="pt", padding=True)
+                inputs = {k: v.to(device) for k, v in inputs.items()}
+                features = clip_model.get_image_features(**inputs)
+            else:
+                inputs = torch.stack([preprocess(img) for img in pil_imgs]).to(device)
+                if device == 'cuda' and next(clip_model.parameters()).dtype == torch.float16:
+                    inputs = inputs.half()
+                features = clip_model.encode_image(inputs)
+
             features_normalized = torch.nn.functional.normalize(features, dim=-1)
             embeddings = features_normalized.cpu().numpy()
 
@@ -630,8 +635,8 @@ class ChunkedMultiPassProcessor:
         except Exception as e:
             print(f"VLM tagging failed: {e}")
 
-    def _pass_inspyrenet(self, scorer: Any, images: Dict, results: Dict):
-        """InSPyReNet pass: subject saliency detection and derived metrics."""
+    def _pass_saliency(self, scorer: Any, images: Dict, results: Dict):
+        """BiRefNet saliency pass: subject saliency detection and derived metrics."""
         pil_imgs = [img['pil'] for img in images.values()]
         cv_imgs = [img['cv'] for img in images.values()]
         paths = list(images.keys())
@@ -644,7 +649,7 @@ class ChunkedMultiPassProcessor:
                            'subject_placement', 'bg_separation'):
                     results[path][key] = scores[i].get(key, 5.0)
         except Exception as e:
-            print(f"InSPyReNet saliency pass failed: {e}")
+            print(f"BiRefNet saliency pass failed: {e}")
 
     # Supplementary PyIQA models store to dedicated columns
     PYIQA_COLUMN_MAP = {
@@ -999,7 +1004,7 @@ def run_single_pass(paths: List[str], pass_name: str, scorer, model_manager) -> 
         'quality-iaa': 'topiq_iaa',
         'quality-face': 'topiq_nr_face',
         'quality-liqe': 'liqe',
-        'saliency': 'inspyrenet',
+        'saliency': 'saliency',
     }
 
     model_name = pass_models.get(pass_name)
@@ -1085,7 +1090,7 @@ def list_available_models():
     print("\n" + "-" * 70)
     print("SUBJECT SALIENCY")
     print("-" * 70)
-    print(f"  {'inspyrenet':<15} {'~2GB':<8} {'--':<8} Subject mask → sharpness, prominence, placement")
+    print(f"  {'birefnet':<15} {'~2GB':<8} {'--':<8} Subject mask → sharpness, prominence, placement")
 
     print("\n" + "=" * 70)
     print("\nNote: SRCC = Spearman correlation on KonIQ-10k benchmark (higher is better)")

@@ -109,18 +109,24 @@ def main():
 
     # Load CLIP model and tagger
     import torch
-    import open_clip
 
-    # Resolve CLIP model from config (supports SigLIP 2 or legacy ViT-L-14)
     clip_cfg = config.get_clip_config()
     clip_model_name = clip_cfg.get('model_name', 'ViT-L-14')
-    clip_pretrained = clip_cfg.get('pretrained', 'laion2b_s32b_b82k')
-
-    model, _, _ = open_clip.create_model_and_transforms(clip_model_name, pretrained=clip_pretrained)
+    clip_backend = clip_cfg.get('backend', 'open_clip')
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = model.to(device).eval()
 
-    tagger = CLIPTagger(model, device, config=config, model_name=clip_model_name)
+    if clip_backend == 'transformers':
+        from transformers import AutoModel
+        model = AutoModel.from_pretrained(clip_model_name, trust_remote_code=True)
+        model = model.to(device).eval()
+    else:
+        import open_clip
+        clip_pretrained = clip_cfg.get('pretrained', 'laion2b_s32b_b82k')
+        model, _, _ = open_clip.create_model_and_transforms(clip_model_name, pretrained=clip_pretrained)
+        model = model.to(device).eval()
+
+    tagger = CLIPTagger(model, device, config=config, model_name=clip_model_name,
+                        backend=clip_backend)
     print(f"Tagger initialized with {len(tagger.tag_vocabulary)} tag categories")
 
     # Count photos to tag

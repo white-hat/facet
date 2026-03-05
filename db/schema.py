@@ -89,7 +89,7 @@ PHOTOS_COLUMNS = [
     ('face_quality_iqa', 'REAL'),    # TOPIQ NR-Face (dedicated face quality)
     ('liqe_score', 'REAL'),          # LIQE quality score
 
-    # Subject saliency metrics (InSPyReNet)
+    # Subject saliency metrics (BiRefNet)
     ('subject_sharpness', 'REAL'),   # Laplacian variance on subject mask
     ('subject_prominence', 'REAL'),  # Subject area ratio
     ('subject_placement', 'REAL'),   # Rule-of-thirds score for subject centroid

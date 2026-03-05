@@ -1863,8 +1863,8 @@
       "max_new_tokens": 256
     },
     "clip": {
-      "model_name": "ViT-SO400M-16-SigLIP2-384",
-      "pretrained": "webli",
+      "model_name": "google/siglip2-so400m-patch16-naflex",
+      "backend": "transformers",
       "embedding_dim": 1152,
       "similarity_threshold_percent": 18
     },
@@ -1917,9 +1917,11 @@
       "topiq_nr_face",
       "liqe"
     ],
-    "inspyrenet": {
+    "saliency": {
       "enabled": false,
-      "description": "InSPyReNet subject saliency detection (~2 GB VRAM)"
+      "model": "ZhengPeng7/BiRefNet",
+      "resolution": 1024,
+      "description": "BiRefNet subject saliency detection (~2 GB VRAM)"
     }
   },
   "quality": {

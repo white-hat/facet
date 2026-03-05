@@ -335,7 +335,8 @@ Controls which AI models are used based on VRAM.
       "model_name": "ViT-SO400M-16-SigLIP2-384",
       "pretrained": "webli",
       "embedding_dim": 1152,
-      "similarity_threshold_percent": 18
+      "similarity_threshold_percent": 18,
+      "backend": "transformers"
     },
     "clip_legacy": {
       "model_name": "ViT-L-14",
@@ -350,9 +351,9 @@ Controls which AI models are used based on VRAM.
       "max_new_tokens": 256
     },
     "supplementary_pyiqa": ["topiq_iaa", "topiq_nr_face", "liqe"],
-    "inspyrenet": {
+    "saliency": {
       "enabled": false,
-      "description": "InSPyReNet subject saliency detection (~2 GB VRAM)"
+      "description": "BiRefNet subject saliency detection (~2 GB VRAM)"
     },
     "samp_net": {
       "model_path": "pretrained_models/samp_net.pth",
@@ -382,15 +383,16 @@ Controls which AI models are used based on VRAM.
 | `qwen3_vl_2b.torch_dtype` | `"bfloat16"` | Precision |
 | `qwen3_vl_2b.max_new_tokens` | `100` | Max generation tokens |
 | `qwen3_vl_2b.vlm_batch_size` | `4` | Images per VLM inference batch |
-| `clip.model_name` | `"ViT-SO400M-16-SigLIP2-384"` | Embedding model (SigLIP 2 for 16gb/24gb) |
+| `clip.model_name` | `"ViT-SO400M-16-SigLIP2-384"` | Embedding model (SigLIP 2 NaFlex for 16gb/24gb) |
 | `clip.pretrained` | `"webli"` | Pre-trained weights |
 | `clip.embedding_dim` | `1152` | Embedding dimensions (1152 for SigLIP 2, 768 for ViT-L-14) |
+| `clip.backend` | `"transformers"` | Backend library: `"transformers"` (SigLIP 2 NaFlex, native aspect ratio) or `"open_clip"` (legacy) |
 | `clip_legacy.model_name` | `"ViT-L-14"` | Legacy CLIP model (for legacy/8gb profiles) |
 | `clip_legacy.pretrained` | `"laion2b_s32b_b82k"` | Legacy pre-trained weights |
 | `florence_2_large.model_path` | `"MiaoshouAI/Florence-2-large-PromptGen-v2.0"` | Florence-2 PromptGen model for tagging |
 | `florence_2_large.vlm_batch_size` | `4` | Images per Florence-2 inference batch |
 | `supplementary_pyiqa` | `["topiq_iaa", "topiq_nr_face", "liqe"]` | Additional PyIQA models to run |
-| `inspyrenet.enabled` | `false` | Enable InSPyReNet subject saliency |
+| `saliency.enabled` | `false` | Enable BiRefNet subject saliency |
 | `samp_net.input_size` | `384` | Image size for inference |
 
 ### VRAM Auto-Detection
@@ -634,7 +636,7 @@ python facet.py /path --pass tags          # Configured tagger only
 python facet.py /path --pass composition   # SAMP-Net only
 python facet.py /path --pass faces         # InsightFace only
 python facet.py /path --pass embeddings    # CLIP/SigLIP embeddings only
-python facet.py /path --pass saliency      # InSPyReNet subject saliency
+python facet.py /path --pass saliency      # BiRefNet subject saliency
 
 # List available models
 python facet.py --list-models
@@ -850,8 +852,8 @@ Configured via `models.profiles.*.tagging_model`:
 |---------|---------------|-----------------|
 | `legacy` | `clip` | CLIP ViT-L-14 (768-dim) |
 | `8gb` | `clip` | CLIP ViT-L-14 (768-dim) |
-| `16gb` | `qwen3-vl-2b` | SigLIP 2 SO400M (1152-dim) |
-| `24gb` | `qwen2.5-vl-7b` | SigLIP 2 SO400M (1152-dim) |
+| `16gb` | `qwen3-vl-2b` | SigLIP 2 NaFlex SO400M (1152-dim) |
+| `24gb` | `qwen2.5-vl-7b` | SigLIP 2 NaFlex SO400M (1152-dim) |
 
 ### Re-tagging Photos
 

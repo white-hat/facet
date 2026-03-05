@@ -176,9 +176,8 @@ def run_doctor(config_path=None, db_path=None, simulate_gpu=None, simulate_vram=
     # --- Optional Dependencies ---
     _section("Optional Dependencies")
     optional_deps = [
-        ('transformers', 'VLM tagging (16gb/24gb profiles)'),
+        ('transformers', 'BiRefNet saliency, SigLIP 2 NaFlex, VLM tagging'),
         ('accelerate', 'VLM tagging (16gb/24gb profiles)'),
-        ('transparent_background', 'Subject saliency (InSPyReNet)'),
         ('rawpy', 'RAW file support'),
     ]
     for module, purpose in optional_deps:

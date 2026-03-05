@@ -15,7 +15,7 @@
 | `python facet.py /path --pass composition` | Run SAMP-Net composition pattern detection only |
 | `python facet.py /path --pass faces` | Run InsightFace face detection only |
 | `python facet.py /path --pass embeddings` | Run CLIP/SigLIP embedding extraction only |
-| `python facet.py /path --pass saliency` | Run InSPyReNet subject saliency detection only |
+| `python facet.py /path --pass saliency` | Run BiRefNet subject saliency detection only |
 | `python facet.py /path --db custom.db` | Use custom database file |
 | `python facet.py /path --config my.json` | Use custom scoring config |
 
@@ -40,8 +40,8 @@ updating specific metrics without full reprocessing. Available passes:
 | `tags` | CLIP / Qwen VLM | Semantic tags from configured vocabulary | 0-16 GB |
 | `composition` | SAMP-Net | `composition_pattern` (14 patterns) + `comp_score` | ~2 GB |
 | `faces` | InsightFace buffalo_l | Face detection, landmarks, blink detection, recognition embeddings | ~2 GB |
-| `embeddings` | CLIP ViT-L-14 or SigLIP 2 | `clip_embedding` BLOB for similarity/tagging | 4-5 GB |
-| `saliency` | InSPyReNet | `subject_sharpness`, `subject_prominence`, `subject_placement`, `bg_separation` | ~2 GB |
+| `embeddings` | CLIP ViT-L-14 or SigLIP 2 NaFlex | `clip_embedding` BLOB for similarity/tagging | 4-5 GB |
+| `saliency` | BiRefNet | `subject_sharpness`, `subject_prominence`, `subject_placement`, `bg_separation` | ~2 GB |
 
 ## Preview & Export
 
@@ -64,7 +64,7 @@ These commands update specific metrics without full photo reprocessing.
 | `python facet.py --recompute-category portrait` | Recompute scores for a single category only |
 | `python facet.py --recompute-tags` | Re-tag all photos using configured model |
 | `python facet.py --recompute-tags-vlm` | Re-tag all photos using VLM tagger |
-| `python facet.py --recompute-saliency` | Recompute subject saliency metrics (InSPyReNet, GPU) |
+| `python facet.py --recompute-saliency` | Recompute subject saliency metrics (BiRefNet, GPU) |
 | `python facet.py --recompute-composition-cpu` | Recompute composition (rule-based, CPU) |
 | `python facet.py --recompute-composition-gpu` | Rescan with SAMP-Net (GPU required) |
 | `python facet.py --recompute-iqa` | Recompute supplementary IQA metrics (TOPIQ IAA, NR-Face, LIQE) from thumbnails |
@@ -88,14 +88,14 @@ These models share VRAM with the primary TOPIQ model and run as part of the defa
 
 ### Subject Saliency
 
-The `--pass saliency` and `--recompute-saliency` commands use InSPyReNet (via the `transparent-background` library) to generate a binary subject mask, then derive four metrics:
+The `--pass saliency` and `--recompute-saliency` commands use BiRefNet (`ZhengPeng7/BiRefNet` from HuggingFace, via the `transformers` library) to generate a binary subject mask, then derive four metrics:
 
 - **Subject Sharpness**: Laplacian variance on the subject mask region vs background. Detects whether the main subject is in focus.
 - **Subject Prominence**: Ratio of subject area to total frame area. High values indicate a dominant subject (e.g., macro photos).
 - **Subject Placement**: Rule-of-thirds scoring for the subject centroid position. Measures compositional placement.
 - **Background Separation**: Edge gradient difference between subject boundary and background. Measures bokeh quality.
 
-Requires `pip install transparent-background` (~2 GB VRAM).
+Requires `transformers` (~2 GB VRAM).
 
 ### Tagging Models
 
@@ -116,7 +116,7 @@ Two embedding models available, selected per VRAM profile via `clip_config`:
 
 | Config | Model | Dimensions | Used By |
 |--------|-------|-----------|---------|
-| `clip` | SigLIP 2 SO400M-384 | 1152 | 16gb, 24gb profiles |
+| `clip` | SigLIP 2 NaFlex SO400M | 1152 | 16gb, 24gb profiles |
 | `clip_legacy` | CLIP ViT-L-14 | 768 | legacy, 8gb profiles |
 
 Embeddings power: semantic tagging, duplicate detection, similar photo search, and CLIP+MLP aesthetic (legacy/8gb). Switching models requires re-embedding all photos (`--force` or `--pass embeddings`).

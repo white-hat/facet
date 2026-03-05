@@ -91,8 +91,10 @@ class BatchProcessor:
             if pil_img is None:
                 return {'path': str(photo_path), 'error': 'Failed to load image'}
 
-            # Preprocess for CLIP
-            clip_input = self.scorer.preprocess(pil_img)
+            # Preprocess for CLIP (open_clip only; transformers uses PIL directly)
+            clip_input = None
+            if not self.scorer.uses_transformers_backend:
+                clip_input = self.scorer.preprocess(pil_img)
 
             # Track metrics (thread-safe)
             load_time = time.time() - start_time
@@ -181,7 +183,9 @@ class BatchProcessor:
 
         # Extract PIL images and pre-processed CLIP inputs
         pil_images = [item['pil_img'] for item in batch]
-        clip_inputs = torch.stack([item['clip_input'] for item in batch]).to(self.scorer.device)
+        clip_inputs = None
+        if batch[0].get('clip_input') is not None:
+            clip_inputs = torch.stack([item['clip_input'] for item in batch]).to(self.scorer.device)
 
         # Use shared batch method for aesthetic/quality scoring
         aesthetic_results = self.scorer.get_aesthetic_and_quality_batch(pil_images, clip_inputs)

@@ -32,7 +32,7 @@ class ModelManager:
         'clip', 'clip_aesthetic', 'samp_net',
         'topiq', 'hyperiqa', 'dbcnn', 'musiq', 'musiq-koniq', 'clipiqa+',
         'topiq_iaa', 'topiq_nr_face', 'liqe',
-        'inspyrenet',
+        'saliency',
         'florence_tagger',
     }
 
@@ -138,15 +138,27 @@ class ModelManager:
         return self.model_settings.get(config_key, self.model_settings.get('clip', {}))
 
     def _load_clip(self):
-        """Load CLIP/SigLIP model for embeddings and tagging."""
+        """Load CLIP/SigLIP model for embeddings and tagging.
+
+        For legacy/8gb profiles: uses open_clip (ViT-L-14).
+        For 16gb/24gb profiles: uses transformers Siglip2Model (NaFlex).
+        """
         if 'clip' in self.models:
             return self.models['clip']
 
-        print("Loading CLIP/SigLIP model...")
+        clip_config = self.get_clip_config()
+        backend = clip_config.get('backend', 'open_clip')
+
+        if backend == 'transformers':
+            return self._load_clip_transformers(clip_config)
+        return self._load_clip_open_clip(clip_config)
+
+    def _load_clip_open_clip(self, clip_config):
+        """Load CLIP via open_clip (legacy/8gb profiles)."""
+        print("Loading CLIP model (open_clip)...")
         try:
             import open_clip
 
-            clip_config = self.get_clip_config()
             model_name = clip_config.get('model_name', 'ViT-L-14')
             pretrained = clip_config.get('pretrained', 'laion2b_s32b_b82k')
 
@@ -160,12 +172,39 @@ class ModelManager:
                 'preprocess': preprocess,
                 'model_name': model_name,
                 'embedding_dim': clip_config.get('embedding_dim', 768),
+                'backend': 'open_clip',
             }
             print(f"CLIP loaded: {model_name} ({pretrained})")
             return self.models['clip']
 
         except Exception as e:
             print(f"Failed to load CLIP: {e}")
+            return None
+
+    def _load_clip_transformers(self, clip_config):
+        """Load SigLIP 2 NaFlex via transformers (16gb/24gb profiles)."""
+        print("Loading SigLIP 2 NaFlex model (transformers)...")
+        try:
+            from transformers import AutoModel, AutoProcessor
+
+            model_name = clip_config.get('model_name', 'google/siglip2-so400m-patch16-naflex')
+
+            model = AutoModel.from_pretrained(model_name, trust_remote_code=True)
+            model = model.to(self.device).eval()
+            processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)
+
+            self.models['clip'] = {
+                'model': model,
+                'preprocess': processor,
+                'model_name': model_name,
+                'embedding_dim': clip_config.get('embedding_dim', 1152),
+                'backend': 'transformers',
+            }
+            print(f"SigLIP 2 NaFlex loaded: {model_name}")
+            return self.models['clip']
+
+        except Exception as e:
+            print(f"Failed to load SigLIP 2 NaFlex: {e}")
             return None
 
     def _load_clip_aesthetic(self):
@@ -443,7 +482,7 @@ class ModelManager:
             'insightface': self._load_insightface,
             'vlm_tagger': lambda: self._load_vlm_tagger('qwen2_5_vl_7b'),
             'qwen3_vl_tagger': lambda: self._load_vlm_tagger('qwen3_vl_2b'),
-            'inspyrenet': self._load_inspyrenet,
+            'saliency': self._load_saliency,
             'florence_tagger': self._load_florence_tagger,
         }
 
@@ -593,24 +632,28 @@ class ModelManager:
             print(f"Failed to load PyIQA {model_name}: {e}")
             return None
 
-    def _load_inspyrenet(self):
-        """Load InSPyReNet saliency detection model."""
-        if 'inspyrenet' in self.models:
-            return self.models['inspyrenet']
+    def _load_saliency(self):
+        """Load BiRefNet saliency detection model."""
+        if 'saliency' in self.models:
+            return self.models['saliency']
 
-        print("Loading InSPyReNet saliency model...")
+        print("Loading BiRefNet saliency model...")
         try:
             from models.saliency_scorer import SaliencyScorer
 
-            scorer = SaliencyScorer(device=self.device)
+            saliency_config = self.model_settings.get('saliency', {})
+            model_name = saliency_config.get('model', SaliencyScorer.DEFAULT_MODEL)
+            resolution = saliency_config.get('resolution', SaliencyScorer.DEFAULT_RESOLUTION)
+
+            scorer = SaliencyScorer(device=self.device, model_name=model_name,
+                                    resolution=resolution)
             scorer.load()
 
-            self.models['inspyrenet'] = scorer
-            print("InSPyReNet loaded")
+            self.models['saliency'] = scorer
             return scorer
 
         except Exception as e:
-            print(f"Failed to load InSPyReNet: {e}")
+            print(f"Failed to load BiRefNet: {e}")
             return None
 
     def unload_all(self):
@@ -712,7 +755,7 @@ class ModelManager:
     # VRAM requirements for each model (in GB)
     # Note: These are runtime estimates including inference memory, not just model weights
     MODEL_VRAM_REQUIREMENTS = {
-        'clip': 5,            # SigLIP 2 SO400M (~5GB); ViT-L-14 was ~4GB
+        'clip': 5,            # SigLIP 2 NaFlex SO400M (~5GB); ViT-L-14 was ~4GB
         'clip_aesthetic': 4,  # Always uses ViT-L-14
         'samp_net': 2,
         'insightface': 2,
@@ -728,7 +771,7 @@ class ModelManager:
         'topiq_iaa': 2,       # Shares backbone with TOPIQ
         'topiq_nr_face': 2,   # Shares backbone with TOPIQ
         'liqe': 2,            # CLIP-based quality assessment
-        'inspyrenet': 2,      # InSPyReNet saliency detection
+        'saliency': 2,        # BiRefNet saliency detection
         'florence_tagger': 4,  # ~1.5GB weights + ~2GB inference
     }
 
@@ -747,7 +790,7 @@ class ModelManager:
         'topiq_iaa': 2.0,
         'topiq_nr_face': 2.0,
         'liqe': 2.0,
-        'inspyrenet': 2.0,
+        'saliency': 2.0,
         'qwen3_vl_tagger': 5.0,
         'florence_tagger': 3.0,
     }

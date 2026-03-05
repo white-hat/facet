@@ -188,7 +188,7 @@ Configuration:
     comp_group.add_argument('--recompute-composition-gpu', action='store_true',
                         help='Recompute composition scores using SAMP-Net neural network (requires GPU)')
     comp_group.add_argument('--recompute-saliency', action='store_true',
-                        help='Recompute subject saliency metrics using InSPyReNet (requires GPU)')
+                        help='Recompute subject saliency metrics using BiRefNet (requires GPU)')
 
     # Weight optimization
     weight_group = parser.add_argument_group('Weight optimization')
@@ -459,7 +459,7 @@ Configuration:
         scorer.rescan_samp_composition(batch_size=batch_size)
         exit()
 
-    # Recompute saliency metrics using InSPyReNet (requires GPU)
+    # Recompute saliency metrics using BiRefNet (requires GPU)
     if args.recompute_saliency:
         from models.model_manager import ModelManager
         from processing.multi_pass import run_single_pass
@@ -1137,7 +1137,8 @@ Configuration:
     # Use existing tagger if available, or create one with scorer's model
     tagger = scorer.tagger if scorer.tagger else CLIPTagger(
         scorer.model, scorer.device, config=scorer.config,
-        model_name=getattr(scorer, '_clip_model_name', 'ViT-L-14')
+        model_name=scorer._clip_model_name,
+        backend=scorer._clip_backend
     )
 
     tagged = run_tagging(scorer.db_path, tagger, scorer.config)
