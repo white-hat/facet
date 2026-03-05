@@ -1,8 +1,8 @@
 # Facet
 
-**A multi-dimensional photo analysis engine that automatically scores, categorizes, and surfaces your best photos using an ensemble of vision models.**
+**A local-first photo analysis engine that scores, categorizes, and surfaces your best photos using an ensemble of vision models.**
 
-Facet examines every facet of an image—from aesthetic appeal and composition to facial detail and technical precision—to help photographers, archivists, and enthusiasts discover their hidden gems.
+Point Facet at a directory of photos. Local AI models analyze every image across multiple dimensions — aesthetic quality, composition, face detail, technical precision — store scores in a SQLite database, and serve results through an interactive web gallery. Everything runs locally, no cloud, no API keys.
 
 ![Python](https://img.shields.io/badge/python-3.10+-blue)
 ![Angular](https://img.shields.io/badge/Angular-20-dd0031)
@@ -11,63 +11,83 @@ Facet examines every facet of an image—from aesthetic appeal and composition t
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 <p align="center">
-  <img src="docs/screenshots/gallery-desktop.jpg" alt="Facet Gallery" width="100%">
+  <img src="docs/screenshots/hero-mosaic.jpg" alt="Facet — Top Picks mosaic gallery" width="100%">
 </p>
 
-## How It Works
+## Features
 
-Point Facet at a directory of photos. Local AI models analyze every image, store scores in a SQLite database, and you browse results in a web viewer. **Everything runs locally — no cloud, no API keys.**
+### Gallery
 
-- **Aesthetic quality** — [TOPIQ](https://github.com/chaofengc/IQA-PyTorch) (0.93 SRCC on KonIQ-10k), the leading no-reference quality model
-- **Composition** — SAMP-Net detecting 14 patterns (rule of thirds, golden ratio, vanishing point, diagonal, symmetric...)
-- **Semantic tagging** — CLIP or Qwen VLMs depending on VRAM profile
-- **Face analysis** — InsightFace detection with 106-point landmarks + HDBSCAN clustering into persons
-- **Technical metrics** — sharpness, noise, exposure, color harmony, dynamic range, contrast
-- **Subject saliency** — InSPyReNet for subject prominence, placement, and background separation
-- **Content categorization** — 30 categories with specialized scoring weights (landscape, portrait, architecture, macro, astro, concert, wildlife, street...)
+Two view modes to browse your library:
 
-## VRAM Profiles
+- **Mosaic** — justified rows that preserve aspect ratios for an edge-to-edge layout
+- **Grid** — uniform card grid with optional metadata overlay showing filename, score, date, EXIF, tags, and recognized faces
 
-| Profile | GPU VRAM | Models | Best For |
-|---------|----------|--------|----------|
-| `auto` | Any | Auto-selected | **Default** — detects VRAM, picks best profile |
-| `legacy` | No GPU (8 GB+ RAM) | CLIP+MLP + SAMP-Net + CLIP tagging (CPU) | CPU-only, no GPU required |
-| `8gb` | 6–14 GB | CLIP+MLP + SAMP-Net + Qwen3-VL | Better tagging, mid-range GPUs |
-| `16gb` | ~14 GB | TOPIQ + SAMP-Net + Qwen3-VL | Best aesthetic accuracy |
-| `24gb` | ~18 GB | TOPIQ + Qwen2-VL + Qwen2.5-VL-7B | Best accuracy + VLM tagging |
+<img src="docs/screenshots/gallery-grid.jpg" alt="Grid mode with photo details" width="100%">
 
-## Web Viewer
+Hover over any photo for a detailed tooltip with the full score breakdown (quality, composition, technical metrics) and EXIF data.
 
-<img src="docs/screenshots/hover-preview.jpg" alt="Hover preview with score breakdown" width="100%">
+<img src="docs/screenshots/hover-tooltip.jpg" alt="Hover tooltip with score breakdown" width="100%">
 
-Dark-themed web gallery with hover score breakdowns, EXIF data, content categories, and a Top Picks filter that surfaces the best photos using a custom weighted score. Responsive on mobile.
+### Filters & Search
+
+Filter by date range, content tag, composition pattern, camera, lens, person, and more. Toggle display options like hiding blinks, best-of-burst, duplicates, and rejected photos. Add custom range filters on any metric.
+
+<img src="docs/screenshots/filter-panel.jpg" alt="Filter sidebar" width="100%">
+
+### Find Similar
+
+Select any photo and find visually similar images across your library. Three similarity modes: visual embedding, color palette, and same-person matching. Adjustable similarity threshold.
+
+<img src="docs/screenshots/similar-photos.jpg" alt="Find Similar results" width="100%">
 
 ### Face Recognition
 
-<img src="docs/screenshots/manage-persons.jpg" alt="Person management" width="100%">
-<img src="docs/screenshots/person-merge.jpg" alt="Person merge" width="100%">
-
-Automatic face detection, HDBSCAN clustering into persons, and blink detection. The management UI lets you merge, rename, and organize person clusters. GPU-accelerated clustering available via cuML.
-
-### Statistics & Analytics
+Automatic face detection with InsightFace, HDBSCAN clustering into person groups, and blink detection. The management UI lets you search, rename, merge, and organize person clusters. Filter the gallery by person to browse all photos of someone.
 
 <table><tr>
-<td><img src="docs/screenshots/stats-gear.jpg" alt="Equipment stats" width="100%"><img src="docs/screenshots/stats-settings.jpg" alt="Shooting settings stats" width="100%"></td>
+<td><img src="docs/screenshots/persons-manage.jpg" alt="Manage Persons page" width="100%"></td>
+<td><img src="docs/screenshots/person-gallery.jpg" alt="Person gallery" width="100%"></td>
+</tr></table>
+
+### Statistics
+
+Interactive dashboards across four tabs:
+
+- **Gear** — camera and lens usage timelines, average scores by equipment, top body+lens combos
+- **Categories** — breakdown by content category with shooting profiles (preferred camera, lens, ISO, aperture, focal length per category)
+- **Timeline** — photos per month/year, day-of-week and hour-of-day distributions, shooting hours heatmap
+- **Correlations** — configurable multi-metric charts across any axis (year, ISO, aperture, focal length, etc.)
+
+<table><tr>
+<td><img src="docs/screenshots/stats-gear.jpg" alt="Equipment statistics" width="100%"></td>
 <td><img src="docs/screenshots/stats-categories.jpg" alt="Category analytics" width="100%"></td>
 </tr><tr>
+<td><img src="docs/screenshots/stats-timeline.jpg" alt="Timeline statistics" width="100%"></td>
 <td><img src="docs/screenshots/stats-correlations.jpg" alt="Correlation charts" width="100%"></td>
-<td><img src="docs/screenshots/stats-timeline.jpg" alt="Timeline stats" width="100%"></td>
-</tr>
-</table>
-
-Interactive dashboards with five tabs: **Gear** (cameras, lenses, body+lens combos, scores by camera/lens), **Categories** (breakdown, weights, correlations, overlap — each a sub-tab), **Score Distribution** (aggregate score histogram and distribution charts), **Timeline** (photos per month/year, day-of-week heatmap, top shooting days), and **Correlations** (configurable multi-metric charts across ISO, aperture, focal length, shutter speed, and more).
+</tr></table>
 
 ### Weight Tuning
 
-<img src="docs/screenshots/weights_slider.jpg" alt="Category weight sliders" width="100%">
-<img src="docs/screenshots/weights_compare.jpg" alt="Weight correlation chart" width="100%">
+Per-category weight editor with live preview showing how weight changes affect the top-ranked photos. Includes a correlation chart comparing configured weights vs actual impact on scores. Pairwise A/B photo comparison learns from your choices. Requires edition mode.
 
-Per-category weight editor with live preview and weight-vs-correlation charts. Pairwise photo comparison with four selection strategies learns from your choices and suggests weight adjustments. **Requires edition mode.**
+<table><tr>
+<td><img src="docs/screenshots/weights-sliders.jpg" alt="Category weight sliders" width="100%"></td>
+<td><img src="docs/screenshots/weights-compare.jpg" alt="A/B photo comparison" width="100%"></td>
+</tr></table>
+
+### Responsive Design
+
+The UI adapts to mobile with a single-column layout, bottom navigation bar, and collapsible filter drawer.
+
+<table><tr>
+<td width="50%"><img src="docs/screenshots/mobile-gallery.jpg" alt="Mobile gallery" width="100%"></td>
+<td width="50%"><img src="docs/screenshots/mobile-filters.jpg" alt="Mobile filters" width="100%"></td>
+</tr></table>
+
+### Multi-Language Support
+
+Available in English, French, German, Spanish, and Italian with a language switcher in the header menu.
 
 ## Quick Start
 
@@ -89,13 +109,13 @@ python viewer.py
 # Open http://localhost:5000
 ```
 
-VRAM is auto-detected at startup. Use `--single-pass` to keep all models loaded simultaneously on high-VRAM systems, or `--pass quality|tags|composition` to run a specific pass.
+VRAM is auto-detected at startup. See [Installation](docs/INSTALLATION.md) for GPU setup and VRAM profile details.
 
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Installation](docs/INSTALLATION.md) | Requirements, GPU setup, dependencies |
+| [Installation](docs/INSTALLATION.md) | Requirements, GPU setup, VRAM profiles, dependencies |
 | [Commands](docs/COMMANDS.md) | All CLI commands reference |
 | [Configuration](docs/CONFIGURATION.md) | Full `scoring_config.json` reference |
 | [Scoring](docs/SCORING.md) | Categories, weights, tuning guide |
