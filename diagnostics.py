@@ -179,10 +179,9 @@ def run_doctor(config_path=None, db_path=None):
         size_mb = os.path.getsize(db_path) / (1024 * 1024)
         _ok("Database", f"{db_path} ({size_mb:.1f} MB)")
         try:
-            conn = sqlite3.connect(db_path)
-            count = conn.execute("SELECT COUNT(*) FROM photos").fetchone()[0]
+            with sqlite3.connect(db_path) as conn:
+                count = conn.execute("SELECT COUNT(*) FROM photos").fetchone()[0]
             _ok("Photos", f"{count:,}")
-            conn.close()
         except Exception as e:
             _warn("Database query", str(e))
     else:
