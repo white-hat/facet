@@ -1,11 +1,13 @@
 """Tests for the diagnostics module (--doctor command)."""
 
+import json
 import sqlite3
 import types
 from unittest import mock
 
 import pytest
 
+from config.scoring_config import ScoringConfig
 from diagnostics import _info, _ok, _section, _warn, run_doctor
 
 
@@ -173,3 +175,210 @@ class TestGpuTroubleshooting:
 
         out = capsys.readouterr().out
         assert "no GPU found" in out
+
+
+# --- VRAM Profile Method Tests ---
+
+
+class TestDetectGpuVramGb:
+    """Test ScoringConfig.detect_gpu_vram_gb()."""
+
+    def test_gpu_detected(self):
+        """When CUDA is available, return VRAM in GB."""
+        mock_torch = types.ModuleType("torch")
+        mock_torch.cuda = types.SimpleNamespace(
+            is_available=lambda: True,
+            get_device_properties=lambda idx: types.SimpleNamespace(
+                total_memory=16 * 1024**3,
+            ),
+        )
+        with mock.patch.dict("sys.modules", {"torch": mock_torch}):
+            result = ScoringConfig.detect_gpu_vram_gb()
+        assert result == 16.0
+
+    def test_no_gpu(self):
+        """When CUDA is not available, return None."""
+        mock_torch = types.ModuleType("torch")
+        mock_torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+        with mock.patch.dict("sys.modules", {"torch": mock_torch}):
+            result = ScoringConfig.detect_gpu_vram_gb()
+        assert result is None
+
+    def test_torch_import_error(self):
+        """When torch import fails, return None."""
+        with mock.patch.dict("sys.modules", {"torch": None}):
+            result = ScoringConfig.detect_gpu_vram_gb()
+        assert result is None
+
+
+class TestSuggestVramProfile:
+    """Test ScoringConfig.suggest_vram_profile() with explicit vram_gb."""
+
+    def test_24gb(self):
+        profile, vram, msg = ScoringConfig.suggest_vram_profile(vram_gb=24.0)
+        assert profile == '24gb'
+        assert vram == 24.0
+        assert '24gb' in msg
+
+    def test_24gb_boundary(self):
+        profile, _, _ = ScoringConfig.suggest_vram_profile(vram_gb=20.0)
+        assert profile == '24gb'
+
+    def test_16gb(self):
+        profile, vram, msg = ScoringConfig.suggest_vram_profile(vram_gb=16.0)
+        assert profile == '16gb'
+        assert '16gb' in msg
+
+    def test_16gb_boundary(self):
+        profile, _, _ = ScoringConfig.suggest_vram_profile(vram_gb=14.0)
+        assert profile == '16gb'
+
+    def test_8gb(self):
+        profile, vram, msg = ScoringConfig.suggest_vram_profile(vram_gb=8.0)
+        assert profile == '8gb'
+        assert '8gb' in msg
+
+    def test_8gb_boundary(self):
+        profile, _, _ = ScoringConfig.suggest_vram_profile(vram_gb=6.0)
+        assert profile == '8gb'
+
+    def test_legacy(self):
+        profile, vram, msg = ScoringConfig.suggest_vram_profile(vram_gb=4.0)
+        assert profile == 'legacy'
+        assert 'legacy' in msg
+
+    def test_no_gpu_with_ram(self):
+        """No GPU, sufficient RAM → legacy profile with RAM info."""
+        mock_psutil = types.ModuleType("psutil")
+        mock_psutil.virtual_memory = lambda: types.SimpleNamespace(total=31 * 1024**3)
+        with mock.patch.object(ScoringConfig, 'detect_gpu_vram_gb', return_value=None), \
+             mock.patch.dict("sys.modules", {"psutil": mock_psutil}):
+            profile, vram, msg = ScoringConfig.suggest_vram_profile()
+        assert profile == 'legacy'
+        assert vram is None
+        assert '31GB RAM' in msg
+
+    def test_no_gpu_low_ram(self):
+        """No GPU, low RAM → legacy with limited CPU mode."""
+        mock_psutil = types.ModuleType("psutil")
+        mock_psutil.virtual_memory = lambda: types.SimpleNamespace(total=4 * 1024**3)
+        with mock.patch.object(ScoringConfig, 'detect_gpu_vram_gb', return_value=None), \
+             mock.patch.dict("sys.modules", {"psutil": mock_psutil}):
+            profile, vram, msg = ScoringConfig.suggest_vram_profile()
+        assert profile == 'legacy'
+        assert 'limited CPU mode' in msg
+
+
+class TestCheckVramProfileCompatibility:
+    """Test ScoringConfig.check_vram_profile_compatibility()."""
+
+    @pytest.fixture()
+    def config_file(self, tmp_path):
+        """Create a minimal config file and return a factory for ScoringConfig."""
+        path = tmp_path / "scoring_config.json"
+
+        def _make(vram_profile='auto'):
+            data = {"models": {"vram_profile": vram_profile}, "categories": []}
+            path.write_text(json.dumps(data))
+            return ScoringConfig(str(path), validate=False)
+
+        return _make
+
+    def test_auto_with_gpu(self, config_file):
+        config = config_file('auto')
+        with mock.patch.object(ScoringConfig, 'detect_gpu_vram_gb', return_value=16.0):
+            ok, profile, msg = config.check_vram_profile_compatibility(verbose=False)
+        assert ok is True
+        assert profile == '16gb'
+        assert config.config['models']['vram_profile'] == '16gb'
+
+    def test_auto_no_gpu(self, config_file):
+        config = config_file('auto')
+        with mock.patch.object(ScoringConfig, 'detect_gpu_vram_gb', return_value=None):
+            ok, profile, msg = config.check_vram_profile_compatibility(verbose=False)
+        assert ok is True
+        assert profile == 'legacy'
+
+    def test_mismatch_16gb_no_gpu(self, config_file):
+        config = config_file('16gb')
+        with mock.patch.object(ScoringConfig, 'detect_gpu_vram_gb', return_value=None):
+            ok, profile, msg = config.check_vram_profile_compatibility(verbose=False)
+        assert ok is False
+        assert profile == 'legacy'
+
+    def test_legacy_no_gpu(self, config_file):
+        config = config_file('legacy')
+        with mock.patch.object(ScoringConfig, 'detect_gpu_vram_gb', return_value=None):
+            ok, profile, msg = config.check_vram_profile_compatibility(verbose=False)
+        assert ok is True
+        assert profile == 'legacy'
+
+
+# --- End-to-End Simulation Tests ---
+
+
+class TestRtx5070TiScenario:
+    """End-to-end tests simulating RTX 5070 Ti detection issue."""
+
+    def test_full_doctor_output(self, capsys, tmp_path):
+        """Simulate RTX 5070 Ti with no CUDA support — full doctor run."""
+        mock_torch = types.ModuleType("torch")
+        mock_torch.__version__ = "2.5.0"
+        mock_torch.version = types.SimpleNamespace(cuda=None)
+        mock_torch.cuda = types.SimpleNamespace(is_available=lambda: False)
+        mock_torch.backends = types.SimpleNamespace(
+            cudnn=types.SimpleNamespace(version=lambda: None)
+        )
+
+        smi_result = types.SimpleNamespace(
+            returncode=0, stdout="NVIDIA RTX 5070 Ti, 565.77\n"
+        )
+
+        mock_psutil = types.ModuleType("psutil")
+        mock_psutil.virtual_memory = lambda: types.SimpleNamespace(total=31 * 1024**3)
+
+        with mock.patch.dict("sys.modules", {"torch": mock_torch, "psutil": mock_psutil}), \
+             mock.patch("diagnostics.subprocess.run", return_value=smi_result), \
+             mock.patch.object(ScoringConfig, 'detect_gpu_vram_gb', return_value=None):
+            run_doctor(
+                config_path=str(tmp_path / "no.json"),
+                db_path=str(tmp_path / "no.db"),
+            )
+
+        out = capsys.readouterr().out
+        assert "GPU Troubleshooting" in out
+        assert "GPU found by driver" in out
+        assert "RTX 5070 Ti" in out
+        assert "cu128" in out
+        assert "legacy" in out
+        assert "31GB RAM" in out
+
+    def test_simulate_gpu_no_vram(self, capsys, tmp_path):
+        """--simulate-gpu without --simulate-vram → troubleshooting output."""
+        run_doctor(
+            config_path=str(tmp_path / "no.json"),
+            db_path=str(tmp_path / "no.db"),
+            simulate_gpu="RTX 5070 Ti",
+        )
+
+        out = capsys.readouterr().out
+        assert "[SIM] Simulation mode: RTX 5070 Ti" in out
+        assert "GPU Troubleshooting" in out
+        assert "GPU found by driver" in out
+        assert "RTX 5070 Ti" in out
+        assert "cu128" in out
+
+    def test_simulate_gpu_with_vram(self, capsys, tmp_path):
+        """--simulate-gpu with --simulate-vram → shows GPU info and suggests profile."""
+        run_doctor(
+            config_path=str(tmp_path / "no.json"),
+            db_path=str(tmp_path / "no.db"),
+            simulate_gpu="RTX 5070 Ti",
+            simulate_vram=16.0,
+        )
+
+        out = capsys.readouterr().out
+        assert "[SIM] Simulation mode: RTX 5070 Ti, 16GB VRAM" in out
+        assert "GPU (simulated)" in out
+        assert "16.0 GB" in out
+        assert "16gb" in out

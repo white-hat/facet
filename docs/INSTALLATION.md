@@ -20,7 +20,7 @@
 python3 -m venv venv
 source venv/bin/activate
 
-# Install base dependencies
+# Install base dependencies (all at once for proper dependency resolution)
 pip install -r requirements.txt
 
 # For 8gb/16gb/24gb profiles, also install:
@@ -29,6 +29,8 @@ pip install transformers>=4.57.0 accelerate>=0.25.0
 # For 24gb profile, additionally:
 pip install qwen-vl-utils>=0.0.2
 ```
+
+> **Hitting dependency errors?** See [Troubleshooting Dependency Conflicts](#troubleshooting-dependency-conflicts) below.
 
 ## GPU Setup
 
@@ -116,6 +118,63 @@ python -c "import torch, cv2, fastapi, insightface, open_clip, numpy, scipy, skl
 |---------|---------|
 | `cuml`, `cupy` | GPU-accelerated face clustering (requires conda + CUDA) |
 | `onnxruntime-gpu` | GPU-accelerated face detection |
+
+## Troubleshooting Dependency Conflicts
+
+Facet has many ML dependencies (`torch`, `open-clip-torch`, `insightface`, etc.) that pull in their own transitive dependencies. pip resolves dependencies sequentially, which can lead to cascading errors where installing one package breaks another.
+
+### Symptoms
+
+- Installing packages one-by-one triggers errors asking you to install yet another package
+- Version conflicts between `torch`, `numpy`, `huggingface-hub`, or `open-clip-torch`
+- `pip install` succeeds but `import` fails at runtime
+
+### Solutions
+
+**1. Install everything at once** — gives pip the full dependency graph to solve:
+
+```bash
+pip install -r requirements.txt
+```
+
+Do **not** install packages individually (`pip install open-clip-torch && pip install insightface && ...`) — this prevents pip from resolving the full graph.
+
+**2. Use [uv](https://docs.astral.sh/uv/) instead of pip** — `uv` resolves the complete dependency graph upfront before installing anything, avoiding cascading conflicts:
+
+```bash
+# Install uv
+pip install uv
+
+# Install all dependencies with full resolution
+uv pip install -r requirements.txt
+
+# With CUDA index for PyTorch:
+uv pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
+```
+
+**3. Start fresh** — if your environment is already in a broken state:
+
+```bash
+deactivate
+rm -rf venv
+python3 -m venv venv && source venv/bin/activate
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+pip install -r requirements.txt
+```
+
+### GPU Detection Issues
+
+If your GPU is not detected (common with newer GPUs like RTX 5070 Ti), run the diagnostic tool:
+
+```bash
+python facet.py --doctor
+```
+
+This checks PyTorch CUDA support, driver compatibility, and suggests the correct pip install command. You can also simulate GPU scenarios for testing:
+
+```bash
+python facet.py --doctor --simulate-gpu "RTX 5070 Ti" --simulate-vram 16
+```
 
 ## First Run
 

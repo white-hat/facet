@@ -203,6 +203,10 @@ Configuration:
                         help='Show available models and their VRAM requirements')
     model_group.add_argument('--doctor', action='store_true',
                         help='Run diagnostic checks (Python, GPU, dependencies, config)')
+    model_group.add_argument('--simulate-gpu', type=str, default=None, metavar='NAME',
+                        help='Simulate GPU for --doctor (e.g., "RTX 5070 Ti")')
+    model_group.add_argument('--simulate-vram', type=float, default=None, metavar='GB',
+                        help='Simulate VRAM in GB for --doctor (e.g., 16)')
 
     # Export
     export_group = parser.add_argument_group('Export')
@@ -228,6 +232,11 @@ Configuration:
     if args.simulate and not args.compute_recommendations:
         parser.error("--simulate requires --compute-recommendations")
 
+    if (args.simulate_gpu or args.simulate_vram is not None) and not args.doctor:
+        parser.error("--simulate-gpu and --simulate-vram require --doctor")
+    if args.simulate_vram is not None and not args.simulate_gpu:
+        parser.error("--simulate-vram requires --simulate-gpu")
+
     if args.dry_run_count != 10 and not args.dry_run:
         parser.error("--dry-run-count requires --dry-run")
 
@@ -246,7 +255,8 @@ Configuration:
     # Doctor mode (lightweight - no GPU needed)
     if args.doctor:
         from diagnostics import run_doctor
-        run_doctor(config_path=args.config, db_path=args.db)
+        run_doctor(config_path=args.config, db_path=args.db,
+                   simulate_gpu=args.simulate_gpu, simulate_vram=args.simulate_vram)
         exit()
 
     # Comparison statistics mode (lightweight - no GPU needed)

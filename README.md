@@ -102,7 +102,7 @@ python -m venv venv && source venv/bin/activate
 # 3. Install PyTorch with CUDA (pick your version at https://pytorch.org/get-started/locally)
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 
-# 4. Install Python dependencies
+# 4. Install Python dependencies (all at once — see Troubleshooting if you hit conflicts)
 pip install -r requirements.txt
 
 # 5. Install ONNX Runtime for face detection (choose ONE)
@@ -120,7 +120,7 @@ python viewer.py
 # Open http://localhost:5000
 ```
 
-Run `python facet.py --doctor` to diagnose GPU issues. See [Installation](docs/INSTALLATION.md) for VRAM profiles, VLM tagging packages (16gb/24gb), and optional dependencies.
+Run `python facet.py --doctor` to diagnose GPU issues. See [Installation](docs/INSTALLATION.md) for VRAM profiles, VLM tagging packages (16gb/24gb), optional dependencies, and [dependency troubleshooting](docs/INSTALLATION.md#troubleshooting-dependency-conflicts).
 
 ## Documentation
 

@@ -27,10 +27,22 @@ def _info(label, value):
     print(f"  [--] {label}: {value}")
 
 
-def run_doctor(config_path=None, db_path=None):
-    """Run full diagnostic report."""
+def run_doctor(config_path=None, db_path=None, simulate_gpu=None, simulate_vram=None):
+    """Run full diagnostic report.
+
+    Args:
+        config_path: Path to scoring config JSON file
+        db_path: Path to database file
+        simulate_gpu: Simulate a GPU name (e.g., "RTX 5070 Ti") for testing
+        simulate_vram: Simulate VRAM in GB (e.g., 16.0) for testing
+    """
     config_path = config_path or 'scoring_config.json'
     db_path = db_path or 'photo_scores_pro.db'
+    simulating = simulate_gpu is not None
+
+    if simulating:
+        vram_str = f", {simulate_vram:.0f}GB VRAM" if simulate_vram else ""
+        print(f"\n  [SIM] Simulation mode: {simulate_gpu}{vram_str}")
 
     # --- Python / Platform ---
     _section("Python / Platform")
@@ -47,32 +59,54 @@ def run_doctor(config_path=None, db_path=None):
 
     # --- PyTorch ---
     _section("PyTorch")
-    try:
-        import torch
-        _ok("torch", torch.__version__)
-        cuda_version = torch.version.cuda or "None (CPU-only build)"
-        if torch.version.cuda:
-            _ok("CUDA (compiled)", cuda_version)
-        else:
-            _warn("CUDA (compiled)", cuda_version)
-
+    if simulating:
+        _info("torch", "skipped (simulation mode)")
+        _info("CUDA", "skipped (simulation mode)")
+    else:
         try:
-            cudnn = torch.backends.cudnn.version()
-            _ok("cuDNN", cudnn)
-        except Exception:
-            _info("cuDNN", "not available")
+            import torch
+            _ok("torch", torch.__version__)
+            cuda_version = torch.version.cuda or "None (CPU-only build)"
+            if torch.version.cuda:
+                _ok("CUDA (compiled)", cuda_version)
+            else:
+                _warn("CUDA (compiled)", cuda_version)
 
-        if torch.cuda.is_available():
-            _ok("torch.cuda.is_available()", "True")
-        else:
-            _warn("torch.cuda.is_available()", "False")
-    except ImportError:
-        _warn("torch", "NOT INSTALLED")
-        print("\n  Install PyTorch: pip install torch torchvision")
-        torch = None
+            try:
+                cudnn = torch.backends.cudnn.version()
+                _ok("cuDNN", cudnn)
+            except Exception:
+                _info("cuDNN", "not available")
+
+            if torch.cuda.is_available():
+                _ok("torch.cuda.is_available()", "True")
+            else:
+                _warn("torch.cuda.is_available()", "False")
+        except ImportError:
+            _warn("torch", "NOT INSTALLED")
+            print("\n  Install PyTorch: pip install torch torchvision")
+            torch = None
 
     # --- GPU ---
-    if torch is not None and torch.cuda.is_available():
+    if simulating:
+        if simulate_vram is not None:
+            _section("GPU (simulated)")
+            _ok("Device", f"{simulate_gpu} (simulated)")
+            _ok("VRAM", f"{simulate_vram:.1f} GB")
+        else:
+            # Simulate "driver sees GPU but torch doesn't" scenario
+            _section("GPU Troubleshooting")
+            _warn("GPU found by driver", f"{simulate_gpu} (simulated)")
+            print()
+            print("  !! PyTorch was built without CUDA support for your GPU.")
+            print("  !! Your PyTorch CUDA version: None (CPU-only)")
+            print("  !!")
+            print("  !! Reinstall with the correct CUDA version:")
+            print("  !!   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128")
+            print("  !!")
+            print("  !! For older GPUs (pre-Blackwell), cu124 may also work:")
+            print("  !!   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124")
+    elif torch is not None and torch.cuda.is_available():
         _section("GPU")
         name = torch.cuda.get_device_name(0)
         props = torch.cuda.get_device_properties(0)
@@ -124,7 +158,8 @@ def run_doctor(config_path=None, db_path=None):
     _section("VRAM Profile")
     try:
         from config.scoring_config import ScoringConfig
-        suggested, vram_gb, msg = ScoringConfig.suggest_vram_profile()
+        profile_vram = simulate_vram if simulating else None
+        suggested, vram_gb, msg = ScoringConfig.suggest_vram_profile(vram_gb=profile_vram)
         _ok("Recommended", msg)
 
         if os.path.exists(config_path):
@@ -198,8 +233,13 @@ def main():
                         help='Path to scoring config JSON file')
     parser.add_argument('--db', type=str, default='photo_scores_pro.db',
                         help='Path to database file')
+    parser.add_argument('--simulate-gpu', type=str, default=None, metavar='NAME',
+                        help='Simulate GPU (e.g., "RTX 5070 Ti")')
+    parser.add_argument('--simulate-vram', type=float, default=None, metavar='GB',
+                        help='Simulate VRAM in GB (e.g., 16)')
     args = parser.parse_args()
-    run_doctor(config_path=args.config, db_path=args.db)
+    run_doctor(config_path=args.config, db_path=args.db,
+               simulate_gpu=args.simulate_gpu, simulate_vram=args.simulate_vram)
 
 
 if __name__ == '__main__':
