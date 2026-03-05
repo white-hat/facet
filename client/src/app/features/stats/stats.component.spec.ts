@@ -138,7 +138,7 @@ describe('StatsComponent', () => {
       await flushPromises();
 
       expect(mockApi.get).toHaveBeenCalledWith('/stats/overview', expect.any(Object));
-      expect(component.overview()).toEqual(mockOverview);
+      expect(component.statsFilters.overview()).toEqual(mockOverview);
       expect(component.loading()).toBe(false);
     });
 
@@ -152,7 +152,7 @@ describe('StatsComponent', () => {
       await flushPromises();
 
       expect(component.loading()).toBe(false);
-      expect(component.overview()).toBeNull();
+      expect(component.statsFilters.overview()).toBeNull();
     });
 
     it('should kick off parallel loads after overview', async () => {
@@ -242,18 +242,20 @@ describe('StatsComponent', () => {
       expect(profile.map(c => c.category)).toEqual(['macro', 'portrait', 'landscape']);
     });
 
-    it('categoryApertureProfile() filters avg_f_stop > 0 and sorts ASC', () => {
-      // landscape has avg_f_stop=0 → filtered; portrait(2.8) < macro(5.6)
-      const aperture = component.categoryApertureProfile();
-      expect(aperture.map(c => c.category)).toEqual(['portrait', 'macro']);
-      expect(aperture.every(c => c.avg_f_stop > 0)).toBe(true);
+    it('categoryMetricData() filters avg_f_stop > 0 and sorts DESC', () => {
+      // landscape has avg_f_stop=0 → filtered; macro(5.6) > portrait(2.8)
+      (component as any).categoryMetric.set('avg_f_stop');
+      const data = (component as any).categoryMetricData();
+      expect(data.map((c: any) => c.category)).toEqual(['macro', 'portrait']);
+      expect(data.every((c: any) => c.avg_f_stop > 0)).toBe(true);
     });
 
-    it('categoryFocalData() filters avg_focal_length > 0 and sorts ASC', () => {
-      // landscape(24) < portrait(85) < macro(100) — all have focal_length > 0
-      const focal = component.categoryFocalData();
-      expect(focal.map(c => c.category)).toEqual(['landscape', 'portrait', 'macro']);
-      expect(focal.every(c => c.avg_focal_length > 0)).toBe(true);
+    it('categoryMetricData() filters avg_focal_length > 0 and sorts DESC', () => {
+      // macro(100) > portrait(85) > landscape(24) — all have focal_length > 0
+      (component as any).categoryMetric.set('avg_focal_length');
+      const data = (component as any).categoryMetricData();
+      expect(data.map((c: any) => c.category)).toEqual(['macro', 'portrait', 'landscape']);
+      expect(data.every((c: any) => c.avg_focal_length > 0)).toBe(true);
     });
 
     it('gear table data: avg_iso=0 and top_camera=null for landscape', () => {

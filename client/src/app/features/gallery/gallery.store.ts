@@ -187,7 +187,7 @@ export interface GalleryFilters {
   search: string;
 }
 
-const DEFAULT_FILTERS: GalleryFilters = {
+export const DEFAULT_FILTERS: GalleryFilters = {
   page: 1,
   per_page: 64,
   sort: 'aggregate',
