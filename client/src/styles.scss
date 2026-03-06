@@ -113,6 +113,11 @@ html, body {
   height: 100%;
 }
 
+// Person selector: reduce height when persons are selected (no label)
+.person-select-compact .mat-mdc-text-field-wrapper {
+  --mat-form-field-container-vertical-padding: 4px;
+}
+
 // Person selector: wider panel with taller rows for face avatars
 .person-select-panel {
   min-width: 320px !important;

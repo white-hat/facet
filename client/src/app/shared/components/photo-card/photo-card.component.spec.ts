@@ -106,7 +106,6 @@ describe('PhotoCardComponent', () => {
     expect(card.currentSort()).toBe('aggregate');
     expect(card.thumbSize()).toBe(240);
     expect(card.isEditionMode()).toBe(false);
-    expect(card.hoverStar()).toBeNull();
     expect(card.personFilterId()).toBe('');
     expect(card.config()).toBeNull();
   });
@@ -117,5 +116,45 @@ describe('PhotoCardComponent', () => {
     const card = getCard();
     expect(card.photo().filename).toBe('updated.jpg');
     expect(card.photo().aggregate).toBe(9.0);
+  });
+
+  describe('cycleStarRating', () => {
+    it('emits next star value (0 → 1)', () => {
+      const card = getCard();
+      const spy = jest.fn();
+      card.starClicked.subscribe(spy);
+      card.cycleStarRating();
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ star: 1 }));
+    });
+
+    it('increments star rating (3 → 4)', () => {
+      fixture.componentInstance.photo.set(makePhoto({ star_rating: 3 }));
+      fixture.detectChanges();
+      const card = getCard();
+      const spy = jest.fn();
+      card.starClicked.subscribe(spy);
+      card.cycleStarRating();
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ star: 4 }));
+    });
+
+    it('wraps from 5 back to 0', () => {
+      fixture.componentInstance.photo.set(makePhoto({ star_rating: 5 }));
+      fixture.detectChanges();
+      const card = getCard();
+      const spy = jest.fn();
+      card.starClicked.subscribe(spy);
+      card.cycleStarRating();
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ star: 0 }));
+    });
+
+    it('treats null rating as 0', () => {
+      fixture.componentInstance.photo.set(makePhoto({ star_rating: null }));
+      fixture.detectChanges();
+      const card = getCard();
+      const spy = jest.fn();
+      card.starClicked.subscribe(spy);
+      card.cycleStarRating();
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({ star: 1 }));
+    });
   });
 });

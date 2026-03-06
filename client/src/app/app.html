@@ -56,8 +56,11 @@
 
         <!-- Person multi-select -->
         @if (store.persons().length) {
-          <mat-form-field class="!hidden lg:!inline-flex w-44 xl:w-52" subscriptSizing="dynamic">
-            <mat-label>{{ 'gallery.person' | translate }}</mat-label>
+          <mat-form-field class="!hidden lg:!inline-flex w-44 xl:w-52" subscriptSizing="dynamic"
+            [class.person-select-compact]="selectedPersonIds().length">
+            @if (!selectedPersonIds().length) {
+              <mat-label>{{ 'gallery.person' | translate }}</mat-label>
+            }
             <mat-select
               multiple
               panelClass="person-select-panel"
@@ -98,7 +101,6 @@
 
         <!-- Search -->
         <mat-form-field class="!hidden lg:!inline-flex w-44 xl:w-56" subscriptSizing="dynamic">
-          <mat-icon matPrefix>search</mat-icon>
           <input
             matInput
             [placeholder]="'gallery.search_placeholder' | translate"
@@ -110,6 +112,8 @@
             <button matSuffix mat-icon-button (click)="clearSearch()">
               <mat-icon>close</mat-icon>
             </button>
+          } @else {
+            <mat-icon matSuffix>search</mat-icon>
           }
         </mat-form-field>
 
