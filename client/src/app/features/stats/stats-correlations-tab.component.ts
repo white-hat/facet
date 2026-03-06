@@ -116,14 +116,14 @@ export class StatsCorrelationsTabComponent {
 
   readonly correlationsCanvas = viewChild<ElementRef<HTMLCanvasElement>>('correlationsCanvas');
 
-  corrXAxis = signal('date_year');
-  corrYMetrics = signal<string[]>(['aggregate', 'aesthetic']);
-  corrGroupBy = signal('');
-  corrChartType = signal('line');
+  readonly corrXAxis = signal('date_year');
+  readonly corrYMetrics = signal<string[]>(['aggregate', 'aesthetic']);
+  readonly corrGroupBy = signal('');
+  readonly corrChartType = signal('line');
   readonly corrMinSamples = 3;
-  corrData = signal<CorrelationApiResponse | null>(null);
-  corrBucketCount = computed(() => this.corrData()?.labels?.length ?? 0);
-  correlationLoading = signal(false);
+  readonly corrData = signal<CorrelationApiResponse | null>(null);
+  readonly corrBucketCount = computed(() => this.corrData()?.labels?.length ?? 0);
+  readonly correlationLoading = signal(false);
 
   readonly corrDimensions = [
     { key: 'iso' }, { key: 'f_stop' }, { key: 'focal_length' },
