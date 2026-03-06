@@ -63,7 +63,8 @@ interface AppConfig {
 
         <!-- Persistent favorite heart (visible without hover, bottom-right) -->
         @if (photo().is_favorite) {
-          <div class="absolute bottom-1.5 right-3 z-20 pointer-events-none md:group-hover/img:opacity-0 transition-opacity">
+          <div class="absolute bottom-1.5 right-3 z-20 pointer-events-none transition-opacity"
+               [class.md:group-hover/img:opacity-0]="isEditionMode()">
             <mat-icon class="!text-base !w-4 !h-4 !leading-4 !text-red-400 drop-shadow-md">favorite</mat-icon>
           </div>
         }
