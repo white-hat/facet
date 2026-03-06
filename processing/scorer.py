@@ -207,14 +207,13 @@ def _get_exif_orientation(photo_path):
     except ImportError:
         # exifread not installed, try PIL
         try:
-            from PIL import Image, ExifTags
+            from PIL import Image
             img = Image.open(photo_path)
-            exif = img._getexif()
+            exif = img.getexif()
             if exif:
-                for tag_id, value in exif.items():
-                    tag = ExifTags.TAGS.get(tag_id, tag_id)
-                    if tag == 'Orientation':
-                        return value
+                orientation = exif.get(0x0112)  # Orientation tag
+                if orientation:
+                    return orientation
         except Exception:
             pass
     except Exception:
@@ -1776,12 +1775,57 @@ class Facet:
         except Exception:
             pass
 
-        # 3. Fallback to Pillow (Original logic for JPEGs)
+        # 3. Fallback to exifread (works with DNG, ARW, and most RAW formats)
+        try:
+            import exifread
+            with open(image_path, 'rb') as f:
+                tags = exifread.process_file(f, details=False)
+            if tags:
+                if 'EXIF DateTimeOriginal' in tags:
+                    exif_data['date_taken'] = str(tags['EXIF DateTimeOriginal'])
+                elif 'Image DateTimeOriginal' in tags:
+                    exif_data['date_taken'] = str(tags['Image DateTimeOriginal'])
+                if 'Image Model' in tags:
+                    exif_data['camera_model'] = str(tags['Image Model'])
+                if 'EXIF LensModel' in tags:
+                    exif_data['lens_model'] = str(tags['EXIF LensModel'])
+                try:
+                    if 'EXIF ISOSpeedRatings' in tags:
+                        exif_data['iso'] = int(tags['EXIF ISOSpeedRatings'].values[0])
+                except (ValueError, IndexError, ZeroDivisionError):
+                    pass
+                try:
+                    if 'EXIF FNumber' in tags:
+                        exif_data['f_stop'] = float(tags['EXIF FNumber'].values[0])
+                except (ValueError, IndexError, ZeroDivisionError):
+                    pass
+                if 'EXIF ExposureTime' in tags:
+                    exif_data['shutter_speed'] = str(tags['EXIF ExposureTime'])
+                try:
+                    if 'EXIF FocalLength' in tags:
+                        exif_data['focal_length'] = float(tags['EXIF FocalLength'].values[0])
+                except (ValueError, IndexError, ZeroDivisionError):
+                    pass
+                try:
+                    if 'EXIF FocalLengthIn35mmFilm' in tags:
+                        exif_data['focal_length_35mm'] = float(tags['EXIF FocalLengthIn35mmFilm'].values[0])
+                except (ValueError, IndexError, ZeroDivisionError):
+                    pass
+                if exif_data['camera_model']:
+                    return exif_data
+        except Exception:
+            pass
+
+        # 4. Fallback to Pillow (JPEG and TIFF/DNG via modern getexif API)
         try:
             img = Image.open(image_path)
-            info = img._getexif()
-            if info:
-                for tag, value in info.items():
+            exif = img.getexif()
+            all_tags = dict(exif.items())
+            exif_ifd = exif.get_ifd(0x8769)
+            if exif_ifd:
+                all_tags.update(exif_ifd)
+            if all_tags:
+                for tag, value in all_tags.items():
                     decoded = ExifTags.TAGS.get(tag, tag)
                     if decoded == 'DateTimeOriginal':
                         exif_data['date_taken'] = str(value)
