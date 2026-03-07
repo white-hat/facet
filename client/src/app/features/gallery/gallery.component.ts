@@ -68,15 +68,13 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
                   [config]="store.config()"
                   [isSelected]="selectedPaths().has(photo.path)"
                   [hideDetails]="effectiveHideDetails()"
-                  [hideTooltip]="effectiveHideTooltip()"
                   [currentSort]="store.filters().sort"
                   [thumbSize]="thumbSize()"
                   [isEditionMode]="auth.isEdition()"
-                  [hoverStar]="hoverStars()[photo.path]"
                   [personFilterId]="store.filters().person_id"
                   (selectionChange)="toggleSelection($event)"
                   (tooltipShow)="showTooltip($event.event, $event.photo)"
-                  (tooltipHide)="hideTooltip(); clearHoverStar(photo.path)"
+                  (tooltipHide)="hideTooltip()"
                   (tagClicked)="store.updateFilter('tag', $event)"
                   (personFilterClicked)="filterByPerson($event)"
                   (personRemoveClicked)="removePerson($event.photo, $event.personId)"
@@ -84,8 +82,7 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
                   (openAddPersonClicked)="openAddPerson($event)"
                   (favoriteToggled)="store.toggleFavorite($event)"
                   (rejectedToggled)="store.toggleRejected($event)"
-                  (starHoverChanged)="$event.star !== null ? setHoverStar($event.path, $event.star) : clearHoverStar($event.path)"
-                  (starClicked)="onStarClick($event.photo, $event.star)"
+                  (starClicked)="store.setRating($event.photo.path, $event.star)"
                 />
               }
             </div>
@@ -99,18 +96,16 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
                       [style.width.px]="row.widths[i]"
                       [style.height.px]="row.height"
                       [hideDetails]="true"
-                      [hideTooltip]="effectiveHideTooltip()"
                       [mosaicMode]="true"
                       [config]="store.config()"
                       [isSelected]="selectedPaths().has(photo.path)"
                       [currentSort]="store.filters().sort"
                       [thumbSize]="thumbSize()"
                       [isEditionMode]="auth.isEdition()"
-                      [hoverStar]="hoverStars()[photo.path]"
                       [personFilterId]="store.filters().person_id"
                       (selectionChange)="toggleSelection($event)"
                       (tooltipShow)="showTooltip($event.event, $event.photo)"
-                      (tooltipHide)="hideTooltip(); clearHoverStar(photo.path)"
+                      (tooltipHide)="hideTooltip()"
                       (tagClicked)="store.updateFilter('tag', $event)"
                       (personFilterClicked)="filterByPerson($event)"
                       (personRemoveClicked)="removePerson($event.photo, $event.personId)"
@@ -118,8 +113,7 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
                       (openAddPersonClicked)="openAddPerson($event)"
                       (favoriteToggled)="store.toggleFavorite($event)"
                       (rejectedToggled)="store.toggleRejected($event)"
-                      (starHoverChanged)="$event.star !== null ? setHoverStar($event.path, $event.star) : clearHoverStar($event.path)"
-                      (starClicked)="onStarClick($event.photo, $event.star)"
+                      (starClicked)="store.setRating($event.photo.path, $event.star)"
                     />
                   }
                 </div>
@@ -469,26 +463,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
 
   hideTooltip(): void {
     this.tooltipPhoto.set(null);
-  }
-
-  // --- Hover star state ---
-  readonly hoverStars = signal<Record<string, number | null>>({});
-
-  setHoverStar(path: string, star: number): void {
-    this.hoverStars.update(s => ({ ...s, [path]: star }));
-  }
-
-  clearHoverStar(path: string): void {
-    this.hoverStars.update(s => {
-      const next = { ...s };
-      delete next[path];
-      return next;
-    });
-  }
-
-  onStarClick(photo: Photo, star: number): void {
-    const newRating = photo.star_rating === star ? 0 : star;
-    this.store.setRating(photo.path, newRating);
   }
 
   // --- Card action handlers ---

@@ -149,7 +149,7 @@ Python packages: `torch`, `torchvision`, `open-clip-torch`, `opencv-python`, `pi
 
 For GPU face clustering (optional): `cuml`, `cupy` (requires conda + CUDA)
 
-External tool: `exiftool` (command-line)
+External tool: `exiftool` (command-line, optional — `exifread` fallback handles all RAW formats)
 
 ## Architecture
 

@@ -63,6 +63,60 @@ describe('GalleryFilterSidebarComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  describe('sectionActiveCounts', () => {
+    it('returns 0 for all sections when no filters are active', () => {
+      const mockStore = (component as any).store;
+      mockStore.filters.set({ ...mockStore.filters(), hide_rejected: false });
+      const counts = component.sectionActiveCounts();
+      expect(counts['date']).toBe(0);
+      expect(counts['content']).toBe(0);
+      expect(counts['equipment']).toBe(0);
+      expect(counts['display']).toBe(0);
+      expect(counts['gallery.sidebar.quality']).toBe(0);
+      expect(counts['gallery.sidebar.face']).toBe(0);
+    });
+
+    it('counts date_from and date_to independently', () => {
+      const mockStore = (component as any).store;
+      mockStore.filters.set({ ...mockStore.filters(), date_from: '2024-01-01' });
+      expect(component.sectionActiveCounts()['date']).toBe(1);
+      mockStore.filters.set({ ...mockStore.filters(), date_to: '2024-12-31' });
+      expect(component.sectionActiveCounts()['date']).toBe(2);
+    });
+
+    it('counts tag and composition_pattern for content section', () => {
+      const mockStore = (component as any).store;
+      mockStore.filters.set({ ...mockStore.filters(), tag: 'landscape' });
+      expect(component.sectionActiveCounts()['content']).toBe(1);
+      mockStore.filters.set({ ...mockStore.filters(), composition_pattern: 'rule_of_thirds' });
+      expect(component.sectionActiveCounts()['content']).toBe(2);
+    });
+
+    it('counts camera and lens for equipment section', () => {
+      const mockStore = (component as any).store;
+      mockStore.filters.set({ ...mockStore.filters(), camera: 'Sony A7', lens: 'FE 85mm' });
+      expect(component.sectionActiveCounts()['equipment']).toBe(2);
+    });
+
+    it('counts favorites_only, is_monochrome, hide_rejected for display section', () => {
+      const mockStore = (component as any).store;
+      mockStore.filters.set({ ...mockStore.filters(), favorites_only: true, is_monochrome: true, hide_rejected: true });
+      expect(component.sectionActiveCounts()['display']).toBe(3);
+    });
+
+    it('counts active metric filters by min/max key', () => {
+      const mockStore = (component as any).store;
+      mockStore.filters.set({ ...mockStore.filters(), min_score: '7', min_aesthetic: '6' });
+      expect(component.sectionActiveCounts()['gallery.sidebar.quality']).toBe(2);
+    });
+
+    it('counts a metric filter once even when both min and max are set', () => {
+      const mockStore = (component as any).store;
+      mockStore.filters.set({ ...mockStore.filters(), min_score: '5', max_score: '9' });
+      expect(component.sectionActiveCounts()['gallery.sidebar.quality']).toBe(1);
+    });
+  });
+
   describe('onDynamicRangeChange', () => {
     const iaaFilter = {
       id: 'aesthetic_iaa_range', labelKey: 'gallery.aesthetic_iaa_range',

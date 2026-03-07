@@ -1,6 +1,6 @@
-import { Component, computed, inject, ElementRef, OnInit, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { MatSelect, MatSelectModule } from '@angular/material/select';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,7 +8,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { GalleryStore, GalleryFilters } from './gallery.store';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { GalleryStore } from './gallery.store';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { FilterDisplayPipe } from '../../shared/pipes/filter-display.pipe';
 import { AdditionalFilterDef } from '../../shared/models/filter-def.model';
@@ -73,8 +74,14 @@ interface FilterGroup {
   filters: AdditionalFilterDef[];
 }
 
+// Pre-built map for O(1) section lookup — both filterGroups and sectionActiveCounts use this.
+const FILTERS_BY_SECTION: Record<string, AdditionalFilterDef[]> = Object.fromEntries(
+  SECTION_ORDER.map(key => [key, ADDITIONAL_FILTERS.filter(f => f.sectionKey === key)])
+);
+
 const SIDEBAR_SECTIONS_KEY = 'facet_sidebar_sections';
-const ACTIVE_FILTERS_KEY = 'facet_active_filters';
+// One-time cleanup of legacy localStorage key from v3.x.
+try { localStorage.removeItem('facet_active_filters'); } catch { /* ignore */ }
 
 function loadSectionStates(): Record<string, boolean> {
   try {
@@ -90,23 +97,10 @@ function saveSectionStates(states: Record<string, boolean>): void {
   } catch { /* ignore */ }
 }
 
-function loadActiveFilterIds(): string[] {
-  try {
-    const raw = localStorage.getItem(ACTIVE_FILTERS_KEY);
-    if (raw) return JSON.parse(raw) as string[];
-  } catch { /* ignore */ }
-  return [];
-}
-
-function saveActiveFilterIds(ids: Set<string>): void {
-  try {
-    localStorage.setItem(ACTIVE_FILTERS_KEY, JSON.stringify([...ids]));
-  } catch { /* ignore */ }
-}
-
 @Component({
   selector: 'app-gallery-filter-sidebar',
   standalone: true,
+  host: { class: 'block h-full' },
   imports: [
     FormsModule,
     MatSelectModule,
@@ -117,29 +111,27 @@ function saveActiveFilterIds(ids: Set<string>): void {
     MatCheckboxModule,
     MatInputModule,
     MatTooltipModule,
+    MatExpansionModule,
     TranslatePipe,
     FilterDisplayPipe,
   ],
   template: `
-    <div class="flex items-center justify-between px-4 py-3 border-b border-[var(--mat-sys-outline-variant)]">
-      <span class="text-base font-medium">{{ 'gallery.filters' | translate }}</span>
-      <div class="flex items-center">
-        <button mat-icon-button [matTooltip]="'gallery.reset_filters' | translate" (click)="store.resetFilters(); clearActiveFilters()">
-          <mat-icon>restart_alt</mat-icon>
-        </button>
-        <button mat-icon-button (click)="store.setFilterDrawerOpen(false)">
-          <mat-icon>close</mat-icon>
-        </button>
-      </div>
-    </div>
+<div data-scroll class="overflow-y-auto px-2 h-full">
 
-    <div #filterScrollArea data-scroll class="overflow-y-auto p-4 flex flex-col gap-1 max-h-[calc(100vh-120px)]">
       <!-- Date Range -->
-      <details [open]="sectionStates()['date'] !== false" (toggle)="onSectionToggle('date', $event)" class="group/section">
-        <summary class="flex items-center justify-between py-2.5 text-xs font-medium uppercase tracking-wider opacity-70 cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-          {{ 'gallery.sidebar.date' | translate }}
-          <mat-icon class="!text-xl transition-transform group-open/section:rotate-180">expand_more</mat-icon>
-        </summary>
+      <mat-expansion-panel class="!mb-1 mt-4" [expanded]="sectionStates()['date'] !== false"
+                           (opened)="onSectionToggle('date', true)"
+                           (closed)="onSectionToggle('date', false)"
+                           [style.background-color]="sectionStates()['date'] !== false ? 'var(--mat-sys-surface-container)' : null">
+        <mat-expansion-panel-header>
+          <mat-panel-title class="flex items-center gap-2">
+            <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">calendar_today</mat-icon>
+            {{ 'gallery.sidebar.date' | translate }}
+            @if (sectionActiveCounts()['date']) {
+              <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">{{ sectionActiveCounts()['date'] }}</span>
+            }
+          </mat-panel-title>
+        </mat-expansion-panel-header>
         <div class="flex flex-col gap-2 pb-2">
           <mat-form-field subscriptSizing="dynamic" class="w-full">
             <mat-label>{{ 'gallery.date_from' | translate }}</mat-label>
@@ -150,15 +142,23 @@ function saveActiveFilterIds(ids: Set<string>): void {
             <input matInput type="date" [value]="store.filters().date_to" (change)="onDateChange('date_to', $event)" />
           </mat-form-field>
         </div>
-      </details>
+      </mat-expansion-panel>
 
       <!-- Content -->
       @if (store.tags().length || store.patterns().length) {
-        <details [open]="sectionStates()['content'] !== false" (toggle)="onSectionToggle('content', $event)" class="group/section">
-          <summary class="flex items-center justify-between py-2.5 text-xs font-medium uppercase tracking-wider opacity-70 cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-            {{ 'gallery.sidebar.content' | translate }}
-            <mat-icon class="!text-xl transition-transform group-open/section:rotate-180">expand_more</mat-icon>
-          </summary>
+        <mat-expansion-panel class="!mb-1" [expanded]="sectionStates()['content'] !== false"
+                             (opened)="onSectionToggle('content', true)"
+                             (closed)="onSectionToggle('content', false)"
+                             [style.background-color]="sectionStates()['content'] !== false ? 'var(--mat-sys-surface-container)' : null">
+          <mat-expansion-panel-header>
+            <mat-panel-title class="flex items-center gap-2">
+              <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">label</mat-icon>
+              {{ 'gallery.sidebar.content' | translate }}
+              @if (sectionActiveCounts()['content']) {
+                <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">{{ sectionActiveCounts()['content'] }}</span>
+              }
+            </mat-panel-title>
+          </mat-expansion-panel-header>
           <div class="flex flex-col gap-2 pb-2">
             @if (store.tags().length) {
               <mat-form-field subscriptSizing="dynamic" class="w-full">
@@ -183,16 +183,24 @@ function saveActiveFilterIds(ids: Set<string>): void {
               </mat-form-field>
             }
           </div>
-        </details>
+        </mat-expansion-panel>
       }
 
       <!-- Equipment -->
       @if (store.cameras().length || store.lenses().length) {
-        <details [open]="sectionStates()['equipment'] !== false" (toggle)="onSectionToggle('equipment', $event)" class="group/section">
-          <summary class="flex items-center justify-between py-2.5 text-xs font-medium uppercase tracking-wider opacity-70 cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-            {{ 'gallery.sidebar.equipment' | translate }}
-            <mat-icon class="!text-xl transition-transform group-open/section:rotate-180">expand_more</mat-icon>
-          </summary>
+        <mat-expansion-panel class="!mb-1" [expanded]="sectionStates()['equipment'] !== false"
+                             (opened)="onSectionToggle('equipment', true)"
+                             (closed)="onSectionToggle('equipment', false)"
+                             [style.background-color]="sectionStates()['equipment'] !== false ? 'var(--mat-sys-surface-container)' : null">
+          <mat-expansion-panel-header>
+            <mat-panel-title class="flex items-center gap-2">
+              <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">photo_camera</mat-icon>
+              {{ 'gallery.sidebar.equipment' | translate }}
+              @if (sectionActiveCounts()['equipment']) {
+                <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">{{ sectionActiveCounts()['equipment'] }}</span>
+              }
+            </mat-panel-title>
+          </mat-expansion-panel-header>
           <div class="flex flex-col gap-2 pb-2">
             @if (store.cameras().length) {
               <mat-form-field subscriptSizing="dynamic" class="w-full">
@@ -217,15 +225,23 @@ function saveActiveFilterIds(ids: Set<string>): void {
               </mat-form-field>
             }
           </div>
-        </details>
+        </mat-expansion-panel>
       }
 
       <!-- Display Options -->
-      <details [open]="sectionStates()['display'] !== false" (toggle)="onSectionToggle('display', $event)" class="group/section">
-        <summary class="flex items-center justify-between py-2.5 text-xs font-medium uppercase tracking-wider opacity-70 cursor-pointer select-none [list-style:none] [&::-webkit-details-marker]:hidden">
-          {{ 'gallery.sidebar.display' | translate }}
-          <mat-icon class="!text-xl transition-transform group-open/section:rotate-180">expand_more</mat-icon>
-        </summary>
+      <mat-expansion-panel class="!mb-1" [expanded]="sectionStates()['display'] !== false"
+                           (opened)="onSectionToggle('display', true)"
+                           (closed)="onSectionToggle('display', false)"
+                           [style.background-color]="sectionStates()['display'] !== false ? 'var(--mat-sys-surface-container)' : null">
+        <mat-expansion-panel-header>
+          <mat-panel-title class="flex items-center gap-2">
+            <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">display_settings</mat-icon>
+            {{ 'gallery.sidebar.display' | translate }}
+            @if (sectionActiveCounts()['display']) {
+              <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">{{ sectionActiveCounts()['display'] }}</span>
+            }
+          </mat-panel-title>
+        </mat-expansion-panel-header>
         <div class="flex flex-col gap-2 pb-2">
           @if (store.galleryMode() === 'grid') {
             <mat-checkbox
@@ -288,110 +304,84 @@ function saveActiveFilterIds(ids: Set<string>): void {
             </div>
           }
         </div>
-      </details>
+      </mat-expansion-panel>
 
-      <!-- Add Filter dropdown -->
-      @if (availableFilterGroups().length) {
-        <mat-form-field subscriptSizing="dynamic" class="w-full mt-2">
-          <mat-label>{{ 'gallery.sidebar.add_filter' | translate }}</mat-label>
-          <mat-select #addFilterSelect (selectionChange)="addAdditionalFilter($event.value)" [value]="null">
-            @for (group of availableFilterGroups(); track group.sectionKey) {
-              <mat-optgroup [label]="group.sectionKey | translate">
-                @for (f of group.filters; track f.id) {
-                  <mat-option [value]="f.id">{{ f.labelKey | translate }}</mat-option>
-                }
-              </mat-optgroup>
+      <!-- Metric filter sections (collapsed by default) -->
+      @for (group of filterGroups; track group.sectionKey) {
+        <mat-expansion-panel class="!mb-1" [expanded]="sectionStates()[group.sectionKey] === true"
+                             (opened)="onSectionToggle(group.sectionKey, true)"
+                             (closed)="onSectionToggle(group.sectionKey, false)"
+                             [style.background-color]="sectionStates()[group.sectionKey] === true ? 'var(--mat-sys-surface-container)' : null">
+          <mat-expansion-panel-header>
+            <mat-panel-title class="flex items-center gap-2">
+              <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">{{ sectionIcons[group.sectionKey] || 'tune' }}</mat-icon>
+              {{ group.sectionKey | translate }}
+              @if (sectionActiveCounts()[group.sectionKey]) {
+                <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">{{ sectionActiveCounts()[group.sectionKey] }}</span>
+              }
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <div class="flex flex-col gap-1 pb-1">
+            @for (def of group.filters; track def.id) {
+              <div class="flex flex-col gap-0">
+                <label class="text-xs opacity-60 px-1">{{ def.labelKey | translate }}</label>
+                <div class="flex items-center gap-1">
+                  <mat-slider [min]="def.sliderMin" [max]="def.sliderMax" [step]="def.step" class="flex-1">
+                    <input matSliderStartThumb
+                      [value]="store.filters()[def.minKey] ? +store.filters()[def.minKey] : def.sliderMin"
+                      (valueChange)="onDynamicRangeChange(def, 'min', $event)" />
+                    <input matSliderEndThumb
+                      [value]="store.filters()[def.maxKey] ? +store.filters()[def.maxKey] : def.sliderMax"
+                      (valueChange)="onDynamicRangeChange(def, 'max', $event)" />
+                  </mat-slider>
+                  <span class="text-xs opacity-60 text-right" [class]="def.spanWidth">{{ store.filters() | filterDisplay:def }}</span>
+                </div>
+              </div>
             }
-          </mat-select>
-        </mat-form-field>
-      }
-
-      <!-- Active additional filters -->
-      @for (def of activeFilterDefs(); track def.id) {
-        <div class="flex flex-col gap-1 mt-1">
-          <div class="flex items-center justify-between">
-            <label class="text-sm opacity-70">{{ def.labelKey | translate }}</label>
-            <button mat-icon-button class="!w-7 !h-7 !p-0" [matTooltip]="'ui.buttons.remove' | translate" (click)="removeAdditionalFilter(def.id)">
-              <mat-icon class="!text-lg">close</mat-icon>
-            </button>
           </div>
-          <div class="flex items-center gap-2">
-            <mat-slider [min]="def.sliderMin" [max]="def.sliderMax" [step]="def.step" class="flex-1">
-              <input matSliderStartThumb
-                [value]="store.filters()[def.minKey] ? +store.filters()[def.minKey] : def.sliderMin"
-                (valueChange)="onDynamicRangeChange(def, 'min', $event)" />
-              <input matSliderEndThumb
-                [value]="store.filters()[def.maxKey] ? +store.filters()[def.maxKey] : def.sliderMax"
-                (valueChange)="onDynamicRangeChange(def, 'max', $event)" />
-            </mat-slider>
-            <span class="text-xs opacity-60 text-right" [class]="def.spanWidth">{{ store.filters() | filterDisplay:def }}</span>
-          </div>
-        </div>
+        </mat-expansion-panel>
       }
     </div>
   `,
 })
-export class GalleryFilterSidebarComponent implements OnInit {
+export class GalleryFilterSidebarComponent {
   readonly store = inject(GalleryStore);
-  readonly filterScrollArea = viewChild<ElementRef<HTMLDivElement>>('filterScrollArea');
-  readonly addFilterSelect = viewChild<MatSelect>('addFilterSelect');
-
-  readonly activeAdditionalFilters = signal<Set<string>>(new Set());
   readonly sectionStates = signal<Record<string, boolean>>(loadSectionStates());
-
   readonly sliderConfig = computed(() => this.store.config()?.display?.thumbnail_slider ?? null);
 
-  readonly activeFilterDefs = computed(() => {
-    const activeIds = this.activeAdditionalFilters();
-    return ADDITIONAL_FILTERS.filter(f => activeIds.has(f.id));
-  });
+  readonly sectionIcons: Record<string, string> = {
+    'gallery.sidebar.quality': 'star',
+    'gallery.sidebar.extended_quality': 'analytics',
+    'gallery.sidebar.face': 'face',
+    'gallery.sidebar.composition': 'grid_3x3',
+    'gallery.sidebar.saliency': 'center_focus_strong',
+    'gallery.sidebar.technical': 'tune',
+    'gallery.sidebar.exposure_range': 'exposure',
+    'gallery.sidebar.ratings': 'grade',
+  };
 
-  readonly availableFilterGroups = computed((): FilterGroup[] => {
-    const activeIds = this.activeAdditionalFilters();
-    const groups: FilterGroup[] = [];
+  readonly filterGroups: FilterGroup[] = SECTION_ORDER.map(sectionKey => ({
+    sectionKey,
+    filters: FILTERS_BY_SECTION[sectionKey],
+  }));
+
+  readonly sectionActiveCounts = computed((): Record<string, number> => {
+    const f = this.store.filters();
+    const counts: Record<string, number> = {
+      date: (f.date_from ? 1 : 0) + (f.date_to ? 1 : 0),
+      content: (f.tag ? 1 : 0) + (f.composition_pattern ? 1 : 0),
+      equipment: (f.camera ? 1 : 0) + (f.lens ? 1 : 0),
+      display: (f.favorites_only ? 1 : 0) + (f.is_monochrome ? 1 : 0) + (f.hide_rejected ? 1 : 0),
+    };
     for (const sectionKey of SECTION_ORDER) {
-      const filters = ADDITIONAL_FILTERS.filter(f => f.sectionKey === sectionKey && !activeIds.has(f.id));
-      if (filters.length) {
-        groups.push({ sectionKey, filters });
-      }
+      counts[sectionKey] = FILTERS_BY_SECTION[sectionKey].filter(
+        def => (f[def.minKey] as string) || (f[def.maxKey] as string)
+      ).length;
     }
-    return groups;
+    return counts;
   });
 
-  ngOnInit(): void {
-    this.initActiveFilters();
-  }
-
-  addAdditionalFilter(filterId: string): void {
-    this.activeAdditionalFilters.update(s => {
-      const next = new Set(s);
-      next.add(filterId);
-      saveActiveFilterIds(next);
-      return next;
-    });
-    this.addFilterSelect()?.writeValue(null);
-  }
-
-  removeAdditionalFilter(filterId: string): void {
-    const def = ADDITIONAL_FILTERS.find(f => f.id === filterId);
-    if (def) {
-      this.store.updateFilters({ [def.minKey]: '', [def.maxKey]: '' } as Partial<GalleryFilters>);
-    }
-    this.activeAdditionalFilters.update(s => {
-      const next = new Set(s);
-      next.delete(filterId);
-      saveActiveFilterIds(next);
-      return next;
-    });
-  }
-
-  clearActiveFilters(): void {
-    this.activeAdditionalFilters.set(new Set());
-    saveActiveFilterIds(new Set());
-  }
-
-  onSectionToggle(sectionId: string, event: Event): void {
-    const isOpen = (event.target as HTMLDetailsElement).open;
+  onSectionToggle(sectionId: string, isOpen: boolean): void {
     this.sectionStates.update(s => {
       const next = { ...s, [sectionId]: isOpen };
       saveSectionStates(next);
@@ -412,19 +402,5 @@ export class GalleryFilterSidebarComponent implements OnInit {
   onDateChange(key: 'date_from' | 'date_to', event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.store.updateFilter(key, value);
-  }
-
-  private initActiveFilters(): void {
-    const f = this.store.filters();
-    const active = new Set(loadActiveFilterIds());
-
-    // Also auto-activate any filters that have non-default values from URL params
-    for (const def of ADDITIONAL_FILTERS) {
-      const min = f[def.minKey] as string;
-      const max = f[def.maxKey] as string;
-      if (min || max) active.add(def.id);
-    }
-
-    this.activeAdditionalFilters.set(active);
   }
 }
