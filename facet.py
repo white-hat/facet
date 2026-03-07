@@ -334,7 +334,6 @@ Configuration:
     # Backfill focal_length_35mm from EXIF (lightweight - no GPU needed)
     if args.backfill_focal_35mm:
         from exiftool import get_exif_batch
-        from pathlib import Path
         init_database(args.db)
         with get_connection(args.db) as conn:
             cursor = conn.execute(
