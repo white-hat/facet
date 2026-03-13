@@ -277,14 +277,30 @@ class PluginManager:
         except Exception:
             logger.exception("Handler '%s' raised an exception", name)
 
+    @staticmethod
+    def _build_safe_url(url: str, resolved_ip: str) -> tuple[str, str]:
+        """Build a request URL using the resolved IP to prevent DNS rebinding.
+
+        Returns ``(safe_url, hostname)`` — the caller should set the
+        ``Host`` header to *hostname*.
+        """
+        from urllib.parse import urlparse, urlunparse
+
+        parsed = urlparse(url)
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        safe_url = urlunparse(parsed._replace(netloc=f"{resolved_ip}:{port}"))
+        return safe_url, parsed.hostname
+
     @classmethod
     def _send_webhook(cls, url: str, event_name: str, data: dict) -> None:
         """POST JSON payload to *url* after SSRF validation."""
         try:
-            cls._validate_webhook_url(url)
+            resolved_ip = cls._validate_webhook_url(url)
         except ValueError as exc:
             logger.error("Webhook %s — %s blocked (SSRF): %s", event_name, url, exc)
             return
+
+        safe_url, hostname = cls._build_safe_url(url, resolved_ip)
 
         payload = json.dumps(
             {"event": event_name, "data": data},
@@ -292,9 +308,12 @@ class PluginManager:
         ).encode("utf-8")
 
         req = urllib_request.Request(
-            url,
+            safe_url,
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Host": hostname,
+            },
             method="POST",
         )
         try:
@@ -357,8 +376,12 @@ class PluginManager:
         ]
 
     @staticmethod
-    def _validate_webhook_url(url: str) -> None:
-        """Reject URLs targeting private/loopback networks (SSRF prevention)."""
+    def _validate_webhook_url(url: str) -> str:
+        """Reject URLs targeting private/loopback networks (SSRF prevention).
+
+        Returns the first safe resolved IP address so callers can connect
+        directly to it, avoiding DNS-rebinding TOCTOU attacks.
+        """
         import ipaddress
         import socket
         from urllib.parse import urlparse
@@ -369,10 +392,18 @@ class PluginManager:
         hostname = parsed.hostname
         if not hostname:
             raise ValueError("No hostname in URL")
+
+        resolved_ip: str | None = None
         for info in socket.getaddrinfo(hostname, parsed.port or 80):
             addr = ipaddress.ip_address(info[4][0])
             if addr.is_private or addr.is_loopback or addr.is_link_local:
                 raise ValueError(f"URL resolves to private address: {addr}")
+            if resolved_ip is None:
+                resolved_ip = str(addr)
+
+        if resolved_ip is None:
+            raise ValueError("Could not resolve hostname")
+        return resolved_ip
 
     def test_webhook(self, url: str) -> dict:
         """Send a test payload to *url* and return the result.
@@ -381,9 +412,11 @@ class PluginManager:
         awaits the result).
         """
         try:
-            self._validate_webhook_url(url)
+            resolved_ip = self._validate_webhook_url(url)
         except ValueError as exc:
             return {"ok": False, "error": str(exc), "url": url}
+
+        safe_url, hostname = self._build_safe_url(url, resolved_ip)
 
         test_data = {
             "event": "test",
@@ -396,18 +429,23 @@ class PluginManager:
         }
         payload = json.dumps(test_data, default=str).encode("utf-8")
         req = urllib_request.Request(
-            url,
+            safe_url,
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Host": hostname,
+            },
             method="POST",
         )
         try:
             with urllib_request.urlopen(req, timeout=10) as resp:
                 return {"ok": True, "status": resp.status, "url": url}
         except URLError as exc:
-            return {"ok": False, "error": str(exc), "url": url}
-        except Exception as exc:
-            return {"ok": False, "error": str(exc), "url": url}
+            reason = getattr(exc, "reason", None)
+            return {"ok": False, "error": f"Connection failed: {reason}" if reason else "Connection failed", "url": url}
+        except Exception:
+            logger.exception("test_webhook unexpected error for %s", url)
+            return {"ok": False, "error": "Webhook request failed", "url": url}
 
     @property
     def high_score_threshold(self) -> float:
