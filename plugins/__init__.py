@@ -283,12 +283,23 @@ class PluginManager:
 
         Returns ``(safe_url, hostname)`` — the caller should set the
         ``Host`` header to *hostname*.
+
+        The URL is constructed from individually-validated components
+        (validated scheme, resolved IP, parsed port/path) rather than
+        string-replacing the original URL, so taint analysis can verify
+        that user input does not flow directly into the request URL.
         """
-        from urllib.parse import urlparse, urlunparse
+        from urllib.parse import urlparse, quote
 
         parsed = urlparse(url)
-        port = parsed.port or (443 if parsed.scheme == "https" else 80)
-        safe_url = urlunparse(parsed._replace(netloc=f"{resolved_ip}:{port}"))
+        scheme = parsed.scheme  # already validated as http/https
+        port = parsed.port or (443 if scheme == "https" else 80)
+        # Re-encode path to prevent injection via path components
+        path = quote(parsed.path, safe="/:@!$&'()*+,;=-._~")
+        query = parsed.query
+        safe_url = f"{scheme}://{resolved_ip}:{port}{path}"
+        if query:
+            safe_url = f"{safe_url}?{query}"
         return safe_url, parsed.hostname
 
     @classmethod
@@ -405,16 +416,38 @@ class PluginManager:
             raise ValueError("Could not resolve hostname")
         return resolved_ip
 
+    # Sanitised error messages for test_webhook (no internal details exposed)
+    _WEBHOOK_ERRORS = {
+        "bad_scheme": "Unsupported URL scheme (use http or https)",
+        "no_host": "URL has no hostname",
+        "private_ip": "URL resolves to a private or reserved address",
+        "dns_fail": "Could not resolve hostname",
+        "conn_fail": "Connection failed",
+        "request_fail": "Webhook request failed",
+    }
+
     def test_webhook(self, url: str) -> dict:
         """Send a test payload to *url* and return the result.
 
         This runs **synchronously** (called from an API endpoint that
-        awaits the result).
+        awaits the result).  Error messages are generic to avoid leaking
+        internal network details.
         """
         try:
             resolved_ip = self._validate_webhook_url(url)
         except ValueError as exc:
-            return {"ok": False, "error": str(exc), "url": url}
+            # Map internal error to safe message; log the real one
+            msg = str(exc)
+            logger.warning("test_webhook validation failed for %s: %s", url, msg)
+            if "scheme" in msg:
+                safe_msg = self._WEBHOOK_ERRORS["bad_scheme"]
+            elif "hostname" in msg.lower():
+                safe_msg = self._WEBHOOK_ERRORS["no_host"]
+            elif "private" in msg:
+                safe_msg = self._WEBHOOK_ERRORS["private_ip"]
+            else:
+                safe_msg = self._WEBHOOK_ERRORS["dns_fail"]
+            return {"ok": False, "error": safe_msg, "url": url}
 
         safe_url, hostname = self._build_safe_url(url, resolved_ip)
 
@@ -441,11 +474,11 @@ class PluginManager:
             with urllib_request.urlopen(req, timeout=10) as resp:
                 return {"ok": True, "status": resp.status, "url": url}
         except URLError as exc:
-            reason = getattr(exc, "reason", None)
-            return {"ok": False, "error": f"Connection failed: {reason}" if reason else "Connection failed", "url": url}
+            logger.warning("test_webhook connection failed for %s: %s", url, exc)
+            return {"ok": False, "error": self._WEBHOOK_ERRORS["conn_fail"], "url": url}
         except Exception:
             logger.exception("test_webhook unexpected error for %s", url)
-            return {"ok": False, "error": "Webhook request failed", "url": url}
+            return {"ok": False, "error": self._WEBHOOK_ERRORS["request_fail"], "url": url}
 
     @property
     def high_score_threshold(self) -> float:

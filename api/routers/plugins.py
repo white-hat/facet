@@ -68,4 +68,10 @@ async def test_webhook(
     result = mgr.test_webhook(body.url)
     if not result["ok"]:
         logger.warning("Test webhook to %s failed: %s", body.url, result.get("error"))
-    return result
+    # Return only known-safe fields (sanitised error messages, no stack traces)
+    response = {"ok": result["ok"], "url": body.url}
+    if result["ok"]:
+        response["status"] = result.get("status")
+    else:
+        response["error"] = result.get("error", "")
+    return response
