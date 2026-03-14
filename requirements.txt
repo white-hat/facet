@@ -3,8 +3,9 @@
 # Note: Also requires 'exiftool' command-line tool (install via system package manager)
 
 # Deep Learning / GPU
-torch>=2.0.0
-torchvision>=0.15.0
+# PyTorch is installed separately with the correct CUDA index URL.
+# Run: bash install.sh (auto-detects GPU)
+# Or manually: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 open-clip-torch>=2.20.0
 
 # HuggingFace Transformers - required for BiRefNet saliency, SigLIP 2 NaFlex embeddings,

@@ -1,11 +1,35 @@
 # Installation
 
-## System Requirements
+## Quick Start
 
-- Python 3.12
+```bash
+git clone https://github.com/ncoevoet/facet.git && cd facet
+bash install.sh          # auto-detects GPU, creates venv, installs everything
+python facet.py --doctor # verify your setup
+```
+
+The install script handles everything: Python venv, GPU/CUDA detection, PyTorch with the correct index URL, ONNX Runtime, all dependencies, transformers/accelerate, and Angular frontend build.
+
+**Options:**
+| Flag | Effect |
+|------|--------|
+| `--cpu` | Force CPU-only PyTorch (no CUDA) |
+| `--cuda VERSION` | Override detected CUDA version (e.g. `--cuda 12.8`) |
+| `--skip-client` | Skip Angular frontend build |
+| `--no-uv` | Use pip instead of uv |
+
+A `Makefile` is also available: `make install`, `make install-cpu`, `make run`, `make doctor`.
+
+---
+
+## Manual Installation
+
+### System Requirements
+
+- Python 3.12 (3.10+ supported)
 - `exiftool` (system package, optional but recommended)
 
-### Installing exiftool
+#### Installing exiftool
 
 exiftool provides the best EXIF extraction for all formats. Without it, the app falls back to `exifread` (Python library, handles all RAW formats) then PIL (JPEG/TIFF/DNG only).
 
@@ -15,17 +39,20 @@ exiftool provides the best EXIF extraction for all formats. Without it, the app 
 | macOS | `brew install exiftool` |
 | Windows | Download from [exiftool.org](https://exiftool.org/) |
 
-## Python Environment
+### Python Environment
 
 ```bash
 # Create virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
+# Install PyTorch first with the correct CUDA index URL
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+
 # Install base dependencies (all at once for proper dependency resolution)
 pip install -r requirements.txt
 
-# For 8gb/16gb/24gb profiles, also install:
+# Install transformers (needed for 8gb+ profiles: SigLIP, BiRefNet, VLM taggers)
 pip install transformers>=4.57.0 accelerate>=0.25.0
 
 # For 24gb profile, additionally:
@@ -34,13 +61,13 @@ pip install qwen-vl-utils>=0.0.2
 
 > **Hitting dependency errors?** See [Troubleshooting Dependency Conflicts](#troubleshooting-dependency-conflicts) below.
 
-## GPU Setup
+### GPU Setup
 
-### PyTorch with CUDA
+#### PyTorch with CUDA
 
-Install from [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/) based on your CUDA version.
+Install from [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally/) based on your CUDA version. The install script does this automatically.
 
-### ONNX Runtime for Face Detection
+#### ONNX Runtime for Face Detection
 
 Choose ONE based on your setup:
 

@@ -153,7 +153,19 @@ GPU acceleration requires the [NVIDIA Container Toolkit](https://docs.nvidia.com
 ### Manual Install
 
 ```bash
-# 1. Install exiftool (system dependency)
+git clone https://github.com/ncoevoet/facet.git && cd facet
+bash install.sh          # auto-detects GPU, creates venv, installs everything
+python facet.py /photos  # score photos
+python viewer.py         # start web viewer → http://localhost:5000
+```
+
+The install script auto-detects your CUDA version, installs the right PyTorch variant, builds the Angular frontend, and verifies all imports. Options: `--cpu` (force CPU), `--cuda 12.8` (override CUDA version), `--skip-client` (skip frontend build).
+
+<details>
+<summary>Step-by-step manual install</summary>
+
+```bash
+# 1. Install exiftool (optional but recommended)
 # Ubuntu/Debian: sudo apt install libimage-exiftool-perl
 # macOS:         brew install exiftool
 
@@ -171,15 +183,13 @@ pip install onnxruntime-gpu>=1.17.0   # GPU (CUDA 12.x)
 # pip install onnxruntime>=1.15.0     # CPU fallback
 
 # 6. Build Angular frontend
-cd client && npm install && npx ng build && cd ..
+cd client && npm ci && npx ng build && cd ..
 
-# 7. Score photos (auto-detects VRAM, uses multi-pass mode)
+# 7. Score photos and start viewer
 python facet.py /path/to/photos
-
-# 8. Run the web viewer (FastAPI API + Angular SPA)
 python viewer.py
-# Open http://localhost:5000
 ```
+</details>
 
 ### PyPI
 
