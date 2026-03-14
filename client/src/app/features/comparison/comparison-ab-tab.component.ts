@@ -207,7 +207,7 @@ interface LearnedWeightsResponse {
               <button mat-stroked-button class="w-full mb-3" [disabled]="learnedWeightsLoading()"
                 (click)="loadLearnedWeights()">
                 @if (learnedWeightsLoading()) {
-                  <mat-spinner diameter="16" />
+                  <mat-spinner diameter="16" class="inline-flex !w-4 !h-4" />
                 }
                 {{ 'compare.actions.suggest_weights' | translate }}
               </button>

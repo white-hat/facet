@@ -46,9 +46,10 @@ interface CritiqueResponse {
   penalties: Record<string, number | boolean>;
   vlm_critique?: string;
   vlm_available?: boolean;
+  caption?: string;
 }
 
-@Pipe({ name: 'contributionColor', standalone: true, pure: true })
+@Pipe({ name: 'contributionColor', standalone: true })
 export class ContributionColorPipe implements PipeTransform {
   transform(value: number, weight: number): string {
     const score = weight > 0 ? value / weight : 0;
@@ -90,7 +91,7 @@ export class CategoryReasonPipe implements PipeTransform {
     DecimalPipe, PercentPipe, TranslatePipe, ContributionColorPipe, CategoryReasonPipe,
   ],
   template: `
-    <h2 mat-dialog-title class="!flex items-center gap-2">
+    <h2 mat-dialog-title class="!flex items-center gap-2 truncate">
       <mat-icon>analytics</mat-icon>
       <span class="flex-1">{{ 'critique.title' | translate }}</span>
       <button mat-icon-button mat-dialog-close class="shrink-0 !-mt-1 !-mr-2">
@@ -108,6 +109,25 @@ export class CategoryReasonPipe implements PipeTransform {
           <p class="text-sm">{{ e }}</p>
         </div>
       } @else if (critique(); as c) {
+        <!-- Caption -->
+        @if (c.caption || captionLoading()) {
+          <div class="text-sm mb-4 p-3 rounded-lg bg-[var(--mat-sys-surface-container)]">
+            <div class="text-xs uppercase tracking-wider opacity-50 mb-1">{{ 'caption.title' | translate }}</div>
+            @if (captionLoading()) {
+              <span class="opacity-60">{{ 'caption.generating' | translate }}</span>
+            } @else {
+              <p>{{ c.caption }}</p>
+            }
+          </div>
+        } @else if (captionAvailable()) {
+          <div class="mb-4">
+            <button mat-stroked-button (click)="generateCaption()">
+              <mat-icon>auto_awesome</mat-icon>
+              {{ 'caption.generate' | translate }}
+            </button>
+          </div>
+        }
+
         <!-- Category reason -->
         <div class="text-sm mb-4 p-3 rounded-lg bg-[var(--mat-sys-surface-container)]">
           <div class="text-xs uppercase tracking-wider opacity-50 mb-1">{{ 'critique.category_reason' | translate }}</div>
@@ -207,13 +227,15 @@ export class CategoryReasonPipe implements PipeTransform {
   `,
 })
 export class PhotoCritiqueDialogComponent implements OnInit {
-  private api = inject(ApiService);
-  private i18n = inject(I18nService);
-  private data = inject<{ photoPath: string; vlmAvailable: boolean }>(MAT_DIALOG_DATA);
+  private readonly api = inject(ApiService);
+  private readonly i18n = inject(I18nService);
+  private readonly data = inject<{ photoPath: string; vlmAvailable: boolean }>(MAT_DIALOG_DATA);
 
   protected readonly loading = signal(true);
   protected readonly critique = signal<CritiqueResponse | null>(null);
   protected readonly error = signal<string | null>(null);
+  protected readonly captionLoading = signal(false);
+  protected readonly captionAvailable = signal(false);
 
   protected readonly hasPenalties = computed(() => {
     const c = this.critique();
@@ -223,15 +245,40 @@ export class PhotoCritiqueDialogComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     try {
       const mode = this.data.vlmAvailable ? 'vlm' : 'rule';
-      const res = await firstValueFrom(
-        this.api.get<CritiqueResponse>('/critique', { path: this.data.photoPath, mode }),
-      );
+      const [res, captionRes] = await Promise.all([
+        firstValueFrom(
+          this.api.get<CritiqueResponse>('/critique', { path: this.data.photoPath, mode }),
+        ),
+        firstValueFrom(
+          this.api.get<{ caption?: string; source?: string }>('/caption', { path: this.data.photoPath }),
+        ).catch(() => null),
+      ]);
+      if (captionRes?.caption) {
+        res.caption = captionRes.caption;
+      } else {
+        this.captionAvailable.set(this.data.vlmAvailable);
+      }
       this.critique.set(res);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : this.i18n.t('critique.error_fallback');
       this.error.set(message);
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  protected async generateCaption(): Promise<void> {
+    this.captionLoading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.api.get<{ caption: string }>('/caption', { path: this.data.photoPath, generate: '1' }),
+      );
+      this.critique.update(c => c ? { ...c, caption: res.caption } : c);
+      this.captionAvailable.set(false);
+    } catch {
+      // ignore
+    } finally {
+      this.captionLoading.set(false);
     }
   }
 }

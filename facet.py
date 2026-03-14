@@ -236,6 +236,15 @@ Configuration:
     export_group.add_argument('--export-json', type=str, nargs='?', const='auto',
                         help='Export database to JSON file (optional: specify filename)')
 
+    # AI features
+    ai_group = parser.add_argument_group('AI features')
+    ai_group.add_argument('--generate-captions', action='store_true',
+                        help='Generate AI captions for photos without one (requires VLM)')
+    ai_group.add_argument('--auto-albums', action='store_true',
+                        help='Auto-generate albums from temporal and visual clustering')
+    ai_group.add_argument('--extract-gps', action='store_true',
+                        help='Backfill GPS coordinates from EXIF data for existing photos')
+
     # Configuration
     config_group = parser.add_argument_group('Configuration')
     config_group.add_argument('--config', type=str, default=None,
@@ -585,7 +594,101 @@ Configuration:
         logger.info("Burst detection complete.")
         exit()
 
+    # Generate AI captions
+    if args.generate_captions:
+        from models.vlm_tagger import VLMTagger
+        from PIL import Image
+        from tqdm import tqdm
+        import io
 
+        config = ScoringConfig(args.config)
+        vlm = VLMTagger(config.get_tagger_model(), config)
+
+        with get_connection(args.db) as conn:
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()}
+            if 'caption' not in cols:
+                print("Error: 'caption' column not found. Run 'python database.py' to migrate the schema first.")
+                sys.exit(1)
+
+            total = conn.execute("SELECT COUNT(*) FROM photos WHERE caption IS NULL").fetchone()[0]
+            logger.info("Generating captions for %d photos...", total)
+            vlm.load()
+            cursor = conn.execute("SELECT path, thumbnail FROM photos WHERE caption IS NULL")
+            batch_size = 100
+            with tqdm(total=total, desc="Captioning") as pbar:
+                while True:
+                    rows = cursor.fetchmany(batch_size)
+                    if not rows:
+                        break
+                    for row in rows:
+                        try:
+                            if row['thumbnail']:
+                                img = Image.open(io.BytesIO(row['thumbnail'])).convert('RGB')
+                            else:
+                                path = row['path']
+                                ext = os.path.splitext(path)[1].lower()
+                                if ext in RAW_EXTENSIONS:
+                                    import rawpy
+                                    with rawpy.imread(path) as raw:
+                                        rgb = raw.postprocess()
+                                    img = Image.fromarray(rgb).convert('RGB')
+                                else:
+                                    img = Image.open(path).convert('RGB')
+                                img.thumbnail((640, 640))
+                            caption = vlm.generate(img, "Describe this photo in one concise sentence.", max_new_tokens=100)
+                            conn.execute("UPDATE photos SET caption = ? WHERE path = ?", (caption.strip(), row['path']))
+                        except Exception as e:
+                            logger.warning("Caption failed for %s: %s", row['path'], e)
+                        pbar.update(1)
+                    conn.commit()
+            vlm.unload()
+        logger.info("Caption generation complete.")
+        exit()
+
+    # Auto-generate albums
+    if args.auto_albums:
+        from analyzers.auto_album import generate_auto_albums
+        config = ScoringConfig(args.config)
+        with get_connection(args.db) as conn:
+            albums = generate_auto_albums(conn, config=config.raw_config)
+            logger.info("Auto-generated %d albums.", len(albums))
+            for a in albums:
+                logger.info("  %s (%d photos)", a['name'], a['photo_count'])
+        exit()
+
+    # Backfill GPS coordinates from EXIF
+    if args.extract_gps:
+        from exiftool.exiftool_batch import get_exif_batch
+        from tqdm import tqdm
+
+        with get_connection(args.db) as conn:
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()}
+            if 'gps_latitude' not in cols or 'gps_longitude' not in cols:
+                print("Error: GPS columns not found. Run 'python database.py' to migrate the schema first.")
+                sys.exit(1)
+
+            # Re-scans photos without GPS each run (idempotent). Photos lacking
+            # GPS EXIF data remain NULL and will be re-checked on subsequent runs,
+            # but the exiftool lookup is fast and this command is run manually.
+            rows = conn.execute(
+                "SELECT path FROM photos WHERE gps_latitude IS NULL"
+            ).fetchall()
+            paths = [r['path'] for r in rows]
+            logger.info("Extracting GPS for %d photos...", len(paths))
+            exif_data = get_exif_batch(paths)
+            updated = 0
+            for path, exif in tqdm(exif_data.items(), desc="GPS extraction"):
+                lat = exif.get('gps_latitude')
+                lng = exif.get('gps_longitude')
+                if lat is not None and lng is not None:
+                    conn.execute(
+                        "UPDATE photos SET gps_latitude = ?, gps_longitude = ? WHERE path = ?",
+                        (lat, lng, path)
+                    )
+                    updated += 1
+            conn.commit()
+            logger.info("Updated GPS for %d photos.", updated)
+        exit()
 
     # Recompute embeddings (required after switching CLIP → SigLIP 2)
     if args.recompute_embeddings:

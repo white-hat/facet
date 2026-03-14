@@ -5,7 +5,6 @@ Uses CLIP/SigLIP embeddings to find photos matching a natural language query.
 """
 
 import logging
-import math
 from typing import Optional
 
 import numpy as np
@@ -17,7 +16,7 @@ from api.database import get_db_connection
 from api.db_helpers import (
     get_existing_columns, get_visibility_clause, get_photos_from_clause,
     get_preference_columns, PHOTO_BASE_COLS, PHOTO_OPTIONAL_COLS,
-    split_photo_tags, attach_person_data, format_date,
+    split_photo_tags, attach_person_data, format_date, sanitize_float_values,
 )
 
 router = APIRouter(tags=["search"])
@@ -99,10 +98,11 @@ def _load_embedding_matrix(conn, vis_sql, vis_params, user_id):
     global _embedding_cache
     from utils.embedding import bytes_to_normalized_embedding
 
-    count = conn.execute(
+    row = conn.execute(
         f"SELECT COUNT(*) FROM photos WHERE clip_embedding IS NOT NULL AND {vis_sql}",
         vis_params
-    ).fetchone()[0]
+    ).fetchone()
+    count = row[0] if row else 0
 
     if _embedding_cache and _embedding_cache['count'] == count and _embedding_cache['user_id'] == user_id:
         return _embedding_cache['matrix'], _embedding_cache['paths']
@@ -206,11 +206,7 @@ async def api_search(
         # Sort by similarity (descending)
         photos.sort(key=lambda p: p.get('similarity', 0), reverse=True)
 
-        # Sanitize floats
-        for photo in photos:
-            for key, value in photo.items():
-                if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
-                    photo[key] = None
+        sanitize_float_values(photos)
 
         return {
             'photos': photos,

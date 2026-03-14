@@ -126,7 +126,8 @@ interface AppConfig {
                 <button
                   class="relative w-7 h-7 rounded-full inline-flex items-center justify-center hover:bg-white/20 transition-colors text-yellow-400"
                   [matTooltip]="'rating.set_rating' | translate"
-                  (click)="cycleStarRating(); $event.stopPropagation()">
+                  (click)="cycleStarRating(); $event.stopPropagation()"
+                  (dblclick)="$event.stopPropagation()">
                   <mat-icon class="!text-lg !w-[18px] !h-[18px] !leading-[18px]">{{ photo().star_rating ? 'star' : 'star_border' }}</mat-icon>
                   @if (photo().star_rating) {
                     <span class="absolute -top-0.5 -right-0.5 min-w-3.5 h-3.5 rounded-full bg-yellow-500 text-black text-[10px] font-bold flex items-center justify-center leading-none">{{ photo().star_rating }}</span>
@@ -141,7 +142,8 @@ interface AppConfig {
                     [class.text-red-400]="photo().is_rejected"
                     [class.text-white]="!photo().is_rejected"
                     [matTooltip]="(photo().is_rejected ? 'rating.unmark_rejected' : 'rating.mark_rejected') | translate"
-                    (click)="rejectedToggled.emit(photo().path); $event.stopPropagation()">
+                    (click)="rejectedToggled.emit(photo().path); $event.stopPropagation()"
+                    (dblclick)="$event.stopPropagation()">
                     <mat-icon class="!text-base !w-4 !h-4 !leading-4">{{ photo().is_rejected ? 'thumb_down' : 'thumb_down_off_alt' }}</mat-icon>
                   </button>
                 }
@@ -150,7 +152,8 @@ interface AppConfig {
                   [class.text-red-400]="photo().is_favorite"
                   [class.text-white]="!photo().is_favorite"
                   [matTooltip]="(photo().is_favorite ? 'rating.remove_favorite' : 'rating.add_favorite') | translate"
-                  (click)="favoriteToggled.emit(photo().path); $event.stopPropagation()">
+                  (click)="favoriteToggled.emit(photo().path); $event.stopPropagation()"
+                  (dblclick)="$event.stopPropagation()">
                   <mat-icon class="!text-base !w-4 !h-4 !leading-4">{{ photo().is_favorite ? 'favorite' : 'favorite_border' }}</mat-icon>
                 </button>
               </div>
@@ -236,11 +239,17 @@ export class PhotoCardComponent {
 
   // Progressive loading
   readonly imageLoaded = signal(false);
+  private previousPath = '';
 
   constructor() {
     effect(() => {
-      this.photo();
-      untracked(() => this.imageLoaded.set(false));
+      const path = this.photo().path;
+      if (path !== untracked(() => this.previousPath)) {
+        untracked(() => {
+          this.previousPath = path;
+          this.imageLoaded.set(false);
+        });
+      }
     });
   }
 

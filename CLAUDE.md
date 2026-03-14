@@ -108,6 +108,11 @@ python facet.py --recompute-blinks               # Recompute blink detection for
 python facet.py --recompute-burst                # Recompute burst detection groups
 python facet.py --detect-duplicates              # Detect duplicate photos via pHash
 
+# AI captioning and auto-albums
+python facet.py --generate-captions          # Generate AI captions for uncaptioned photos (VLM, GPU)
+python facet.py --auto-albums                # Auto-generate albums from photo clusters
+python facet.py --extract-gps                # Extract GPS coordinates from EXIF into database
+
 # Saliency commands
 python facet.py --recompute-saliency  # Recompute subject saliency metrics (BiRefNet, GPU)
 
@@ -271,6 +276,10 @@ SQLite table `photos` with columns:
 
 **Duplicates:** duplicate_group_id, is_duplicate_lead
 
+**AI/Content:** caption (VLM-generated text description)
+
+**Location:** gps_latitude, gps_longitude
+
 **Tags/Recognition:** tags (JSON), person_id, face_embedding (BLOB)
 
 **Raw data (for recalculation):** clip_embedding (BLOB), histogram_data (BLOB), raw_sharpness_variance, config_version
@@ -279,7 +288,7 @@ SQLite table `photos` with columns:
 - `photo_tags(photo_path, tag)` - Normalized tag lookup for fast exact-match queries (replaces `LIKE '%tag%'`)
 - `faces(id, photo_path, face_index, embedding, bbox_*, person_id, confidence, face_thumbnail)` - Face embeddings and thumbnails for recognition
 - `persons(id, name, representative_face_id, face_count, centroid, auto_clustered, face_thumbnail)` - Person clusters (name=NULL for auto-clustered)
-- `albums(id, user_id, name, description, cover_photo_path, is_smart, smart_filter_json, created_at, updated_at)` - Photo albums (manual and smart)
+- `albums(id, user_id, name, description, cover_photo_path, is_smart, smart_filter_json, share_token, created_at, updated_at)` - Photo albums (manual, smart, and shared)
 - `album_photos(id, album_id, photo_path, position, added_at)` - Album membership with ordering
 
 ### Performance Optimizations
@@ -333,6 +342,20 @@ See [docs/FACE_RECOGNITION.md](docs/FACE_RECOGNITION.md) for the complete workfl
 
 **AI Critique:** `GET /api/critique?path=<photo_path>&mode=rule|vlm` — rule-based score breakdown (all profiles) or VLM-powered critique (16gb/24gb only).
 
+**Memories:** `GET /api/memories?date=YYYY-MM-DD` — photos taken on the same calendar date in previous years ("On This Day").
+
+**AI Captioning:** `GET /api/caption?path=<path>` — generate or retrieve AI caption for a photo. Bulk generation via `--generate-captions` CLI.
+
+**Timeline:** `GET /api/timeline?cursor=&limit=&direction=` and `GET /api/timeline/dates?year=&month=` — chronological photo browsing with date navigation. Angular route: `/timeline`.
+
+**Photo Sharing:** `POST|DELETE /api/albums/{id}/share` to generate/revoke share tokens, `GET /api/shared/album/{id}?token=` for public access. Angular route: `/shared/album/:id`.
+
+**AI Culling (Similar Groups):** `GET /api/similar-groups?threshold=&page=&per_page=` — groups of visually similar photos for culling, accessible via similarity tab in burst culling.
+
+**AI Auto-Albums:** `POST /api/albums/auto-generate` — auto-create albums from photo clusters. Also available via `--auto-albums` CLI.
+
+**Map View:** `GET /api/photos/map?bounds=&zoom=&limit=` and `GET /api/photos/map/count` — geotagged photo locations for Leaflet map. Angular route: `/map`.
+
 ### Key Implementation Details
 
 - **Embeddings:** SigLIP 2 NaFlex SO400M (1152-dim, 16gb/24gb, native aspect ratio via `transformers`) or CLIP ViT-L-14 (768-dim, legacy/8gb via `open_clip`)
@@ -380,5 +403,16 @@ For quick reference, here are the actual defaults from the config file:
 | `viewer.features` | `show_albums` | `true` |
 | `viewer.features` | `show_critique` | `true` |
 | `viewer.features` | `show_vlm_critique` | `false` |
+| `viewer.features` | `show_memories` | `true` |
+| `viewer.features` | `show_captions` | `true` |
+| `viewer.features` | `show_timeline` | `true` |
+| `viewer.features` | `show_map` | `true` |
+| `similarity_groups` | `default_threshold` | `0.85` |
+| `similarity_groups` | `min_group_size` | `2` |
+| `similarity_groups` | `max_photos` | `10000` |
+| `similarity_groups` | `max_group_size` | `50` |
+| `auto_albums` | `min_photos_per_album` | `5` |
+| `auto_albums` | `time_gap_hours` | `4` |
+| `auto_albums` | `embedding_threshold` | `0.6` |
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the complete reference.

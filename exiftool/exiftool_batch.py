@@ -209,7 +209,9 @@ def parse_exif_data(raw_data):
         'f_stop': _safe_numeric(raw_data.get('Aperture')),
         'shutter_speed': str(raw_data.get('ExposureTime')) if raw_data.get('ExposureTime') else None,
         'focal_length': _safe_numeric(raw_data.get('FocalLength')),
-        'focal_length_35mm': _safe_numeric(raw_data.get('FocalLengthIn35mmFilm'))
+        'focal_length_35mm': _safe_numeric(raw_data.get('FocalLengthIn35mmFilm')),
+        'gps_latitude': _safe_numeric(raw_data.get('GPSLatitude')),
+        'gps_longitude': _safe_numeric(raw_data.get('GPSLongitude')),
     }
 
 

@@ -10,7 +10,8 @@ import { CompareFiltersService } from './compare-filters.service';
 import { ComparisonComponent } from './comparison.component';
 
 describe('ComparisonComponent', () => {
-  let component: ComparisonComponent;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let component: any;
   let mockApi: { get: jest.Mock; post: jest.Mock; delete: jest.Mock };
   let mockSnackBar: { open: jest.Mock };
   let mockI18n: { t: jest.Mock };

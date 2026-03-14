@@ -73,6 +73,10 @@ export interface ViewerConfig {
     show_albums: boolean;
     show_critique: boolean;
     show_vlm_critique: boolean;
+    show_memories: boolean;
+    show_captions: boolean;
+    show_timeline: boolean;
+    show_map: boolean;
   };
   quality_thresholds: {
     good: number;

@@ -37,7 +37,9 @@
       "merge": "Unisci persone",
       "back": "Indietro",
       "cancel": "Annulla",
-      "download": "Scarica"
+      "download": "Scarica",
+      "save": "Salva",
+      "load_more": "Carica altro"
     },
     "sort": {
       "toggle_direction": "Inverti ordinamento",
@@ -45,6 +47,7 @@
     },
     "labels": {
       "photos": "foto",
+      "photo_count": "{count} foto",
       "photo": "foto",
       "selected": "selezionate",
       "of": "di",
@@ -944,6 +947,7 @@
     "invalid_credentials": "Nome utente o password non validi"
   },
   "edition": {
+    "label": "Modifica",
     "unlock_title": "Sblocca modalita di modifica",
     "unlock_description": "Inserisci la password di modifica per abilitare le funzionalita di editing.",
     "unlock_button": "Sblocca",
@@ -957,7 +961,10 @@
     "persons": "Persone",
     "compare": "Regolazione pesi",
     "albums": "Album",
-    "culling": "Selezione"
+    "culling": "Selezione",
+    "memories": "Ricordi",
+    "timeline": "Cronologia",
+    "map": "Mappa"
   },
   "auth": {
     "logout": "Esci",
@@ -1332,9 +1339,18 @@
     "select_merge_target_desc": "Scegli la persona in cui verranno uniti tutti i volti:",
     "similarity_threshold": "Soglia di somiglianza",
     "clear_selection": "Cancella",
-    "share_link": "Copia link di condivisione",
-    "link_copied": "Link di condivisione copiato negli appunti",
-    "link_copy_error": "Impossibile copiare il link di condivisione"
+    "share_link": "Link di condivisione",
+    "link_copied": "Link copiato negli appunti!",
+    "link_copy_error": "Impossibile copiare il link di condivisione",
+    "sort_count": "Numero di foto",
+    "sort_name": "Nome",
+    "share": "Condividi",
+    "share_description": "Chiunque abbia questo link può vedere le foto di questa persona.",
+    "copy_link": "Copia link",
+    "generate_link": "Genera link",
+    "invalid_share_link": "Link di condivisione non valido",
+    "share_link_error": "Questo link di condivisione non è valido.",
+    "load_error": "Impossibile caricare la persona."
   },
   "slideshow": {
     "start": "Presentazione",
@@ -1359,7 +1375,29 @@
     "save_smart": "Salva come album intelligente",
     "smart_album": "Album intelligente",
     "confirm_delete_title": "Elimina album",
-    "confirm_delete_message": "Eliminare l'album \"{name}\"? Le foto non verranno rimosse."
+    "confirm_delete_message": "Eliminare l'album \"{name}\"? Le foto non verranno rimosse.",
+    "share": "Condividi",
+    "share_description": "Chiunque abbia questo link può vedere l'album.",
+    "share_link": "Link di condivisione",
+    "link_copied": "Link copiato!",
+    "revoke_share": "Revoca",
+    "copy_link": "Copia link",
+    "generate_link": "Genera link",
+    "photos_count": "{count} foto",
+    "delete": "Elimina",
+    "edit": "Modifica",
+    "search": "Cerca album",
+    "sort_by": "Ordina per",
+    "sort_recent": "Recente",
+    "sort_name": "Nome",
+    "sort_photos": "Numero foto",
+    "filter_type": "Tipo",
+    "type_all": "Tutti",
+    "type_manual": "Manuale",
+    "type_smart": "Intelligente",
+    "invalid_share_link": "Link di condivisione non valido",
+    "share_link_revoked": "Questo link di condivisione non è valido o è stato revocato.",
+    "load_error": "Impossibile caricare l'album."
   },
   "critique": {
     "title": "Perche questo punteggio?",
@@ -1455,6 +1493,73 @@
     "next": "Successivo",
     "error_loading": "Errore nel caricamento dei gruppi",
     "error_confirming": "Errore nella conferma",
-    "error_auto_select": "Errore nella selezione automatica"
+    "error_auto_select": "Errore nella selezione automatica",
+    "burst_groups": "Gruppi di raffiche",
+    "similar_groups": "Gruppi simili",
+    "similarity_threshold": "Soglia di similarità",
+    "burst_help": "Le foto scattate in rapida successione vengono raggruppate insieme. Clicca sulle foto da tenere (bordo verde), le foto non selezionate (bordo rosso) verranno nascoste. La foto migliore viene selezionata automaticamente in base a nitidezza e qualità.",
+    "similar_help": "Le foto visivamente simili nella tua libreria vengono raggruppate utilizzando embedding IA. Esamina ogni gruppo, tieni gli scatti migliori e scarta i quasi-duplicati. Regola il cursore della soglia per controllare quanto simili devono essere le foto per formare un gruppo.",
+    "help": "Aiuto"
+  },
+  "memories": {
+    "title": "In questo giorno",
+    "empty": "Nessun ricordo per questo giorno",
+    "years_ago": "{count} anno fa",
+    "years_ago_plural": "{count} anni fa",
+    "no_memories": "Nessun ricordo per questo giorno.",
+    "photos_count": "foto"
+  },
+  "caption": {
+    "title": "Didascalia",
+    "generate": "Genera didascalia",
+    "generating": "Generazione in corso...",
+    "unavailable": "La generazione di didascalie richiede un modello VLM (16 GB+ VRAM)"
+  },
+  "timeline": {
+    "title": "Cronologia",
+    "no_photos": "Nessuna foto con data trovata",
+    "jump_to_date": "Vai alla data",
+    "photos_on_date": "{count} foto",
+    "empty": "Nessuna foto con date trovata.",
+    "more": "altre",
+    "load_more": "Carica altro"
+  },
+  "albums_sharing": {
+    "share": "Condividi album",
+    "copy_link": "Copia link",
+    "link_copied": "Link copiato negli appunti",
+    "revoke_share": "Revoca condivisione",
+    "shared_album": "Album condiviso",
+    "invalid_link": "Link di condivisione non valido o scaduto"
+  },
+  "auto_albums": {
+    "auto_generate": "Genera album automaticamente",
+    "auto_generate_confirm": "Verranno creati album basati su data e similarità visiva. Continuare?",
+    "auto_generating": "Generazione album in corso...",
+    "auto_generated": "{count} album creati",
+    "error_generating": "Generazione automatica degli album non riuscita"
+  },
+  "map": {
+    "title": "Mappa",
+    "no_gps": "Nessuna foto con dati GPS trovata",
+    "photos_count": "{count} foto con posizione",
+    "cluster_photos": "{count} foto",
+    "score": "Punteggio: {score}"
+  },
+  "photo_detail": {
+    "back": "Indietro",
+    "download": "Scarica",
+    "caption": "Didascalia",
+    "no_caption": "Nessuna didascalia disponibile",
+    "persons": "Persone",
+    "quality": "Qualità",
+    "composition": "Composizione",
+    "saliency": "Salienza del soggetto",
+    "technical": "Tecnico",
+    "exif": "Dati EXIF",
+    "tags": "Tag",
+    "rating": "Valutazione",
+    "favorite": "Preferito",
+    "rejected": "Rifiutato"
   }
 }

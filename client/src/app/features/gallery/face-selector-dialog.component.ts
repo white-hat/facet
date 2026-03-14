@@ -6,6 +6,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { FaceThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 interface PhotoFace {
@@ -22,11 +23,12 @@ interface PhotoFace {
     MatDialogModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
     FaceThumbnailUrlPipe,
     TranslatePipe,
   ],
   template: `
-    <h2 mat-dialog-title>{{ 'manage_persons.select_face' | translate }}</h2>
+    <h2 mat-dialog-title class="truncate" [matTooltip]="'manage_persons.select_face' | translate">{{ 'manage_persons.select_face' | translate }}</h2>
     <mat-dialog-content class="!flex !flex-col gap-3 min-w-[320px] min-h-[120px]">
       @if (loading()) {
         <div class="flex items-center justify-center gap-3 py-8">

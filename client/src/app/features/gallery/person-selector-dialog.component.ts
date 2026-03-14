@@ -7,6 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { PersonOption } from './gallery.store';
 import { PersonThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 
 @Component({
@@ -18,11 +19,12 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
     MatFormFieldModule,
     MatInputModule,
     MatIconModule,
+    MatTooltipModule,
     PersonThumbnailUrlPipe,
     TranslatePipe,
   ],
   template: `
-    <h2 mat-dialog-title>{{ 'manage_persons.assign_face' | translate }}</h2>
+    <h2 mat-dialog-title class="truncate" [matTooltip]="'manage_persons.assign_face' | translate">{{ 'manage_persons.assign_face' | translate }}</h2>
     <mat-dialog-content class="!flex !flex-col gap-3 min-w-[320px]">
       <mat-form-field subscriptSizing="dynamic" class="w-full">
         <mat-icon matPrefix>search</mat-icon>

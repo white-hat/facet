@@ -3,6 +3,7 @@ Gallery router — photo listing, type counts, similar photos.
 
 """
 
+import logging
 import math
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -12,10 +13,11 @@ from api.config import VIEWER_CONFIG, load_viewer_config
 from api.database import get_db_connection
 from api.db_helpers import (
     get_existing_columns, get_cached_count, _add_tag_filter,
-    get_art_tags_from_config, HIDE_BLINKS_SQL, HIDE_BURSTS_SQL, HIDE_DUPLICATES_SQL,
+    get_art_tags_from_config, build_hide_clauses,
     PHOTO_BASE_COLS, PHOTO_OPTIONAL_COLS,
-    split_photo_tags, attach_person_data,
+    split_photo_tags, attach_person_data, sanitize_float_values,
     get_visibility_clause, get_photos_from_clause, get_preference_columns,
+    build_photo_select_columns,
     format_date, to_exif_date,
 )
 from api.top_picks import get_top_picks_score_sql, get_top_picks_threshold
@@ -24,6 +26,7 @@ from api.types import (
 )
 
 router = APIRouter(tags=["gallery"])
+logger = logging.getLogger(__name__)
 
 
 def _build_gallery_where(params, conn=None, user_id=None):
@@ -127,12 +130,12 @@ def _build_gallery_where(params, conn=None, user_id=None):
     if params.get('is_silhouette') == '1':
         where_clauses.append("is_silhouette = 1")
 
-    if params.get('hide_bursts') in ('1', 'true') or params.get('burst_only') in ('1', 'true'):
-        where_clauses.append(HIDE_BURSTS_SQL)
-    if params.get('hide_blinks') in ('1', 'true') or params.get('no_blink') in ('1', 'true'):
-        where_clauses.append(HIDE_BLINKS_SQL)
-    if params.get('hide_duplicates') in ('1', 'true'):
-        where_clauses.append(HIDE_DUPLICATES_SQL)
+    hb = params.get('hide_blinks', '')
+    hide_blinks_val = hb if hb in ('1', 'true') else params.get('no_blink', '')
+    hbr = params.get('hide_bursts', '')
+    hide_bursts_val = hbr if hbr in ('1', 'true') else params.get('burst_only', '')
+    hide_duplicates_val = params.get('hide_duplicates', '')
+    where_clauses.extend(build_hide_clauses(hide_blinks_val, hide_bursts_val, hide_duplicates_val))
 
     pref_cols = get_preference_columns(user_id)
     if params.get('min_rating'):
@@ -213,6 +216,42 @@ def _build_gallery_where(params, conn=None, user_id=None):
             pass
 
     return where_clauses, sql_params
+
+
+@router.get("/api/photo")
+async def api_photo(
+    path: str = Query(...),
+    user: Optional[CurrentUser] = Depends(get_optional_user),
+):
+    """Get a single photo by path (same shape as gallery items)."""
+    conn = get_db_connection()
+    try:
+        user_id = user.user_id if user else None
+        from_clause, from_params = get_photos_from_clause(user_id)
+        vis_sql, vis_params = get_visibility_clause(user_id)
+
+        select_cols = build_photo_select_columns(conn, user_id)
+
+        query = f"SELECT {', '.join(select_cols)} FROM {from_clause} WHERE photos.path = ? AND {vis_sql}"
+        row = conn.execute(query, from_params + [path] + vis_params).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Photo not found")
+
+        photos = split_photo_tags([row], VIEWER_CONFIG['display']['tags_per_photo'])
+        photo = photos[0]
+        photo['date_formatted'] = format_date(photo.get('date_taken'))
+        attach_person_data([photo], conn)
+
+        sanitize_float_values([photo])
+
+        return photo
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to fetch photo details")
+        raise HTTPException(status_code=500, detail='Internal server error')
+    finally:
+        conn.close()
 
 
 @router.get("/api/type_counts")
@@ -407,16 +446,12 @@ async def api_photos(
         attach_person_data(photos, conn)
 
     except Exception:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Failed to fetch gallery photos")
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
         conn.close()
 
-    for photo in photos:
-        for key, value in photo.items():
-            if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
-                photo[key] = None
+    sanitize_float_values(photos)
 
     return {
         'photos': photos,
@@ -625,7 +660,7 @@ def _find_similar_color(conn, source, photo_path, min_similarity, vis_sql, vis_p
     return results[:500], None
 
 
-def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_params):
+def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_params, user_id=None):
     """Find photos containing the same person(s) via person_id or face embedding cosine."""
     import numpy as np
     from utils.embedding import bytes_to_normalized_embedding
@@ -639,6 +674,9 @@ def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_
     if not faces:
         return [], 'no_faces'
 
+    # Build visibility clause with 'p' alias for JOIN queries
+    p_vis_sql, p_vis_params = get_visibility_clause(user_id, table_alias='p')
+
     person_ids = [f['person_id'] for f in faces if f['person_id']]
 
     if person_ids:
@@ -650,8 +688,8 @@ def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_
             JOIN photos p ON p.path = f.photo_path
             WHERE f.person_id IN ({placeholders})
               AND f.photo_path != ?
-              AND {vis_sql.replace('photos.path', 'p.path')}  -- get_visibility_clause() references photos.path
-        """, person_ids + [photo_path] + vis_params).fetchall()
+              AND {p_vis_sql}
+        """, person_ids + [photo_path] + p_vis_params).fetchall()
 
         results = [_similar_result(dict(r), 1.0) for r in rows]
         results.sort(key=lambda x: x.get('date_taken') or '', reverse=True)
@@ -671,9 +709,9 @@ def _find_similar_person(conn, source, photo_path, min_similarity, vis_sql, vis_
         SELECT f.photo_path as path, f.embedding, p.filename, p.date_taken, p.aggregate, p.aesthetic
         FROM faces f
         JOIN photos p ON p.path = f.photo_path
-        WHERE f.photo_path != ? AND f.embedding IS NOT NULL AND {vis_sql.replace('photos.path', 'p.path')}  -- get_visibility_clause() references photos.path
+        WHERE f.photo_path != ? AND f.embedding IS NOT NULL AND {p_vis_sql}
         LIMIT 50000
-    """, [photo_path] + vis_params).fetchall()
+    """, [photo_path] + p_vis_params).fetchall()
 
     # Group best similarity per photo
     photo_sims: dict = {}
@@ -751,7 +789,7 @@ async def api_similar_photos(
         elif mode == 'color':
             results, message = _find_similar_color(conn, source, photo_path, effective_min_sim, vis_sql, vis_params)
         elif mode == 'person':
-            results, message = _find_similar_person(conn, source, photo_path, effective_min_sim, vis_sql, vis_params)
+            results, message = _find_similar_person(conn, source, photo_path, effective_min_sim, vis_sql, vis_params, user_id=user_id)
         else:
             results, message = [], None
 
@@ -773,8 +811,7 @@ async def api_similar_photos(
         return response
 
     except Exception:
-        import traceback
-        traceback.print_exc()
+        logger.exception("Failed to find similar photos")
         return {'error': 'Internal server error'}
     finally:
         conn.close()

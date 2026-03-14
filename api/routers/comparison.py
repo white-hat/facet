@@ -513,9 +513,10 @@ async def api_comparison_learned_weights(
     # Check if we have enough comparisons
     conn = get_db_connection()
     try:
-        count = conn.execute(
+        row = conn.execute(
             "SELECT COUNT(*) FROM comparisons WHERE winner IN ('a', 'b', 'tie')"
-        ).fetchone()[0]
+        ).fetchone()
+        count = row[0] if row else 0
     finally:
         conn.close()
 
@@ -1161,7 +1162,10 @@ async def api_weight_snapshots(
                 snapshot = dict(row)
                 # Parse weights JSON
                 if snapshot.get('weights'):
-                    snapshot['weights'] = json.loads(snapshot['weights'])
+                    try:
+                        snapshot['weights'] = json.loads(snapshot['weights'])
+                    except (json.JSONDecodeError, TypeError):
+                        snapshot['weights'] = {}
                 snapshots.append(snapshot)
 
             return {'snapshots': snapshots}
@@ -1235,7 +1239,10 @@ async def api_restore_weights(
             raise HTTPException(status_code=404, detail='Snapshot not found')
 
         snapshot = dict(row)
-        weights = json.loads(snapshot['weights'])
+        try:
+            weights = json.loads(snapshot['weights'])
+        except (json.JSONDecodeError, TypeError):
+            raise HTTPException(status_code=500, detail='Corrupted snapshot data')
         category = snapshot['category']
 
         # Load and update config

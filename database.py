@@ -115,10 +115,11 @@ def migrate_user_preferences(username, db_path=DEFAULT_DB_PATH):
         return
 
     # Count existing photos with ratings
-    count = conn.execute("""
+    row = conn.execute("""
         SELECT COUNT(*) FROM photos
         WHERE star_rating > 0 OR is_favorite = 1 OR is_rejected = 1
-    """).fetchone()[0]
+    """).fetchone()
+    count = row[0] if row else 0
 
     if count == 0:
         logger.info("No ratings to migrate.")
@@ -133,7 +134,8 @@ def migrate_user_preferences(username, db_path=DEFAULT_DB_PATH):
         FROM photos
         WHERE star_rating > 0 OR is_favorite = 1 OR is_rejected = 1
     """, (username,))
-    migrated = conn.execute("SELECT changes()").fetchone()[0]
+    row = conn.execute("SELECT changes()").fetchone()
+    migrated = row[0] if row else 0
     conn.commit()
     conn.close()
 

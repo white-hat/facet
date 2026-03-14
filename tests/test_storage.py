@@ -229,7 +229,9 @@ class TestMigrateToDatabase:
         mock_conn = MagicMock()
         mock_conn.__enter__ = MagicMock(return_value=mock_conn)
         mock_conn.__exit__ = MagicMock(return_value=False)
-        mock_conn.execute.return_value.fetchall.return_value = [("/photo1.jpg",)]
+        mock_cursor = MagicMock()
+        mock_cursor.__iter__ = MagicMock(return_value=iter([("/photo1.jpg",)]))
+        mock_conn.execute.return_value = mock_cursor
 
         with mock.patch("storage.migrate.get_connection", return_value=mock_conn):
             count = migrate_to_database("/fake.db", fs_path)

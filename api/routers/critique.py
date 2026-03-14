@@ -13,6 +13,7 @@ from api.auth import CurrentUser, get_optional_user
 from api.config import VIEWER_CONFIG, _FULL_CONFIG
 from api.database import get_db_connection
 from api.db_helpers import get_visibility_clause
+from api.model_cache import get_or_load_vlm_tagger
 
 router = APIRouter(tags=["critique"])
 logger = logging.getLogger(__name__)
@@ -300,21 +301,6 @@ async def api_critique(
         conn.close()
 
 
-_vlm_tagger_cache = None
-
-
-def _get_or_load_vlm_tagger(vlm_config):
-    """Cache the VLM tagger at module level to avoid reloading on every request."""
-    global _vlm_tagger_cache
-    if _vlm_tagger_cache is not None:
-        return _vlm_tagger_cache
-    from models.vlm_tagger import VLMTagger
-    tagger = VLMTagger(vlm_config, _FULL_CONFIG)
-    tagger.load()
-    _vlm_tagger_cache = tagger
-    return tagger
-
-
 def _get_vlm_critique(photo, rule_critique):
     """Generate VLM-powered critique if available."""
     try:
@@ -333,7 +319,7 @@ def _get_vlm_critique(photo, rule_critique):
         if not vlm_config.get('model_name'):
             return None
 
-        tagger = _get_or_load_vlm_tagger(vlm_config)
+        tagger = get_or_load_vlm_tagger(vlm_config, _FULL_CONFIG)
 
         # Build critique prompt
         category = rule_critique.get('category', 'photo')

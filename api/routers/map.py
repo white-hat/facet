@@ -1,0 +1,154 @@
+"""
+Map view router — GPS-based photo browsing with clustering at low zoom levels.
+
+"""
+
+import logging
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from api.auth import CurrentUser, get_optional_user
+from api.database import get_db_connection
+from api.db_helpers import get_existing_columns, get_visibility_clause
+
+router = APIRouter(tags=["map"])
+logger = logging.getLogger(__name__)
+
+
+def _get_cluster_zoom_threshold():
+    """Read map.cluster_zoom_threshold from scoring_config.json."""
+    try:
+        from api.config import _FULL_CONFIG
+        return _FULL_CONFIG.get('map', {}).get('cluster_zoom_threshold', 10)
+    except Exception:
+        return 10
+
+
+@router.get("/api/photos/map")
+async def api_photos_map(
+    bounds: str = Query(..., description="sw_lat,sw_lng,ne_lat,ne_lng"),
+    zoom: int = Query(10, ge=0, le=22),
+    limit: int = Query(500, ge=1, le=2000),
+    user: Optional[CurrentUser] = Depends(get_optional_user),
+):
+    """Return photo locations within bounds, clustered at low zoom or individual at high zoom."""
+    existing_cols = get_existing_columns()
+    if 'gps_latitude' not in existing_cols or 'gps_longitude' not in existing_cols:
+        return {'photos': [], 'clusters': []}
+
+    # Parse bounds
+    try:
+        parts = [float(x) for x in bounds.split(',')]
+        if len(parts) != 4:
+            raise ValueError
+        sw_lat, sw_lng, ne_lat, ne_lng = parts
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail='Invalid bounds format. Expected: sw_lat,sw_lng,ne_lat,ne_lng')
+
+    conn = get_db_connection()
+    try:
+        user_id = user.user_id if user else None
+        vis_sql, vis_params = get_visibility_clause(user_id)
+
+        # Handle antimeridian wrap-around: when sw_lng > ne_lng, the bounds
+        # cross the antimeridian so we use OR instead of BETWEEN for longitude.
+        if sw_lng > ne_lng:
+            lng_clause = "(gps_longitude >= ? OR gps_longitude <= ?)"
+        else:
+            lng_clause = "gps_longitude BETWEEN ? AND ?"
+
+        base_where = (
+            f"gps_latitude IS NOT NULL AND gps_longitude IS NOT NULL "
+            f"AND gps_latitude BETWEEN ? AND ? "
+            f"AND {lng_clause} "
+            f"AND {vis_sql}"
+        )
+        base_params = [sw_lat, ne_lat, sw_lng, ne_lng] + vis_params
+
+        if zoom < _get_cluster_zoom_threshold():
+            # Cluster mode — group into grid cells (floor zoom at 2 to cap cell_size)
+            effective_zoom = max(zoom, 2)
+            cell_size = 180.0 / (2 ** effective_zoom)
+            rows = conn.execute(
+                f"SELECT "
+                f"  ROUND(gps_latitude / ?, 0) * ? AS grid_lat, "
+                f"  ROUND(gps_longitude / ?, 0) * ? AS grid_lng, "
+                f"  COUNT(*) AS count, "
+                f"  (SELECT p2.path FROM photos p2 "
+                f"   WHERE p2.gps_latitude IS NOT NULL "
+                f"   AND ROUND(p2.gps_latitude / ?, 0) = ROUND(photos.gps_latitude / ?, 0) "
+                f"   AND ROUND(p2.gps_longitude / ?, 0) = ROUND(photos.gps_longitude / ?, 0) "
+                f"   ORDER BY p2.aggregate DESC LIMIT 1) AS representative_path "
+                f"FROM photos "
+                f"WHERE {base_where} "
+                f"GROUP BY grid_lat, grid_lng "
+                f"ORDER BY count DESC "
+                f"LIMIT ?",
+                [cell_size, cell_size, cell_size, cell_size,
+                 cell_size, cell_size, cell_size, cell_size]
+                + base_params + [limit],
+            ).fetchall()
+
+            clusters = [
+                {
+                    'lat': row['grid_lat'],
+                    'lng': row['grid_lng'],
+                    'count': row['count'],
+                    'representative_path': row['representative_path'],
+                }
+                for row in rows
+            ]
+            return {'clusters': clusters, 'photos': []}
+
+        else:
+            # Individual mode
+            rows = conn.execute(
+                f"SELECT path, gps_latitude AS lat, gps_longitude AS lng, "
+                f"  aggregate, filename "
+                f"FROM photos "
+                f"WHERE {base_where} "
+                f"ORDER BY aggregate DESC "
+                f"LIMIT ?",
+                base_params + [limit],
+            ).fetchall()
+
+            photos = [
+                {
+                    'path': row['path'],
+                    'lat': row['lat'],
+                    'lng': row['lng'],
+                    'aggregate': row['aggregate'],
+                    'filename': row['filename'],
+                }
+                for row in rows
+            ]
+            return {'clusters': [], 'photos': photos}
+
+    finally:
+        conn.close()
+
+
+@router.get("/api/photos/map/count")
+async def api_photos_map_count(
+    user: Optional[CurrentUser] = Depends(get_optional_user),
+):
+    """Return count of photos with GPS data, for nav badge visibility."""
+    existing_cols = get_existing_columns()
+    if 'gps_latitude' not in existing_cols or 'gps_longitude' not in existing_cols:
+        return {'count': 0}
+
+    conn = get_db_connection()
+    try:
+        user_id = user.user_id if user else None
+        vis_sql, vis_params = get_visibility_clause(user_id)
+
+        row = conn.execute(
+            f"SELECT COUNT(*) AS cnt FROM photos "
+            f"WHERE gps_latitude IS NOT NULL AND gps_longitude IS NOT NULL AND {vis_sql}",
+            vis_params,
+        ).fetchone()
+
+        return {'count': row['cnt']}
+    finally:
+        conn.close()

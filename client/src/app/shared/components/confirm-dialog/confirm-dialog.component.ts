@@ -1,14 +1,15 @@
 import { Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslatePipe } from '../../pipes/translate.pipe';
 
 @Component({
   selector: 'app-confirm-dialog',
   standalone: true,
-  imports: [MatButtonModule, MatDialogModule, TranslatePipe],
+  imports: [MatButtonModule, MatDialogModule, MatTooltipModule, TranslatePipe],
   template: `
-    <h2 mat-dialog-title>{{ data.title }}</h2>
+    <h2 mat-dialog-title class="truncate" [matTooltip]="data.title">{{ data.title }}</h2>
     <mat-dialog-content>
       <p>{{ data.message }}</p>
     </mat-dialog-content>

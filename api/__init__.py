@@ -102,6 +102,10 @@ def create_app() -> FastAPI:
     from api.routers.critique import router as critique_router
     from api.routers.burst_culling import router as burst_culling_router
     from api.routers.plugins import router as plugins_router
+    from api.routers.memories import router as memories_router
+    from api.routers.caption import router as caption_router
+    from api.routers.timeline import router as timeline_router
+    from api.routers.map import router as map_router
 
     app.include_router(health_router)
     app.include_router(auth_router)
@@ -120,6 +124,10 @@ def create_app() -> FastAPI:
     app.include_router(critique_router)
     app.include_router(burst_culling_router)
     app.include_router(plugins_router)
+    app.include_router(memories_router)
+    app.include_router(caption_router)
+    app.include_router(timeline_router)
+    app.include_router(map_router)
 
     # Initialise plugin manager (global singleton + router reference)
     from plugins import init_global_plugin_manager

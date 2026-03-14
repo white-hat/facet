@@ -273,6 +273,34 @@ Save a combination of filters (camera, tag, person, date range, score thresholds
 
 Controlled by `viewer.features.show_albums` (default: `true`).
 
+### AI Auto-Albums
+
+Click "Auto-Generate" on the albums page to automatically create albums from photo clusters based on time proximity, GPS location, and content similarity. Albums are named using date ranges and detected themes.
+
+Also available via CLI:
+
+```bash
+python facet.py --auto-albums
+```
+
+### Photo Sharing
+
+Share albums with external users via tokenized links. No authentication required to view shared albums.
+
+| Action | How To |
+|--------|--------|
+| **Share** | Open album, click "Share" button to generate a shareable link |
+| **Revoke** | Click "Unshare" to invalidate the share token |
+| **View** | Recipients open the link to browse the shared album at `/shared/album/:id` |
+
+### API
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/albums/{id}/share` | Generate share token for album |
+| `DELETE /api/albums/{id}/share` | Revoke share token |
+| `GET /api/shared/album/{id}?token=` | View shared album (no auth required) |
+
 ## AI Critique
 
 Get a detailed breakdown of a photo's scores with strengths, weaknesses, and improvement suggestions.
@@ -293,6 +321,84 @@ Uses the configured VLM (Qwen3-VL-2B or Qwen2.5-VL-7B) to provide a richer, cont
 | `GET /api/critique?path=<photo_path>&mode=vlm` | VLM-powered critique (requires GPU) |
 
 Controlled by `viewer.features.show_critique` (default: `true`) and `viewer.features.show_vlm_critique` (default: `false`).
+
+## AI Captioning
+
+Get an AI-generated natural language caption for any photo. Captions are generated on first request and cached in the `caption` database column.
+
+### API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/caption?path=<photo_path>` | Get or generate caption for a photo |
+
+Also available via CLI for bulk generation:
+
+```bash
+python facet.py --generate-captions    # Generate captions for all uncaptioned photos
+```
+
+Controlled by `viewer.features.show_captions` (default: `true`). Requires 16gb or 24gb VRAM profile for VLM-based captioning.
+
+## Memories ("On This Day")
+
+Browse photos taken on the same calendar date in previous years. A memories dialog shows a year-by-year retrospective of matching photos.
+
+### API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/memories?date=YYYY-MM-DD` | Get photos taken on this date in previous years |
+
+Controlled by `viewer.features.show_memories` (default: `true`).
+
+## Timeline View
+
+Chronological photo browser with date-based navigation. Scroll through photos organized by date with a sidebar showing available years and months.
+
+### API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/timeline?cursor=&limit=&direction=` | Paginated timeline photos with cursor-based navigation |
+| `GET /api/timeline/dates?year=&month=` | Available dates for year/month navigation |
+
+Access via the `/timeline` route. Controlled by `viewer.features.show_timeline` (default: `true`).
+
+## Map View
+
+View photos on an interactive map based on GPS coordinates extracted from EXIF data. Uses Leaflet for map rendering with clustering at different zoom levels.
+
+### Setup
+
+Extract GPS coordinates from existing photos:
+
+```bash
+python facet.py --extract-gps    # Extract GPS lat/lng from EXIF into database
+```
+
+GPS coordinates are also extracted automatically during scoring for new photos.
+
+### API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/photos/map?bounds=&zoom=&limit=` | Photos within map bounds (clustered by zoom) |
+| `GET /api/photos/map/count` | Total count of geotagged photos |
+
+Access via the `/map` route. Controlled by `viewer.features.show_map` (default: `true`).
+
+## AI Culling (Similar Groups)
+
+Find groups of visually similar photos across your library for culling. Unlike burst detection (which groups by time), similar groups use CLIP/SigLIP embedding similarity to find photos that look alike regardless of when they were taken.
+
+Access via the similarity tab in the burst culling component.
+
+### API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/similar-groups?threshold=&page=&per_page=` | Paginated groups of visually similar photos |
 
 ## Pairwise Comparison Mode
 
@@ -607,6 +713,22 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 | `GET /api/albums/{id}/photos` | List photos in album (paginated) |
 | `POST /api/albums/{id}/photos` | Add photos to album |
 | `DELETE /api/albums/{id}/photos` | Remove photos from album |
+| `POST /api/albums/{id}/share` | Generate share token |
+| `DELETE /api/albums/{id}/share` | Revoke share token |
+| `POST /api/albums/auto-generate` | Auto-generate albums from photo clusters |
+| `GET /api/shared/album/{id}?token=` | View shared album (no auth) |
+
+### Memories, Timeline, Map & Captions
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/memories?date=` | Photos taken on this date in previous years |
+| `GET /api/caption?path=` | Get or generate AI caption |
+| `GET /api/timeline?cursor=&limit=&direction=` | Paginated timeline photos |
+| `GET /api/timeline/dates?year=&month=` | Available dates for navigation |
+| `GET /api/photos/map?bounds=&zoom=&limit=` | Geotagged photos within bounds |
+| `GET /api/photos/map/count` | Count of geotagged photos |
+| `GET /api/similar-groups?threshold=&page=&per_page=` | Groups of visually similar photos |
 
 ### Statistics
 
@@ -648,4 +770,7 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 | Scan button missing | Requires `superadmin` role and `viewer.features.show_scan_button: true` |
 | Search returns no results | Ensure photos have `clip_embedding` data (run scoring first) |
 | VLM critique unavailable | Requires 16gb/24gb VRAM profile and `viewer.features.show_vlm_critique: true` |
+| Map shows no photos | Run `--extract-gps` to populate GPS columns, ensure photos have EXIF GPS data |
+| Captions not generating | Requires 16gb/24gb VRAM profile for VLM captioning |
+| Timeline empty | Ensure photos have `date_taken` values |
 | Port 5000 in use | Change port in `viewer.py` or kill the conflicting process |

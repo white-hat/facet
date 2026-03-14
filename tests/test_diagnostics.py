@@ -2,6 +2,7 @@
 
 import json
 import sqlite3
+import sys
 import types
 from unittest import mock
 
@@ -9,6 +10,27 @@ import pytest
 
 from config.scoring_config import ScoringConfig
 from diagnostics import _info, _ok, _section, _warn, run_doctor
+
+
+class _StdoutProxy:
+    """Proxy that always writes to the current sys.stdout (respects capsys patching)."""
+    def write(self, msg):
+        sys.stdout.write(msg)
+    def flush(self):
+        sys.stdout.flush()
+
+
+@pytest.fixture(autouse=True)
+def _configure_diagnostics_logger():
+    """Route diagnostics logger output to stdout so capsys can capture it."""
+    import logging
+    logger = logging.getLogger("facet.diagnostics")
+    handler = logging.StreamHandler(_StdoutProxy())
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+    yield
+    logger.removeHandler(handler)
 
 
 class TestOutputHelpers:

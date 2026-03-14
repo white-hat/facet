@@ -110,9 +110,10 @@ def _query_person_photos(person_id: int, *, page: int, per_page: int,
 
     conn = get_db_connection()
     try:
-        total_count = conn.execute(
+        row = conn.execute(
             f"SELECT COUNT(*) FROM photos WHERE {where_sql}", sql_params
-        ).fetchone()[0]
+        ).fetchone()
+        total_count = row[0] if row else 0
         total_pages = max(1, math.ceil(total_count / per_page))
 
         existing_cols = get_existing_columns(conn)
@@ -144,11 +145,15 @@ async def list_persons(
     page: int = Query(1, ge=1),
     per_page: int = Query(48, ge=1, le=200),
     search: str = Query(""),
-    sort: str = Query("count_desc", pattern="^(count_asc|count_desc|quality_asc|quality_desc)$"),
+    sort: str = Query("count_desc", pattern="^(count_asc|count_desc|quality_asc|quality_desc|name_asc|name_desc)$"),
     user: CurrentUser = Depends(require_authenticated),
 ):
     """List all persons with pagination and search."""
-    if sort == "count_asc":
+    if sort == "name_asc":
+        order_clause = "ORDER BY COALESCE(p.name, '') ASC, p.face_count DESC"
+    elif sort == "name_desc":
+        order_clause = "ORDER BY COALESCE(p.name, '') DESC, p.face_count DESC"
+    elif sort == "count_asc":
         order_clause = "ORDER BY p.face_count ASC, p.id"
     elif sort == "quality_asc":
         order_clause = "ORDER BY rep_quality ASC, p.id"
@@ -165,9 +170,10 @@ async def list_persons(
 
     conn = get_db_connection()
     try:
-        total = conn.execute(
+        row = conn.execute(
             f"SELECT COUNT(*) FROM persons p {where_clause}", params
-        ).fetchone()[0]
+        ).fetchone()
+        total = row[0] if row else 0
 
         offset = (page - 1) * per_page
         persons = conn.execute(f"""
@@ -237,8 +243,9 @@ async def _do_merge(source_id: int, target_id: int):
                      (target_id, source_id))
 
         # 2. Update target face_count
-        count = conn.execute("SELECT COUNT(*) FROM faces WHERE person_id = ?",
-                             (target_id,)).fetchone()[0]
+        row = conn.execute("SELECT COUNT(*) FROM faces WHERE person_id = ?",
+                           (target_id,)).fetchone()
+        count = row[0] if row else 0
         conn.execute("UPDATE persons SET face_count = ? WHERE id = ?",
                      (count, target_id))
 
@@ -278,10 +285,11 @@ async def merge_persons_batch(
         )
 
         # Update target face_count
-        new_count = conn.execute(
+        row = conn.execute(
             "SELECT COUNT(*) FROM faces WHERE person_id = ?",
             (body.target_id,),
-        ).fetchone()[0]
+        ).fetchone()
+        new_count = row[0] if row else 0
         conn.execute(
             "UPDATE persons SET face_count = ? WHERE id = ?",
             (new_count, body.target_id),

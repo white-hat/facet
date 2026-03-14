@@ -58,7 +58,7 @@ Chart.register(...registerables);
             (click)="weightsTab()?.recalculateScores()"
             [matTooltip]="'comparison.recalculate_tooltip' | translate">
             @if (weightsTab()?.recalculating()) {
-              <mat-spinner diameter="16" />
+              <mat-spinner diameter="16" class="inline-flex !w-4 !h-4" />
             } @else {
               <mat-icon>calculate</mat-icon>
             }

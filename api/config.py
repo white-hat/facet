@@ -3,10 +3,13 @@ Configuration loading for the FastAPI API server.
 
 """
 
+import fcntl
 import os
 import json
 import math
 import shutil
+import tempfile
+import threading
 import time
 import secrets
 
@@ -16,17 +19,43 @@ FACET_SCRIPT = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'facet.p
 
 
 def _load_and_ensure_share_secret():
-    """Load scoring_config.json once, ensure share_secret exists. Returns (config_dict, secret)."""
+    """Load scoring_config.json once, ensure share_secret exists. Returns (config_dict, secret).
+
+    Uses file locking to prevent race conditions when multiple workers start simultaneously.
+    Writes atomically via temp file + rename to avoid partial writes.
+    """
     try:
         with open(_CONFIG_PATH) as f:
             config = json.load(f)
     except Exception:
         config = {}
     if 'share_secret' not in config or not config['share_secret']:
-        config['share_secret'] = secrets.token_hex(32)
-        shutil.copy2(_CONFIG_PATH, f"{_CONFIG_PATH}.backup")
-        with open(_CONFIG_PATH, 'w') as f:
-            json.dump(config, f, indent=2)
+        lock_path = f"{_CONFIG_PATH}.lock"
+        lock_fd = open(lock_path, 'w')
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            # Re-read after acquiring lock — another worker may have written the secret
+            try:
+                with open(_CONFIG_PATH) as f:
+                    config = json.load(f)
+            except Exception:
+                config = {}
+            if 'share_secret' not in config or not config['share_secret']:
+                config['share_secret'] = secrets.token_hex(32)
+                shutil.copy2(_CONFIG_PATH, f"{_CONFIG_PATH}.backup")
+                # Atomic write: write to temp file then rename
+                dir_name = os.path.dirname(_CONFIG_PATH)
+                fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.json')
+                try:
+                    with os.fdopen(fd, 'w') as f:
+                        json.dump(config, f, indent=2)
+                    os.replace(tmp_path, _CONFIG_PATH)
+                except Exception:
+                    os.unlink(tmp_path)
+                    raise
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            lock_fd.close()
     return config, config['share_secret']
 
 
@@ -93,7 +122,7 @@ def load_viewer_config(config=None):
         'quality_thresholds': {'good': 6, 'great': 7, 'excellent': 8, 'best': 9},
         'photo_types': {'top_picks_min_score': 7, 'low_light_max_luminance': 0.2},
         'defaults': {'hide_blinks': True, 'hide_bursts': True, 'hide_duplicates': True, 'hide_details': True, 'hide_rejected': True, 'sort': 'aggregate', 'sort_direction': 'DESC'},
-        'features': {'show_similar_button': True, 'show_merge_suggestions': True, 'show_rating_controls': True, 'show_rating_badge': True, 'show_semantic_search': True, 'show_albums': True, 'show_critique': True, 'show_vlm_critique': False},
+        'features': {'show_similar_button': True, 'show_merge_suggestions': True, 'show_rating_controls': True, 'show_rating_badge': True, 'show_semantic_search': True, 'show_albums': True, 'show_critique': True, 'show_vlm_critique': False, 'show_memories': True, 'show_captions': True, 'show_timeline': True, 'show_map': False},
         'cache_ttl_seconds': 3600,
         'notification_duration_ms': 2000
     }
@@ -160,12 +189,16 @@ def get_all_scan_directories():
     return sorted(dirs)
 
 
+_config_lock = threading.Lock()
+
+
 def reload_config():
     """Reload scoring_config.json from disk."""
     global _FULL_CONFIG, _share_secret, VIEWER_CONFIG, JWT_SECRET
-    _FULL_CONFIG, _share_secret = _load_and_ensure_share_secret()
-    VIEWER_CONFIG = load_viewer_config(_FULL_CONFIG)
-    JWT_SECRET = _share_secret
+    with _config_lock:
+        _FULL_CONFIG, _share_secret = _load_and_ensure_share_secret()
+        VIEWER_CONFIG = load_viewer_config(_FULL_CONFIG)
+        JWT_SECRET = _share_secret
 
 
 def map_disk_path(db_path):
@@ -201,19 +234,24 @@ def get_comparison_mode_settings():
 
 # Cache for existing columns (loaded once at startup, rarely changes)
 _existing_columns_cache = None
+_existing_columns_lock = threading.Lock()
 
 # Cache for photo type counts (keyed by hide_blinks/hide_bursts/hide_duplicates combination)
 _photo_types_cache = {'data': {}, 'expires': 0}
+_photo_types_lock = threading.Lock()
 
 # Cache for COUNT query results (avoids repeated full-table scans)
 _count_cache = {}
+_count_cache_lock = threading.Lock()
 COUNT_CACHE_TTL = 300  # seconds
 
 # Track if photo_tags lookup table is available (checked once at startup)
 _photo_tags_available = None
+_photo_tags_lock = threading.Lock()
 
 # Cache for stats API responses
 _stats_cache = {}  # key -> {'data': ..., 'expires': float}
+_stats_cache_lock = threading.Lock()
 
 
 def _sanitize_stats(obj):
@@ -229,11 +267,13 @@ def _sanitize_stats(obj):
 
 def _get_stats_cached(cache_key, compute_fn):
     now = time.time()
-    cached = _stats_cache.get(cache_key)
-    if cached and now < cached['expires']:
-        return cached['data']
+    with _stats_cache_lock:
+        cached = _stats_cache.get(cache_key)
+        if cached and now < cached['expires']:
+            return cached['data']
     data = _sanitize_stats(compute_fn())
-    _stats_cache[cache_key] = {'data': data, 'expires': now + VIEWER_CONFIG['cache_ttl_seconds']}
+    with _stats_cache_lock:
+        _stats_cache[cache_key] = {'data': data, 'expires': now + VIEWER_CONFIG['cache_ttl_seconds']}
     return data
 
 # --- CORRELATION QUERY WHITELISTS ---

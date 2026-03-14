@@ -5,14 +5,16 @@ Database helper functions for the FastAPI API server.
 
 import hashlib
 import logging
+import math
 import struct
 import time
 from config import ScoringConfig
 
 logger = logging.getLogger("facet.api.db_helpers")
 from api.config import (
-    _existing_columns_cache,
-    _photo_tags_available, _count_cache, COUNT_CACHE_TTL,
+    _existing_columns_cache, _existing_columns_lock,
+    _photo_tags_available, _photo_tags_lock,
+    _count_cache, _count_cache_lock, COUNT_CACHE_TTL,
     is_multi_user_enabled, get_user_directories
 )
 from api.database import get_db_connection
@@ -50,6 +52,18 @@ HIDE_BLINKS_SQL = "(is_blink = 0 OR is_blink IS NULL)"
 HIDE_BURSTS_SQL = "(is_burst_lead = 1 OR is_burst_lead IS NULL)"
 HIDE_DUPLICATES_SQL = "(is_duplicate_lead = 1 OR is_duplicate_lead IS NULL OR duplicate_group_id IS NULL)"
 
+
+def build_hide_clauses(hide_blinks: str, hide_bursts: str, hide_duplicates: str) -> list[str]:
+    """Convert hide-toggle string params ('1'/'true') to SQL WHERE fragments."""
+    clauses = []
+    if hide_blinks in ('1', 'true'):
+        clauses.append(HIDE_BLINKS_SQL)
+    if hide_bursts in ('1', 'true'):
+        clauses.append(HIDE_BURSTS_SQL)
+    if hide_duplicates in ('1', 'true'):
+        clauses.append(HIDE_DUPLICATES_SQL)
+    return clauses
+
 # Column lists shared by gallery and person viewer
 PHOTO_BASE_COLS = [
     'path', 'filename', 'date_taken', 'camera_model', 'lens_model', 'iso',
@@ -67,33 +81,38 @@ PHOTO_OPTIONAL_COLS = [
     'aesthetic_iaa', 'face_quality_iqa', 'liqe_score',
     'subject_sharpness', 'subject_prominence', 'subject_placement', 'bg_separation',
     'star_rating', 'is_favorite', 'is_rejected',
-    'duplicate_group_id', 'is_duplicate_lead'
+    'duplicate_group_id', 'is_duplicate_lead',
+    'caption', 'gps_latitude', 'gps_longitude'
 ]
 
 
 def get_existing_columns(conn=None):
     """Get list of columns that exist in the photos table. Cached after first call."""
     global _existing_columns_cache
-    if _existing_columns_cache is not None:
-        return _existing_columns_cache
+    with _existing_columns_lock:
+        if _existing_columns_cache is not None:
+            return _existing_columns_cache
 
     if conn is None:
         conn = get_db_connection()
         cursor = conn.execute('PRAGMA table_info(photos)')
-        _existing_columns_cache = {row[1] for row in cursor.fetchall()}
+        result = {row[1] for row in cursor.fetchall()}
         conn.close()
     else:
         cursor = conn.execute('PRAGMA table_info(photos)')
-        _existing_columns_cache = {row[1] for row in cursor.fetchall()}
+        result = {row[1] for row in cursor.fetchall()}
 
+    with _existing_columns_lock:
+        _existing_columns_cache = result
     return _existing_columns_cache
 
 
 def is_photo_tags_available(conn=None):
     """Check if the photo_tags lookup table exists and has data."""
     global _photo_tags_available
-    if _photo_tags_available is not None:
-        return _photo_tags_available
+    with _photo_tags_lock:
+        if _photo_tags_available is not None:
+            return _photo_tags_available
 
     close_conn = False
     if conn is None:
@@ -101,14 +120,16 @@ def is_photo_tags_available(conn=None):
         close_conn = True
 
     try:
-        count = conn.execute("SELECT COUNT(*) FROM photo_tags").fetchone()[0]
-        _photo_tags_available = count > 0
+        row = conn.execute("SELECT COUNT(*) FROM photo_tags").fetchone()
+        result = row[0] > 0 if row else False
     except Exception:
-        _photo_tags_available = False
+        result = False
 
     if close_conn:
         conn.close()
 
+    with _photo_tags_lock:
+        _photo_tags_available = result
     return _photo_tags_available
 
 
@@ -187,21 +208,54 @@ def get_cached_count(conn, where_str, sql_params, from_clause="photos"):
     cache_key = hashlib.sha256(f"{from_clause}:{where_str}:{tuple(sql_params)}".encode()).hexdigest()
 
     now = time.time()
-    if cache_key in _count_cache:
-        count, ts = _count_cache[cache_key]
-        if now - ts < COUNT_CACHE_TTL:
-            return count
+    with _count_cache_lock:
+        if cache_key in _count_cache:
+            count, ts = _count_cache[cache_key]
+            if now - ts < COUNT_CACHE_TTL:
+                return count
 
-    count = conn.execute(f"SELECT COUNT(*) FROM {from_clause}{where_str}", sql_params).fetchone()[0]
-    _count_cache[cache_key] = (count, now)
+    row = conn.execute(f"SELECT COUNT(*) FROM {from_clause}{where_str}", sql_params).fetchone()
+    count = row[0] if row else 0
 
-    if len(_count_cache) > 100:
-        expired = [k for k, (_, ts) in _count_cache.items() if now - ts > COUNT_CACHE_TTL * 2]
-        for k in expired:
-            del _count_cache[k]
+    with _count_cache_lock:
+        _count_cache[cache_key] = (count, now)
+        if len(_count_cache) > 100:
+            expired = [k for k, (_, ts) in _count_cache.items() if now - ts > COUNT_CACHE_TTL * 2]
+            for k in expired:
+                del _count_cache[k]
 
     return count
 
+
+
+def sanitize_float_values(data):
+    """Replace NaN/Infinity with None in a list of dicts."""
+    for item in data:
+        for key, value in item.items():
+            if isinstance(value, float) and (math.isinf(value) or math.isnan(value)):
+                item[key] = None
+    return data
+
+
+def build_photo_select_columns(conn, user_id=None):
+    """Build the SELECT column list for photo queries.
+
+    Resolves existing columns, applies user-preference overrides for
+    star_rating / is_favorite / is_rejected, and returns a list of SQL
+    column expressions ready to join into a SELECT clause.
+    """
+    existing_cols = get_existing_columns(conn)
+    pref_cols = get_preference_columns(user_id)
+    pref_col_names = {'star_rating', 'is_favorite', 'is_rejected'}
+
+    select_cols = list(PHOTO_BASE_COLS)
+    for c in PHOTO_OPTIONAL_COLS:
+        if c in existing_cols:
+            if c in pref_col_names:
+                select_cols.append(f"{pref_cols[c]} as {c}")
+            else:
+                select_cols.append(c)
+    return select_cols
 
 
 def update_person_face_count(conn, person_id):
@@ -271,8 +325,13 @@ def attach_person_data(photos, conn):
 
 # --- MULTI-USER VISIBILITY & PREFERENCES ---
 
-def get_visibility_clause(user_id):
-    """Returns (sql_fragment, params) for photo visibility in multi-user mode."""
+def get_visibility_clause(user_id, table_alias='photos'):
+    """Returns (sql_fragment, params) for photo visibility in multi-user mode.
+
+    Args:
+        user_id: The current user ID (or None).
+        table_alias: Table name or alias to qualify the path column (default: 'photos').
+    """
     if not user_id or not is_multi_user_enabled():
         return '1=1', []
 
@@ -284,7 +343,7 @@ def get_visibility_clause(user_id):
     params = []
     for d in all_dirs:
         prefix = d.rstrip('/\\') + '/'
-        conditions.append("photos.path LIKE ?")
+        conditions.append(f"{table_alias}.path LIKE ?")
         params.append(prefix + '%')
 
     return f"({' OR '.join(conditions)})", params
@@ -347,9 +406,10 @@ def backfill_image_dimensions():
     """Backfill image_width/image_height from thumbnail BLOBs for NULL rows."""
     conn = get_db_connection()
     try:
-        null_count = conn.execute(
+        row = conn.execute(
             "SELECT COUNT(*) FROM photos WHERE image_width IS NULL OR image_height IS NULL"
-        ).fetchone()[0]
+        ).fetchone()
+        null_count = row[0] if row else 0
         if null_count == 0:
             return
 

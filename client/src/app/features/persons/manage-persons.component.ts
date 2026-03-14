@@ -1,10 +1,7 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy, ElementRef, viewChild, effect } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, inject, signal, computed, OnInit, effect } from '@angular/core';
 import { RouterLink, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import {
   MatDialogModule,
   MatDialog,
@@ -12,6 +9,7 @@ import {
   MatDialogRef,
 } from '@angular/material/dialog';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
@@ -21,6 +19,8 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { PersonThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
 import { PersonCardComponent, Person } from '../../shared/components/person-card/person-card.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { InfiniteScrollDirective } from '../../shared/directives/infinite-scroll.directive';
+import { PersonsFiltersService } from './persons-filters.service';
 
 interface PersonsResponse {
   persons: Person[];
@@ -29,9 +29,9 @@ interface PersonsResponse {
 
 @Component({
   selector: 'app-merge-target-dialog',
-  imports: [MatButtonModule, MatDialogModule, MatIconModule, TranslatePipe, PersonThumbnailUrlPipe],
+  imports: [MatButtonModule, MatDialogModule, MatIconModule, MatTooltipModule, TranslatePipe, PersonThumbnailUrlPipe],
   template: `
-    <h2 mat-dialog-title>{{ 'persons.select_merge_target' | translate }}</h2>
+    <h2 mat-dialog-title class="truncate" [matTooltip]="'persons.select_merge_target' | translate">{{ 'persons.select_merge_target' | translate }}</h2>
     <mat-dialog-content>
       <p class="text-sm text-gray-400 mb-4">{{ 'persons.select_merge_target_desc' | translate }}</p>
       <div class="grid grid-cols-3 gap-3">
@@ -73,10 +73,7 @@ export class MergeTargetDialogComponent {
 @Component({
   selector: 'app-manage-persons',
   imports: [
-    FormsModule,
     RouterLink,
-    MatFormFieldModule,
-    MatInputModule,
     MatButtonModule,
     MatIconModule,
     MatDialogModule,
@@ -84,37 +81,18 @@ export class MergeTargetDialogComponent {
     MatSnackBarModule,
     TranslatePipe,
     PersonCardComponent,
+    InfiniteScrollDirective,
   ],
   template: `
-    <div class="p-4 md:p-6 max-w-screen-2xl mx-auto">
+    <div class="px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 max-w-screen-2xl mx-auto">
       <!-- Header -->
-      <div class="flex flex-wrap items-center gap-4 mb-6">
-        <h1 class="text-2xl font-medium">{{ 'persons.manage_title' | translate }}</h1>
-        <div class="flex-1"></div>
+      <div class="flex flex-wrap items-center justify-end gap-4 mb-3">
         @if (auth.isEdition()) {
           <a mat-button routerLink="/merge-suggestions">
             <mat-icon>auto_fix_high</mat-icon>
             {{ 'persons.merge_suggestions' | translate }}
           </a>
         }
-      </div>
-
-      <!-- Search bar -->
-      <div class="flex flex-wrap items-center gap-3 mb-3">
-        <mat-form-field class="flex-1 min-w-48" subscriptSizing="dynamic">
-          <mat-icon matPrefix>search</mat-icon>
-          <input
-            matInput
-            [placeholder]="'persons.search_placeholder' | translate"
-            [(ngModel)]="searchQuery"
-            (ngModelChange)="onSearchChange()"
-          />
-          @if (searchQuery) {
-            <button matSuffix mat-icon-button (click)="clearSearch()">
-              <mat-icon>close</mat-icon>
-            </button>
-          }
-        </mat-form-field>
       </div>
 
       <!-- Loading -->
@@ -152,7 +130,7 @@ export class MergeTargetDialogComponent {
 
       <!-- Infinite scroll sentinel -->
       @if (hasMore()) {
-        <div #scrollSentinel class="flex justify-center py-8">
+        <div appInfiniteScroll (scrollReached)="onScrollReached()" class="flex justify-center py-8">
           <mat-spinner diameter="36" />
         </div>
       }
@@ -160,7 +138,7 @@ export class MergeTargetDialogComponent {
 
     <!-- Selection action bar (sticky bottom) -->
     @if (auth.isEdition() && selectedIds().size > 0) {
-      <div class="fixed bottom-14 lg:bottom-0 left-0 right-0 z-50 flex flex-col lg:flex-row items-center justify-center gap-2 lg:gap-3 px-4 lg:px-6 py-2 lg:py-3 bg-[var(--mat-sys-surface-container-high)] border-t border-[var(--mat-sys-outline-variant)] shadow-lg">
+      <div class="fixed bottom-[45px] lg:bottom-0 left-0 right-0 z-50 flex flex-col lg:flex-row items-center justify-center gap-2 lg:gap-3 px-4 lg:px-6 py-2 lg:py-3 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] shadow-lg">
         <span class="text-sm font-medium">{{ 'gallery.selection.count' | translate:{ count: selectedIds().size } }}</span>
         <div class="flex items-center gap-2">
           <button mat-button (click)="clearSelection()">
@@ -180,15 +158,14 @@ export class MergeTargetDialogComponent {
     }
   `,
 })
-export class ManagePersonsComponent implements OnInit, OnDestroy {
+export class ManagePersonsComponent implements OnInit {
   readonly auth = inject(AuthService);
   private readonly api = inject(ApiService);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
+  private readonly personsFilters = inject(PersonsFiltersService);
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
-
-  readonly scrollSentinel = viewChild<ElementRef>('scrollSentinel');
 
   readonly persons = signal<Person[]>([]);
   readonly total = signal(0);
@@ -196,49 +173,26 @@ export class ManagePersonsComponent implements OnInit, OnDestroy {
   readonly editingId = signal<number | null>(null);
   readonly selectedIds = signal<Set<number>>(new Set());
 
-  searchQuery = '';
   private page = 1;
   private readonly perPage = 48;
-  private searchTimeout: ReturnType<typeof setTimeout> | null = null;
-  private observer: IntersectionObserver | null = null;
+  private initialized = false;
 
   readonly hasMore = computed(() => this.persons().length < this.total());
 
   constructor() {
     effect(() => {
-      const el = this.scrollSentinel()?.nativeElement;
-      if (!el) return;
-      this.observer?.disconnect();
-      const scrollRoot = el.closest('main') ?? null;
-      this.observer = new IntersectionObserver(
-        (entries) => {
-          if (entries[0]?.isIntersecting && this.hasMore() && !this.loading()) {
-            this.loadMore();
-          }
-        },
-        { root: scrollRoot, rootMargin: '200px' },
-      );
-      this.observer.observe(el);
+      this.personsFilters.sort();
+      this.personsFilters.sortDirection();
+      this.personsFilters.search();
+      if (this.initialized) {
+        this.loadPersons(true);
+      }
     });
   }
 
   async ngOnInit(): Promise<void> {
+    this.initialized = true;
     await this.loadPersons(true);
-  }
-
-  ngOnDestroy(): void {
-    if (this.searchTimeout) clearTimeout(this.searchTimeout);
-    this.observer?.disconnect();
-  }
-
-  onSearchChange(): void {
-    if (this.searchTimeout) clearTimeout(this.searchTimeout);
-    this.searchTimeout = setTimeout(() => this.loadPersons(true), 300);
-  }
-
-  clearSearch(): void {
-    this.searchQuery = '';
-    this.loadPersons(true);
   }
 
   async loadPersons(reset: boolean): Promise<void> {
@@ -249,11 +203,15 @@ export class ManagePersonsComponent implements OnInit, OnDestroy {
     this.loading.set(true);
 
     try {
+      const sortParam = this.personsFilters.sort() === 'name'
+        ? (this.personsFilters.sortDirection() === 'asc' ? 'name_asc' : 'name_desc')
+        : (this.personsFilters.sortDirection() === 'asc' ? 'count_asc' : 'count_desc');
       const res = await firstValueFrom(
         this.api.get<PersonsResponse>('/persons', {
-          search: this.searchQuery,
+          search: this.personsFilters.search(),
           page: this.page,
           per_page: this.perPage,
+          sort: sortParam,
         }),
       );
 
@@ -270,9 +228,11 @@ export class ManagePersonsComponent implements OnInit, OnDestroy {
     }
   }
 
-  loadMore(): void {
-    this.page++;
-    this.loadPersons(false);
+  onScrollReached(): void {
+    if (this.hasMore() && !this.loading()) {
+      this.page++;
+      this.loadPersons(false);
+    }
   }
 
   // --- Inline rename ---

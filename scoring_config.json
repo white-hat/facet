@@ -1824,6 +1824,29 @@
   "duplicate_detection": {
     "similarity_threshold_percent": 90
   },
+  "timeline": {
+    "photos_per_group": 30
+  },
+  "map": {
+    "cluster_zoom_threshold": 10
+  },
+  "burst_scoring": {
+    "weight_aggregate": 0.4,
+    "weight_aesthetic": 0.25,
+    "weight_sharpness": 0.2,
+    "weight_blink": 0.15
+  },
+  "similarity_groups": {
+    "default_threshold": 0.85,
+    "min_group_size": 2,
+    "max_photos": 10000,
+    "max_group_size": 50
+  },
+  "auto_albums": {
+    "min_photos_per_album": 5,
+    "time_gap_hours": 4,
+    "embedding_threshold": 0.6
+  },
   "models": {
     "vram_profile": "auto",
     "keep_in_ram": "auto",
@@ -2197,7 +2220,11 @@
       "show_semantic_search": true,
       "show_albums": true,
       "show_critique": true,
-      "show_vlm_critique": true
+      "show_vlm_critique": true,
+      "show_memories": true,
+      "show_captions": true,
+      "show_timeline": true,
+      "show_map": true
     },
     "allowed_origins": [
       "http://localhost:4200",

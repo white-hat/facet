@@ -4,6 +4,7 @@ import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { AlbumService } from '../../core/services/album.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -13,10 +14,10 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
   standalone: true,
   imports: [
     FormsModule, MatDialogModule, MatFormFieldModule, MatInputModule,
-    MatButtonModule, TranslatePipe,
+    MatButtonModule, MatTooltipModule, TranslatePipe,
   ],
   template: `
-    <h2 mat-dialog-title>{{ 'albums.save_smart' | translate }}</h2>
+    <h2 mat-dialog-title class="truncate" [matTooltip]="'albums.save_smart' | translate">{{ 'albums.save_smart' | translate }}</h2>
     <mat-dialog-content>
       <mat-form-field class="w-full">
         <mat-label>{{ 'albums.name' | translate }}</mat-label>

@@ -62,6 +62,34 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: 'timeline',
+    loadComponent: () =>
+      import('./features/timeline/timeline.component').then(m => m.TimelineComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'map',
+    loadComponent: () =>
+      import('./features/map/map.component').then(m => m.MapComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'photo',
+    loadComponent: () =>
+      import('./features/photo-detail/photo-detail.component').then(m => m.PhotoDetailComponent),
+    canActivate: [authGuard],
+  },
+  {
+    path: 'shared/album/:albumId',
+    loadComponent: () =>
+      import('./shared/components/shared-view/shared-view.component').then(m => m.SharedViewComponent),
+  },
+  {
+    path: 'shared/person/:personId',
+    loadComponent: () =>
+      import('./shared/components/shared-view/shared-view.component').then(m => m.SharedViewComponent),
+  },
+  {
     path: '**',
     redirectTo: '',
   },

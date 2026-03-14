@@ -25,16 +25,20 @@ import { I18nService } from './core/services/i18n.service';
 import { ThemeService } from './core/services/theme.service';
 import { GalleryStore, GalleryFilters } from './features/gallery/gallery.store';
 import { StatsFiltersService } from './features/stats/stats-filters.service';
+import { TimelineFiltersService } from './features/timeline/timeline-filters.service';
+import { AlbumsFiltersService } from './features/albums/albums-filters.service';
+import { PersonsFiltersService } from './features/persons/persons-filters.service';
 import { CompareFiltersService } from './features/comparison/compare-filters.service';
 import { TranslatePipe } from './shared/pipes/translate.pipe';
 import { PersonThumbnailUrlPipe, ThumbnailUrlPipe } from './shared/pipes/thumbnail-url.pipe';
+import { MemoriesDialogComponent } from './features/gallery/memories-dialog.component';
 
 /** Inline dialog for edition password prompt. */
 @Component({
   selector: 'app-edition-dialog',
   imports: [FormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule, MatDialogModule, TranslatePipe],
   template: `
-    <h2 mat-dialog-title class="flex items-center gap-2">
+    <h2 mat-dialog-title class="flex items-center gap-2 truncate">
       <mat-icon>lock_open</mat-icon>
       {{ 'edition.unlock_title' | translate }}
     </h2>
@@ -57,8 +61,8 @@ import { PersonThumbnailUrlPipe, ThumbnailUrlPipe } from './shared/pipes/thumbna
 export class EditionDialogComponent {
   private dialogRef = inject(MatDialogRef<EditionDialogComponent>);
   private auth = inject(AuthService);
-  password = '';
-  error = signal(false);
+  protected password = '';
+  protected readonly error = signal(false);
 
   async submit(): Promise<void> {
     this.error.set(false);
@@ -100,17 +104,24 @@ export class EditionDialogComponent {
   host: { class: 'block h-full' },
 })
 export class App implements OnInit {
-  private router = inject(Router);
-  private dialog = inject(MatDialog);
-  private api = inject(ApiService);
-  auth = inject(AuthService);
-  i18n = inject(I18nService);
-  themeService = inject(ThemeService);
-  store = inject(GalleryStore);
-  statsFilters = inject(StatsFiltersService);
-  compareFilters = inject(CompareFiltersService);
-  mobileSearchOpen = signal(false);
+  private readonly router = inject(Router);
+  private readonly dialog = inject(MatDialog);
+  private readonly api = inject(ApiService);
+  protected readonly auth = inject(AuthService);
+  private readonly i18n = inject(I18nService);
+  protected readonly themeService = inject(ThemeService);
+  protected readonly store = inject(GalleryStore);
+  protected readonly statsFilters = inject(StatsFiltersService);
+  protected readonly timelineFilters = inject(TimelineFiltersService);
+  protected readonly albumsFilters = inject(AlbumsFiltersService);
+  protected readonly personsFilters = inject(PersonsFiltersService);
+  protected readonly compareFilters = inject(CompareFiltersService);
+  protected readonly mobileSearchOpen = signal(false);
+  protected readonly mobileAlbumsSearchOpen = signal(false);
+  protected readonly mobilePersonsSearchOpen = signal(false);
   protected readonly hasBurstGroups = signal(false);
+  protected readonly hasMemories = signal(false);
+  protected readonly hasGeoPhotos = signal(false);
 
   private url = toSignal(
     this.router.events.pipe(
@@ -120,27 +131,30 @@ export class App implements OnInit {
     { initialValue: this.router.url },
   );
 
-  isGalleryRoute = computed(() => {
+  protected readonly isGalleryRoute = computed(() => {
     const path = this.url().split('?')[0];
     return path === '/' || path === '' || path.startsWith('/album/');
   });
 
-  isStatsRoute = computed(() => this.url().split('?')[0] === '/stats');
+  protected readonly isStatsRoute = computed(() => this.url().split('?')[0] === '/stats');
 
-  isCompareRoute = computed(() => this.url().split('?')[0] === '/compare');
+  protected readonly isCompareRoute = computed(() => this.url().split('?')[0] === '/compare');
+  protected readonly isTimelineRoute = computed(() => this.url().split('?')[0] === '/timeline');
+  protected readonly isAlbumsRoute = computed(() => this.url().split('?')[0] === '/albums');
+  protected readonly isPersonsRoute = computed(() => this.url().split('?')[0] === '/persons');
 
-  sortGroups = computed(() => {
+  protected readonly sortGroups = computed(() => {
     const grouped = this.store.config()?.sort_options_grouped;
     if (!grouped) return null;
     return Object.entries(grouped);
   });
 
-  selectedPersonIds = computed(() => {
+  protected readonly selectedPersonIds = computed(() => {
     const raw = this.store.filters().person_id;
     return raw ? raw.split(',') : [];
   });
 
-  selectedPersons = computed(() => {
+  protected readonly selectedPersons = computed(() => {
     const ids = new Set(this.selectedPersonIds());
     if (!ids.size) return [];
     return this.store.persons().filter(p => ids.has(String(p.id)));
@@ -184,7 +198,7 @@ export class App implements OnInit {
     { minKey: 'date_from', maxKey: 'date_to', labelKey: 'gallery.sidebar.date' },
   ];
 
-  activeFilterChips = computed<{ id: string; labelKey: string; value: string; clearKeys: string[] }[]>(() => {
+  protected readonly activeFilterChips = computed<{ id: string; labelKey: string; value: string; clearKeys: string[] }[]>(() => {
     if (!this.isGalleryRoute()) return [];
     const f = this.store.filters();
     const chips: { id: string; labelKey: string; value: string; clearKeys: string[] }[] = [];
@@ -243,7 +257,7 @@ export class App implements OnInit {
     this.store.updateFilter('similarity_mode', mode);
   }
 
-  clearFilterChip(chip: { id: string; clearKeys: string[] }): void {
+  protected clearFilterChip(chip: { id: string; clearKeys: string[] }): void {
     for (const key of chip.clearKeys) {
       // Handle person_id chip removal (key = "person_N")
       if (key.startsWith('person_')) {
@@ -265,10 +279,11 @@ export class App implements OnInit {
   async ngOnInit(): Promise<void> {
     await this.i18n.load();
     this.store.loadTypeCounts();
+    this.store.loadConfig();
     try {
       await this.auth.checkStatus();
+      const promises: Promise<void>[] = [];
       if (this.auth.isEdition()) {
-        const promises: Promise<void>[] = [];
         promises.push(
           firstValueFrom(
             this.api.get<{ total_groups: number }>('/burst-groups', { page: 1, per_page: 1 }),
@@ -276,68 +291,105 @@ export class App implements OnInit {
             this.hasBurstGroups.set(data.total_groups > 0);
           }).catch(() => { /* Non-critical */ }),
         );
-        await Promise.all(promises);
       }
+      promises.push(
+        firstValueFrom(
+          this.api.get<{ has_memories: boolean }>('/memories/check'),
+        ).then(data => {
+          this.hasMemories.set(data.has_memories);
+        }).catch(() => { /* Non-critical */ }),
+      );
+      promises.push(
+        firstValueFrom(
+          this.api.get<{ count: number }>('/photos/map/count'),
+        ).then(data => {
+          this.hasGeoPhotos.set(data.count > 0);
+        }).catch(() => { /* Non-critical */ }),
+      );
+      await Promise.all(promises);
     } catch {
       // Auth check failed — guard will redirect if needed
     }
   }
 
-  onTypeChange(type: string): void {
+  protected onTypeChange(type: string): void {
     this.store.updateFilter('type', type);
   }
 
-  onSortChange(sort: string): void {
+  protected onSortChange(sort: string): void {
     this.store.updateFilter('sort', sort);
   }
 
-  toggleSortDirection(): void {
+  protected toggleSortDirection(): void {
     const current = this.store.filters().sort_direction;
     this.store.updateFilter('sort_direction', current === 'DESC' ? 'ASC' : 'DESC');
   }
 
-  onSearchChange(event: Event): void {
+  protected onSearchChange(event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     if (value !== this.store.filters().search) {
       this.store.updateFilter('search', value);
     }
   }
 
-  clearSearch(): void {
+  protected clearSearch(): void {
     this.store.updateFilter('search', '');
   }
 
-  onStatsCategoryChange(cat: string): void {
+  protected onStatsCategoryChange(cat: string): void {
     this.statsFilters.filterCategory.set(cat);
   }
 
-  onCompareCategoryChange(cat: string): void {
+  protected onCompareCategoryChange(cat: string): void {
     this.compareFilters.selectedCategory.set(cat);
   }
 
-  onStatsDateChange(field: 'from' | 'to', event: Event): void {
+  protected onStatsDateChange(field: 'from' | 'to', event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     if (field === 'from') this.statsFilters.dateFrom.set(value);
     else this.statsFilters.dateTo.set(value);
   }
 
-  onPersonChange(ids: string[]): void {
+  protected onTimelineDateChange(field: 'from' | 'to', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    if (field === 'from') this.timelineFilters.dateFrom.set(value);
+    else this.timelineFilters.dateTo.set(value);
+  }
+
+  protected onPersonChange(ids: string[]): void {
     this.store.updateFilter('person_id', ids.join(','));
   }
 
-  switchLang(lang: string): void {
+  protected switchLang(lang: string): void {
     this.i18n.setLocale(lang);
   }
 
-  logout(): void {
+  protected logout(): void {
     this.auth.logout();
   }
 
-  showEditionDialog(): void {
+  protected showEditionDialog(): void {
     this.dialog.open(EditionDialogComponent, { width: '95vw', maxWidth: '360px' });
   }
 
-  lockEdition(): void {
-    this.auth.dropEdition();
+  protected async lockEdition(): Promise<void> {
+    await this.auth.dropEdition();
+    const editionRoutes = ['/compare', '/culling'];
+    const path = this.url().split('?')[0];
+    if (editionRoutes.some(r => path.startsWith(r))) {
+      this.router.navigate(['/']);
+    }
+  }
+
+  protected openMemoriesDialog(): void {
+    this.dialog.open(MemoriesDialogComponent, { width: '95vw', maxWidth: '700px' });
+  }
+
+  protected onPersonsSortChange(sort: string): void {
+    this.personsFilters.sort.set(sort);
+  }
+
+  protected togglePersonsSortDirection(): void {
+    this.personsFilters.sortDirection.update(d => d === 'desc' ? 'asc' : 'desc');
   }
 }

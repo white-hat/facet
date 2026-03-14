@@ -27,6 +27,8 @@ All settings are in `scoring_config.json`. After modifying, run `python facet.py
 - [Performance](#performance)
 - [Storage](#storage)
 - [Plugins](#plugins)
+- [Similarity Groups](#similarity-groups)
+- [Auto Albums](#auto-albums)
 
 ---
 
@@ -1046,7 +1048,11 @@ Toggle optional features to reduce memory usage or simplify the UI:
       "show_similar_button": true,
       "show_merge_suggestions": true,
       "show_rating_controls": true,
-      "show_rating_badge": true
+      "show_rating_badge": true,
+      "show_memories": true,
+      "show_captions": true,
+      "show_timeline": true,
+      "show_map": true
     }
   }
 }
@@ -1063,6 +1069,10 @@ Toggle optional features to reduce memory usage or simplify the UI:
 | `show_albums` | `true` | Show albums feature (create, manage, and browse photo albums) |
 | `show_critique` | `true` | Show AI critique button on photo cards (rule-based score breakdown) |
 | `show_vlm_critique` | `false` | Enable VLM-powered critique mode (requires 16gb/24gb VRAM profile) |
+| `show_memories` | `true` | Show "On This Day" memories dialog (photos taken on the same date in previous years) |
+| `show_captions` | `true` | Show AI-generated captions on photo cards |
+| `show_timeline` | `true` | Show timeline view for chronological browsing with date navigation |
+| `show_map` | `false` | Show map view with GPS-based photo locations (requires Leaflet; off by default since photos may lack GPS data) |
 
 **Memory optimization:** Setting `show_similar_button: false` prevents numpy from being loaded, reducing viewer memory footprint. The similar photos feature computes CLIP embedding cosine similarity which requires numpy.
 
@@ -1281,6 +1291,48 @@ Webhook options: `url` (required), `events` (list of event names), `min_score` (
 | `POST` | `/api/plugins/test-webhook` | Send a test payload to a webhook URL |
 
 ---
+
+## Similarity Groups
+
+Settings for the AI similar-photo culling feature, which groups visually similar photos using CLIP/SigLIP embeddings:
+
+```json
+{
+  "similarity_groups": {
+    "default_threshold": 0.85,
+    "min_group_size": 2,
+    "max_photos": 10000,
+    "max_group_size": 50
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `default_threshold` | `0.85` | Minimum cosine similarity (0.0–1.0) to consider two photos as visually similar. Lower values produce larger groups but with less visual similarity. |
+| `min_group_size` | `2` | Minimum number of photos required to form a similarity group |
+| `max_photos` | `10000` | Maximum photos to load for similarity computation (O(n²) cost). Increase for larger libraries at the expense of computation time. |
+| `max_group_size` | `50` | Maximum photos per similarity group. Larger groups are split to keep the UI usable. |
+
+## Auto Albums
+
+Settings for automatic album generation from temporal and visual clustering:
+
+```json
+{
+  "auto_albums": {
+    "min_photos_per_album": 5,
+    "time_gap_hours": 4,
+    "embedding_threshold": 0.6
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `min_photos_per_album` | `5` | Minimum photos required to create an auto-album |
+| `time_gap_hours` | `4` | Time gap (hours) between photos that starts a new temporal group |
+| `embedding_threshold` | `0.6` | Cosine similarity threshold for sub-clustering within temporal groups |
 
 ## Share Secret
 

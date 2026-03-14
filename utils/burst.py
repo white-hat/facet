@@ -25,10 +25,10 @@ class IncrementalBurstProcessor:
             db_path: Path to SQLite database
             config: ScoringConfig instance
         """
-        from datetime import datetime
+        from utils.date_utils import parse_date
 
         self.db_path = db_path
-        self.datetime = datetime
+        self._parse_date_fn = parse_date
 
         # Load burst detection settings from config
         burst_config = config.get_burst_detection_settings()
@@ -49,12 +49,7 @@ class IncrementalBurstProcessor:
 
     def _parse_date(self, date_str):
         """Parse EXIF date string to datetime object."""
-        if not date_str:
-            return None
-        try:
-            return self.datetime.strptime(date_str[:19], '%Y:%m:%d %H:%M:%S')
-        except (ValueError, TypeError):
-            return None
+        return self._parse_date_fn(date_str)
 
     def _phash_distance(self, hash1, hash2):
         """Compute hamming distance between two hex phash strings."""

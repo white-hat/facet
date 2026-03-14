@@ -5,7 +5,6 @@ import {
   signal,
   OnInit,
   OnDestroy,
-  ElementRef,
   viewChild,
   afterNextRender,
   effect,
@@ -18,11 +17,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatMenuModule } from '@angular/material/menu';
-import { ActivatedRoute } from '@angular/router';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { ActivatedRoute, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { GalleryStore } from './gallery.store';
 import { Photo } from '../../shared/models/photo.model';
-import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -36,6 +35,7 @@ import { PhotoCardComponent } from '../../shared/components/photo-card/photo-car
 import { AlbumService, Album } from '../../core/services/album.service';
 import { CreateAlbumDialogComponent } from '../albums/create-album-dialog.component';
 import { PhotoCritiqueDialogComponent } from './photo-critique-dialog.component';
+import { InfiniteScrollDirective } from '../../shared/directives/infinite-scroll.directive';
 
 @Component({
   selector: 'app-gallery',
@@ -46,12 +46,14 @@ import { PhotoCritiqueDialogComponent } from './photo-critique-dialog.component'
     MatButtonModule,
     MatDialogModule,
     MatMenuModule,
+    MatTooltipModule,
     TranslatePipe,
     MatSnackBarModule,
     PhotoTooltipComponent,
     SlideshowComponent,
     GalleryFilterSidebarComponent,
     PhotoCardComponent,
+    InfiniteScrollDirective,
   ],
   template: `
     <mat-sidenav-container class="h-full">
@@ -155,7 +157,7 @@ import { PhotoCritiqueDialogComponent } from './photo-critique-dialog.component'
         }
 
         <!-- Infinite scroll sentinel -->
-        <div #scrollSentinel class="h-1"></div>
+        <div appInfiniteScroll (scrollReached)="onScrollReached()" class="h-1"></div>
       </mat-sidenav-content>
     </mat-sidenav-container>
 
@@ -180,26 +182,18 @@ import { PhotoCritiqueDialogComponent } from './photo-critique-dialog.component'
 
     <!-- Selection action bar -->
     @if (selectionCount()) {
-      <div class="fixed bottom-14 lg:bottom-0 left-0 right-0 z-50 flex flex-col lg:flex-row items-center justify-center gap-2 lg:gap-3 px-4 lg:px-6 py-2 lg:py-3 bg-[var(--mat-sys-surface-container-high)] border-t border-[var(--mat-sys-outline-variant)] shadow-lg">
-        <span class="text-sm font-medium">{{ 'gallery.selection.count' | translate:{ count: selectionCount() } }}</span>
-        <div class="flex items-center gap-2">
-          <button mat-button (click)="clearSelection()">
-            <mat-icon>close</mat-icon>
-            {{ 'gallery.selection.clear' | translate }}
-          </button>
+      <div class="fixed bottom-[45px] lg:bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-1 lg:gap-3 px-2 lg:px-6 py-1 lg:py-3 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] shadow-lg">
+        <span class="text-sm font-medium shrink-0">{{ 'gallery.selection.count' | translate:{ count: selectionCount() } }}</span>
+        <div class="flex items-center gap-0 lg:gap-2">
+          <button mat-icon-button class="lg:!hidden" (click)="clearSelection()" [matTooltip]="'gallery.selection.clear' | translate"><mat-icon>close</mat-icon></button>
+          <button mat-button class="!hidden lg:!inline-flex" (click)="clearSelection()"><mat-icon>close</mat-icon> {{ 'gallery.selection.clear' | translate }}</button>
           @if (auth.isEdition()) {
-            <button mat-button (click)="batchFavorite()">
-              <mat-icon>favorite</mat-icon>
-              {{ 'gallery.selection.favorite' | translate }}
-            </button>
-            <button mat-button (click)="batchReject()">
-              <mat-icon>thumb_down</mat-icon>
-              {{ 'gallery.selection.reject' | translate }}
-            </button>
-            <button mat-button [matMenuTriggerFor]="rateMenu">
-              <mat-icon>star</mat-icon>
-              {{ 'gallery.selection.rate' | translate }}
-            </button>
+            <button mat-icon-button class="lg:!hidden" (click)="batchFavorite()" [matTooltip]="'gallery.selection.favorite' | translate"><mat-icon>favorite</mat-icon></button>
+            <button mat-button class="!hidden lg:!inline-flex" (click)="batchFavorite()"><mat-icon>favorite</mat-icon> {{ 'gallery.selection.favorite' | translate }}</button>
+            <button mat-icon-button class="lg:!hidden" (click)="batchReject()" [matTooltip]="'gallery.selection.reject' | translate"><mat-icon>thumb_down</mat-icon></button>
+            <button mat-button class="!hidden lg:!inline-flex" (click)="batchReject()"><mat-icon>thumb_down</mat-icon> {{ 'gallery.selection.reject' | translate }}</button>
+            <button mat-icon-button class="lg:!hidden" [matMenuTriggerFor]="rateMenu" [matTooltip]="'gallery.selection.rate' | translate"><mat-icon>star</mat-icon></button>
+            <button mat-button class="!hidden lg:!inline-flex" [matMenuTriggerFor]="rateMenu"><mat-icon>star</mat-icon> {{ 'gallery.selection.rate' | translate }}</button>
             <mat-menu #rateMenu="matMenu">
               @for (star of [1, 2, 3, 4, 5]; track star) {
                 <button mat-menu-item (click)="batchRate(star)">
@@ -212,10 +206,8 @@ import { PhotoCritiqueDialogComponent } from './photo-critique-dialog.component'
             </mat-menu>
           }
           @if (store.config()?.features?.show_albums) {
-            <button mat-button [matMenuTriggerFor]="albumMenu">
-              <mat-icon>photo_library</mat-icon>
-              {{ 'albums.add_photos' | translate }}
-            </button>
+            <button mat-icon-button class="lg:!hidden" [matMenuTriggerFor]="albumMenu" [matTooltip]="'albums.add_photos' | translate"><mat-icon>photo_library</mat-icon></button>
+            <button mat-button class="!hidden lg:!inline-flex" [matMenuTriggerFor]="albumMenu"><mat-icon>photo_library</mat-icon> {{ 'albums.add_photos' | translate }}</button>
             <mat-menu #albumMenu="matMenu">
               @for (album of albumOptions(); track album.id) {
                 <button mat-menu-item (click)="addToAlbum(album.id)">{{ album.name }}</button>
@@ -226,14 +218,10 @@ import { PhotoCritiqueDialogComponent } from './photo-critique-dialog.component'
               </button>
             </mat-menu>
           }
-          <button mat-button (click)="copyPaths()">
-            <mat-icon>content_copy</mat-icon>
-            {{ 'gallery.selection.copy_filenames' | translate }}
-          </button>
-          <button mat-flat-button (click)="downloadSelected()">
-            <mat-icon>download</mat-icon>
-            {{ 'gallery.selection.download' | translate }}
-          </button>
+          <button mat-icon-button class="lg:!hidden" (click)="copyPaths()" [matTooltip]="'gallery.selection.copy_filenames' | translate"><mat-icon>content_copy</mat-icon></button>
+          <button mat-button class="!hidden lg:!inline-flex" (click)="copyPaths()"><mat-icon>content_copy</mat-icon> {{ 'gallery.selection.copy_filenames' | translate }}</button>
+          <button mat-icon-button class="lg:!hidden" (click)="downloadSelected()" [matTooltip]="'gallery.selection.download' | translate"><mat-icon>download</mat-icon></button>
+          <button mat-flat-button class="!hidden lg:!inline-flex" (click)="downloadSelected()"><mat-icon>download</mat-icon> {{ 'gallery.selection.download' | translate }}</button>
         </div>
       </div>
     }
@@ -241,39 +229,38 @@ import { PhotoCritiqueDialogComponent } from './photo-critique-dialog.component'
   host: { class: 'block h-full' },
 })
 export class GalleryComponent implements OnInit, OnDestroy {
-  store = inject(GalleryStore);
-  api = inject(ApiService);
-  auth = inject(AuthService);
-  private snackBar = inject(MatSnackBar);
-  private i18n = inject(I18nService);
-  private dialog = inject(MatDialog);
-  private albumService = inject(AlbumService);
-  private route = inject(ActivatedRoute);
+  protected readonly store = inject(GalleryStore);
+  protected readonly auth = inject(AuthService);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly i18n = inject(I18nService);
+  private readonly dialog = inject(MatDialog);
+  private readonly albumService = inject(AlbumService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   // Album options for "Add to album" menu
-  readonly albumOptions = signal<Album[]>([]);
+  protected readonly albumOptions = signal<Album[]>([]);
 
-  private observer: IntersectionObserver | null = null;
   private resizeObserver: ResizeObserver | null = null;
-  readonly scrollSentinel = viewChild<ElementRef<HTMLDivElement>>('scrollSentinel');
+  private readonly scrollDirective = viewChild(InfiniteScrollDirective);
   private readonly filterDrawer = viewChild<MatSidenav>('filterDrawer');
 
   // Sidebar scroll preservation
   private savedFilterScroll = 0;
 
   // Tooltip state
-  readonly tooltipPhoto = signal<Photo | null>(null);
-  readonly tooltipX = signal(0);
-  readonly tooltipY = signal(0);
-  readonly tooltipFlipped = signal(false);
+  protected readonly tooltipPhoto = signal<Photo | null>(null);
+  protected readonly tooltipX = signal(0);
+  protected readonly tooltipY = signal(0);
+  protected readonly tooltipFlipped = signal(false);
 
   // Selection state
-  readonly selectedPaths = signal<Set<string>>(new Set());
-  readonly selectionCount = computed(() => this.selectedPaths().size);
+  protected readonly selectedPaths = signal<Set<string>>(new Set());
+  protected readonly selectionCount = computed(() => this.selectedPaths().size);
   private lastSelectedIndex = -1;
 
   /** True when the device has no hover capability (touch device) */
-  readonly isTouchDevice = signal(false);
+  protected readonly isTouchDevice = signal(false);
 
   /** Thumbnail request size derived from card width (2x for retina, capped at 640). Returns 640 on mobile (full-width cards). */
   readonly thumbSize = computed(() => {
@@ -285,23 +272,21 @@ export class GalleryComponent implements OnInit, OnDestroy {
   readonly cardWidth = computed(() => this.store.cardWidth() || 168);
 
   /** Whether the viewport is md+ (768px) — mosaic is only available on desktop */
-  readonly isDesktop = signal(false);
+  protected readonly isDesktop = signal(false);
 
   /** Effective gallery mode: force grid on small viewports */
   readonly effectiveGalleryMode = computed(() =>
     (this.isDesktop() && this.containerWidth() > 0) ? this.store.galleryMode() : 'grid',
   );
 
-  /** On mobile, always show details regardless of the hide_details preference */
-  readonly effectiveHideDetails = computed(() =>
-    this.isDesktop() ? this.store.filters().hide_details : false,
-  );
+  /** Whether to hide photo details below the thumbnails */
+  readonly effectiveHideDetails = computed(() => this.store.filters().hide_details);
 
   /** Cached hide_tooltip signal — avoids re-reading store.filters() per card in @for */
   readonly effectiveHideTooltip = computed(() => this.store.filters().hide_tooltip);
 
   /** Container width for mosaic layout (updated via ResizeObserver) */
-  readonly containerWidth = signal(0);
+  protected readonly containerWidth = signal(0);
 
   /** Mosaic row layout: justified rows of photos preserving aspect ratios */
   readonly mosaicRows = computed(() => {
@@ -366,7 +351,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
       };
       mql.addEventListener('change', this.desktopMqlHandler);
 
-      this.setupIntersectionObserver();
       this.setupResizeObserver();
     });
 
@@ -384,7 +368,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
       this.store.photos(); // track dependency
       this.store.cardWidth(); // track dependency
       this.store.galleryMode(); // track dependency
-      this.recheckSentinel();
+      this.scrollDirective()?.recheck();
       // Clear tooltip when photos change (prevents stale tooltips after filter changes)
       untracked(() => this.tooltipPhoto.set(null));
     });
@@ -415,7 +399,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     await Promise.all([this.store.loadFilterOptions(), this.store.loadTypeCounts()]);
     await this.store.loadPhotos();
     this.store.initializing.set(false);
-    this.recheckSentinel();
+    this.scrollDirective()?.recheck();
     if (this.store.config()?.features?.show_albums) {
       firstValueFrom(this.albumService.list()).then(res =>
         this.albumOptions.set(res.albums),
@@ -424,7 +408,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    this.observer?.disconnect();
     this.resizeObserver?.disconnect();
     if (this.desktopMql && this.desktopMqlHandler) {
       this.desktopMql.removeEventListener('change', this.desktopMqlHandler);
@@ -444,7 +427,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleSelection(photo: Photo, event?: MouseEvent): void {
+  protected toggleSelection(photo: Photo, event?: MouseEvent): void {
     const photos = this.store.photos();
     const clickedIndex = photos.findIndex(p => p.path === photo.path);
     const current = this.selectedPaths();
@@ -466,11 +449,11 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.selectedPaths.set(next);
   }
 
-  clearSelection(): void {
+  protected clearSelection(): void {
     this.selectedPaths.set(new Set());
   }
 
-  copyPaths(): void {
+  protected copyPaths(): void {
     const filenames = [...this.selectedPaths()]
       .map(p => p.split(/[\\/]/).pop() ?? p)
       .join('\n');
@@ -490,15 +473,15 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.snackBar.open(this.i18n.t(i18nKey, { count: paths.length, ...extraParams }), '', { duration: 2000 });
   }
 
-  async batchFavorite(): Promise<void> {
+  protected async batchFavorite(): Promise<void> {
     await this.executeBatchAction(p => this.store.batchFavorite(p), 'gallery.selection.batch_favorited');
   }
 
-  async batchReject(): Promise<void> {
+  protected async batchReject(): Promise<void> {
     await this.executeBatchAction(p => this.store.batchReject(p), 'gallery.selection.batch_rejected');
   }
 
-  async batchRate(rating: number): Promise<void> {
+  protected async batchRate(rating: number): Promise<void> {
     await this.executeBatchAction(p => this.store.batchRating(p, rating), 'gallery.selection.batch_rated', { rating });
   }
 
@@ -511,11 +494,14 @@ export class GalleryComponent implements OnInit, OnDestroy {
     document.body.removeChild(a);
   }
 
-  downloadPhoto(photo: Photo): void {
-    this.triggerDownload(photo.path);
+  protected downloadPhoto(photo: Photo): void {
+    this.router.navigate(['/photo'], {
+      queryParams: { path: photo.path },
+      state: { photo },
+    });
   }
 
-  async downloadSelected(): Promise<void> {
+  protected async downloadSelected(): Promise<void> {
     const paths = [...this.selectedPaths()];
     for (const path of paths) {
       this.triggerDownload(path);
@@ -682,27 +668,9 @@ export class GalleryComponent implements OnInit, OnDestroy {
     }
   }
 
-  private setupIntersectionObserver(): void {
-    const sentinel = this.scrollSentinel();
-    if (!sentinel) return;
-
-    this.observer = new IntersectionObserver(
-      entries => {
-        if (entries[0]?.isIntersecting && this.store.hasMore() && !this.store.loading() && !this.store.initializing()) {
-          this.store.nextPage().then(() => this.recheckSentinel());
-        }
-      },
-      { rootMargin: '200px' },
-    );
-    this.observer.observe(sentinel.nativeElement);
-  }
-
-  /** Re-observe sentinel to trigger another load if it's still visible after content change */
-  private recheckSentinel(): void {
-    if (!this.isBrowser || !this.observer) return;
-    const sentinel = this.scrollSentinel();
-    if (!sentinel) return;
-    this.observer.unobserve(sentinel.nativeElement);
-    this.observer.observe(sentinel.nativeElement);
+  onScrollReached(): void {
+    if (this.store.hasMore() && !this.store.loading() && !this.store.initializing()) {
+      this.store.nextPage().then(() => this.scrollDirective()?.recheck());
+    }
   }
 }

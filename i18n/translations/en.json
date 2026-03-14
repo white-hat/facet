@@ -37,7 +37,9 @@
       "merge": "Merge Persons",
       "back": "Back",
       "cancel": "Cancel",
-      "download": "Download"
+      "download": "Download",
+      "save": "Save",
+      "load_more": "Load more"
     },
     "sort": {
       "toggle_direction": "Toggle sort direction",
@@ -45,6 +47,7 @@
     },
     "labels": {
       "photos": "photos",
+      "photo_count": "{count} photos",
       "photo": "photo",
       "selected": "selected",
       "of": "of",
@@ -944,6 +947,7 @@
     "invalid_credentials": "Invalid username or password"
   },
   "edition": {
+    "label": "Edition",
     "unlock_title": "Unlock Edition Mode",
     "unlock_description": "Enter the edition password to enable editing features.",
     "unlock_button": "Unlock",
@@ -957,7 +961,10 @@
     "persons": "Persons",
     "compare": "Weight Tuning",
     "albums": "Albums",
-    "culling": "Culling"
+    "culling": "Culling",
+    "memories": "Memories",
+    "timeline": "Timeline",
+    "map": "Map"
   },
   "auth": {
     "logout": "Log out",
@@ -1332,9 +1339,18 @@
     "select_merge_target_desc": "Choose which person all faces will be merged into:",
     "similarity_threshold": "Similarity Threshold",
     "clear_selection": "Clear",
-    "share_link": "Copy share link",
-    "link_copied": "Share link copied to clipboard",
-    "link_copy_error": "Failed to copy share link"
+    "share_link": "Share link",
+    "link_copied": "Link copied to clipboard!",
+    "link_copy_error": "Failed to copy share link",
+    "sort_count": "Photo count",
+    "sort_name": "Name",
+    "share": "Share",
+    "share_description": "Anyone with this link can view this person's photos.",
+    "copy_link": "Copy link",
+    "generate_link": "Generate link",
+    "invalid_share_link": "Invalid share link",
+    "share_link_error": "This share link is invalid.",
+    "load_error": "Failed to load person."
   },
   "slideshow": {
     "start": "Slideshow",
@@ -1359,7 +1375,29 @@
     "save_smart": "Save as Smart Album",
     "smart_album": "Smart Album",
     "confirm_delete_title": "Delete Album",
-    "confirm_delete_message": "Delete album \"{name}\"? Photos will not be removed."
+    "confirm_delete_message": "Delete album \"{name}\"? Photos will not be removed.",
+    "share": "Share",
+    "share_description": "Anyone with this link can view the album.",
+    "share_link": "Share link",
+    "link_copied": "Link copied to clipboard!",
+    "revoke_share": "Revoke",
+    "copy_link": "Copy link",
+    "generate_link": "Generate link",
+    "photos_count": "{count} photos",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search albums",
+    "sort_by": "Sort by",
+    "sort_recent": "Recent",
+    "sort_name": "Name",
+    "sort_photos": "Photo count",
+    "filter_type": "Type",
+    "type_all": "All",
+    "type_manual": "Manual",
+    "type_smart": "Smart",
+    "invalid_share_link": "Invalid share link",
+    "share_link_revoked": "This share link is invalid or has been revoked.",
+    "load_error": "Failed to load album."
   },
   "critique": {
     "title": "Why This Score?",
@@ -1455,6 +1493,73 @@
     "next": "Next",
     "error_loading": "Failed to load burst groups",
     "error_confirming": "Failed to confirm selection",
-    "error_auto_select": "Failed to auto-select"
+    "error_auto_select": "Failed to auto-select",
+    "burst_groups": "Burst Groups",
+    "similar_groups": "Similar Groups",
+    "similarity_threshold": "Similarity Threshold",
+    "burst_help": "Photos taken in rapid succession are grouped together. Click photos to keep them (green border), unselected photos (red border) will be hidden. The best photo is auto-selected based on sharpness and quality.",
+    "similar_help": "Visually similar photos across your library are grouped using AI embeddings. Review each group, keep the best shots, and discard near-duplicates. Adjust the threshold slider to control how similar photos must be to form a group.",
+    "help": "Help"
+  },
+  "memories": {
+    "title": "On This Day",
+    "empty": "No memories for this day",
+    "years_ago": "{count} year ago",
+    "years_ago_plural": "{count} years ago",
+    "no_memories": "No memories for this day.",
+    "photos_count": "photos"
+  },
+  "caption": {
+    "title": "Caption",
+    "generate": "Generate Caption",
+    "generating": "Generating caption...",
+    "unavailable": "Caption generation requires a VLM model (16GB+ VRAM)"
+  },
+  "timeline": {
+    "title": "Timeline",
+    "no_photos": "No photos with dates found",
+    "jump_to_date": "Jump to date",
+    "photos_on_date": "{count} photos",
+    "empty": "No photos with dates found.",
+    "more": "more",
+    "load_more": "Load more"
+  },
+  "albums_sharing": {
+    "share": "Share Album",
+    "copy_link": "Copy Link",
+    "link_copied": "Link copied to clipboard",
+    "revoke_share": "Revoke Share",
+    "shared_album": "Shared Album",
+    "invalid_link": "Invalid or expired share link"
+  },
+  "auto_albums": {
+    "auto_generate": "Auto-generate Albums",
+    "auto_generate_confirm": "This will create albums based on date and visual similarity. Continue?",
+    "auto_generating": "Generating albums...",
+    "auto_generated": "{count} albums created",
+    "error_generating": "Failed to auto-generate albums"
+  },
+  "map": {
+    "title": "Map",
+    "no_gps": "No photos with GPS data found",
+    "photos_count": "{count} photos with location",
+    "cluster_photos": "{count} photos",
+    "score": "Score: {score}"
+  },
+  "photo_detail": {
+    "back": "Back",
+    "download": "Download",
+    "caption": "Caption",
+    "no_caption": "No caption available",
+    "persons": "Persons",
+    "quality": "Quality",
+    "composition": "Composition",
+    "saliency": "Subject Saliency",
+    "technical": "Technical",
+    "exif": "EXIF Data",
+    "tags": "Tags",
+    "rating": "Rating",
+    "favorite": "Favorite",
+    "rejected": "Rejected"
   }
 }

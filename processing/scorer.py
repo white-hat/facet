@@ -1781,7 +1781,7 @@ class Facet:
         exif_data = {
             'date_taken': None, 'camera_model': None, 'lens_model': None,
             'iso': None, 'f_stop': None, 'shutter_speed': None, 'focal_length': None,
-            'focal_length_35mm': None
+            'focal_length_35mm': None, 'gps_latitude': None, 'gps_longitude': None
         }
 
         # 1. Try persistent ExifTool (fastest - no subprocess spawn)
@@ -1811,6 +1811,8 @@ class Facet:
             exif_data['shutter_speed'] = str(data.get('ExposureTime'))
             exif_data['focal_length'] = data.get('FocalLength')
             exif_data['focal_length_35mm'] = data.get('FocalLengthIn35mmFilm')
+            exif_data['gps_latitude'] = data.get('GPSLatitude')
+            exif_data['gps_longitude'] = data.get('GPSLongitude')
 
             if exif_data['camera_model']:
                 return exif_data
@@ -1911,7 +1913,8 @@ class Facet:
                     shadow_clipped, highlight_clipped, is_silhouette, is_group_portrait, leading_lines_score,
                     face_confidence, is_monochrome, mean_saturation,
                     dynamic_range_stops, noise_sigma, contrast_score, tags,
-                    quality_score, composition_explanation, scoring_model, composition_pattern
+                    quality_score, composition_explanation, scoring_model, composition_pattern,
+                    gps_latitude, gps_longitude
                 )
                 VALUES (
                     :path, :filename, :category, :image_width, :image_height,
@@ -1925,7 +1928,8 @@ class Facet:
                     :shadow_clipped, :highlight_clipped, :is_silhouette, :is_group_portrait, :leading_lines_score,
                     :face_confidence, :is_monochrome, :mean_saturation,
                     :dynamic_range_stops, :noise_sigma, :contrast_score, :tags,
-                    :quality_score, :composition_explanation, :scoring_model, :composition_pattern
+                    :quality_score, :composition_explanation, :scoring_model, :composition_pattern,
+                    :gps_latitude, :gps_longitude
                 )
             ''', res)
 
@@ -2242,13 +2246,7 @@ def process_bursts(db_path, config_path='scoring_config.json'):
                 return 999
             return bin(int(hash1, 16) ^ int(hash2, 16)).count('1')
 
-        def parse_date(date_str):
-            if not date_str:
-                return None
-            try:
-                return datetime.strptime(date_str[:19], '%Y:%m:%d %H:%M:%S')
-            except (ValueError, TypeError):
-                return None
+        from utils.date_utils import parse_date
 
         def shares_person(path1, path2):
             """Check if two photos share at least one identified person."""

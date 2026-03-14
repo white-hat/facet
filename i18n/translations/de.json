@@ -37,7 +37,9 @@
       "merge": "Personen zusammenführen",
       "back": "Zurück",
       "cancel": "Abbrechen",
-      "download": "Herunterladen"
+      "download": "Herunterladen",
+      "save": "Speichern",
+      "load_more": "Mehr laden"
     },
     "sort": {
       "toggle_direction": "Sortierrichtung umschalten",
@@ -45,6 +47,7 @@
     },
     "labels": {
       "photos": "Fotos",
+      "photo_count": "{count} Fotos",
       "photo": "Foto",
       "selected": "ausgewählt",
       "of": "von",
@@ -944,6 +947,7 @@
     "invalid_credentials": "Ungültiger Benutzername oder Passwort"
   },
   "edition": {
+    "label": "Bearbeitung",
     "unlock_title": "Bearbeitungsmodus entsperren",
     "unlock_description": "Geben Sie das Bearbeitungspasswort ein, um Bearbeitungsfunktionen zu aktivieren.",
     "unlock_button": "Entsperren",
@@ -957,7 +961,10 @@
     "persons": "Personen",
     "compare": "Gewichtungsoptimierung",
     "albums": "Alben",
-    "culling": "Auswahl"
+    "culling": "Auswahl",
+    "memories": "Erinnerungen",
+    "timeline": "Zeitleiste",
+    "map": "Karte"
   },
   "auth": {
     "logout": "Abmelden",
@@ -1332,9 +1339,18 @@
     "select_merge_target_desc": "Wählen Sie die Person, in die alle Gesichter zusammengeführt werden:",
     "similarity_threshold": "Ähnlichkeitsschwelle",
     "clear_selection": "Auswahl aufheben",
-    "share_link": "Freigabelink kopieren",
-    "link_copied": "Freigabelink in Zwischenablage kopiert",
-    "link_copy_error": "Freigabelink konnte nicht kopiert werden"
+    "share_link": "Freigabelink",
+    "link_copied": "Link in die Zwischenablage kopiert!",
+    "link_copy_error": "Freigabelink konnte nicht kopiert werden",
+    "sort_count": "Fotoanzahl",
+    "sort_name": "Name",
+    "share": "Teilen",
+    "share_description": "Jeder mit diesem Link kann die Fotos dieser Person sehen.",
+    "copy_link": "Link kopieren",
+    "generate_link": "Link generieren",
+    "invalid_share_link": "Ungültiger Freigabelink",
+    "share_link_error": "Dieser Freigabelink ist ungültig.",
+    "load_error": "Person konnte nicht geladen werden."
   },
   "slideshow": {
     "start": "Diashow",
@@ -1359,7 +1375,29 @@
     "save_smart": "Als intelligentes Album speichern",
     "smart_album": "Intelligentes Album",
     "confirm_delete_title": "Album loschen",
-    "confirm_delete_message": "Album \"{name}\" loschen? Fotos werden nicht entfernt."
+    "confirm_delete_message": "Album \"{name}\" loschen? Fotos werden nicht entfernt.",
+    "share": "Teilen",
+    "share_description": "Jeder mit diesem Link kann das Album ansehen.",
+    "share_link": "Freigabelink",
+    "link_copied": "Link kopiert!",
+    "revoke_share": "Widerrufen",
+    "copy_link": "Link kopieren",
+    "generate_link": "Link erstellen",
+    "photos_count": "{count} Fotos",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "search": "Alben suchen",
+    "sort_by": "Sortieren nach",
+    "sort_recent": "Neueste",
+    "sort_name": "Name",
+    "sort_photos": "Fotoanzahl",
+    "filter_type": "Typ",
+    "type_all": "Alle",
+    "type_manual": "Manuell",
+    "type_smart": "Intelligent",
+    "invalid_share_link": "Ungültiger Freigabelink",
+    "share_link_revoked": "Dieser Freigabelink ist ungültig oder wurde widerrufen.",
+    "load_error": "Album konnte nicht geladen werden."
   },
   "critique": {
     "title": "Warum diese Bewertung?",
@@ -1455,6 +1493,73 @@
     "next": "Weiter",
     "error_loading": "Fehler beim Laden der Gruppen",
     "error_confirming": "Fehler bei der Bestätigung",
-    "error_auto_select": "Fehler bei der automatischen Auswahl"
+    "error_auto_select": "Fehler bei der automatischen Auswahl",
+    "burst_groups": "Serienbildgruppen",
+    "similar_groups": "Ähnliche Gruppen",
+    "similarity_threshold": "Ähnlichkeitsschwelle",
+    "burst_help": "Fotos, die in schneller Folge aufgenommen wurden, werden zusammengefasst. Klicken Sie auf Fotos, um sie zu behalten (grüner Rahmen). Nicht ausgewählte Fotos (roter Rahmen) werden ausgeblendet. Das beste Foto wird automatisch anhand von Schärfe und Qualität ausgewählt.",
+    "similar_help": "Visuell ähnliche Fotos in Ihrer Bibliothek werden mithilfe von KI-Embeddings gruppiert. Überprüfen Sie jede Gruppe, behalten Sie die besten Aufnahmen und verwerfen Sie Fast-Duplikate. Passen Sie den Schwellenwert-Regler an, um zu steuern, wie ähnlich Fotos sein müssen, um eine Gruppe zu bilden.",
+    "help": "Hilfe"
+  },
+  "memories": {
+    "title": "An diesem Tag",
+    "empty": "Keine Erinnerungen für diesen Tag",
+    "years_ago": "Vor {count} Jahr",
+    "years_ago_plural": "Vor {count} Jahren",
+    "no_memories": "Keine Erinnerungen für diesen Tag.",
+    "photos_count": "Fotos"
+  },
+  "caption": {
+    "title": "Beschriftung",
+    "generate": "Beschriftung generieren",
+    "generating": "Beschriftung wird generiert...",
+    "unavailable": "Beschriftungsgenerierung erfordert ein VLM-Modell (16 GB+ VRAM)"
+  },
+  "timeline": {
+    "title": "Zeitleiste",
+    "no_photos": "Keine Fotos mit Datum gefunden",
+    "jump_to_date": "Zum Datum springen",
+    "photos_on_date": "{count} Fotos",
+    "empty": "Keine Fotos mit Datumsangaben gefunden.",
+    "more": "mehr",
+    "load_more": "Mehr laden"
+  },
+  "albums_sharing": {
+    "share": "Album teilen",
+    "copy_link": "Link kopieren",
+    "link_copied": "Link in Zwischenablage kopiert",
+    "revoke_share": "Freigabe widerrufen",
+    "shared_album": "Geteiltes Album",
+    "invalid_link": "Ungültiger oder abgelaufener Freigabelink"
+  },
+  "auto_albums": {
+    "auto_generate": "Alben automatisch generieren",
+    "auto_generate_confirm": "Es werden Alben basierend auf Datum und visueller Ähnlichkeit erstellt. Fortfahren?",
+    "auto_generating": "Alben werden generiert...",
+    "auto_generated": "{count} Alben erstellt",
+    "error_generating": "Automatische Albumgenerierung fehlgeschlagen"
+  },
+  "map": {
+    "title": "Karte",
+    "no_gps": "Keine Fotos mit GPS-Daten gefunden",
+    "photos_count": "{count} Fotos mit Standort",
+    "cluster_photos": "{count} Fotos",
+    "score": "Bewertung: {score}"
+  },
+  "photo_detail": {
+    "back": "Zurück",
+    "download": "Herunterladen",
+    "caption": "Beschriftung",
+    "no_caption": "Keine Beschriftung verfügbar",
+    "persons": "Personen",
+    "quality": "Qualität",
+    "composition": "Komposition",
+    "saliency": "Motivhervorhebung",
+    "technical": "Technisch",
+    "exif": "EXIF-Daten",
+    "tags": "Schlagwörter",
+    "rating": "Bewertung",
+    "favorite": "Favorit",
+    "rejected": "Abgelehnt"
   }
 }

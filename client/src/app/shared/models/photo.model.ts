@@ -69,4 +69,7 @@ export interface Photo {
   is_favorite: boolean | null;
   is_rejected: boolean | null;
   similarity?: number;
+  caption?: string;
+  gps_latitude?: number;
+  gps_longitude?: number;
 }

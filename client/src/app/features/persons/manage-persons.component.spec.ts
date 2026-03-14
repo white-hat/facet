@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { I18nService } from '../../core/services/i18n.service';
+import { PersonsFiltersService } from './persons-filters.service';
 import { ManagePersonsComponent } from './manage-persons.component';
 
 describe('ManagePersonsComponent', () => {
@@ -44,6 +46,8 @@ describe('ManagePersonsComponent', () => {
         { provide: I18nService, useValue: mockI18n },
         { provide: MatDialog, useValue: mockDialog },
         { provide: MatSnackBar, useValue: mockSnackBar },
+        { provide: Router, useValue: { navigate: jest.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
       ],
     });
     component = TestBed.inject(ManagePersonsComponent);
@@ -104,6 +108,7 @@ describe('ManagePersonsComponent', () => {
         search: '',
         page: 1,
         per_page: 48,
+        sort: 'count_desc',
       });
       expect(component.persons()).toEqual(mockPersonsResponse.persons);
       expect(component.total()).toBe(3);
@@ -124,13 +129,15 @@ describe('ManagePersonsComponent', () => {
     });
 
     it('should pass search query to API', async () => {
-      component.searchQuery = 'alice';
+      const personsFilters = TestBed.inject(PersonsFiltersService);
+      personsFilters.search.set('alice');
       await component.loadPersons(true);
 
       expect(mockApi.get).toHaveBeenCalledWith('/persons', {
         search: 'alice',
         page: 1,
         per_page: 48,
+        sort: 'count_desc',
       });
     });
   });

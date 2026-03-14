@@ -71,6 +71,9 @@ These commands update specific metrics without full photo reprocessing.
 | `python facet.py --recompute-blinks` | Recompute blink detection |
 | `python facet.py --recompute-burst` | Recompute burst detection groups |
 | `python facet.py --detect-duplicates` | Detect duplicate photos using pHash comparison |
+| `python facet.py --generate-captions` | Generate AI captions for photos using VLM (requires 16gb/24gb) |
+| `python facet.py --auto-albums` | Auto-generate albums from photo clusters (time, location, content) |
+| `python facet.py --extract-gps` | Extract GPS coordinates from EXIF data into database columns |
 | `python facet.py --compute-recommendations` | Analyze database, show scoring summary |
 | `python facet.py --compute-recommendations --verbose` | Show detailed statistics |
 | `python facet.py --compute-recommendations --apply-recommendations` | Auto-apply scoring fixes |

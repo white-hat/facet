@@ -37,7 +37,9 @@
       "merge": "Fusionar personas",
       "back": "Volver",
       "cancel": "Cancelar",
-      "download": "Descargar"
+      "download": "Descargar",
+      "save": "Guardar",
+      "load_more": "Cargar más"
     },
     "sort": {
       "toggle_direction": "Cambiar dirección de orden",
@@ -45,6 +47,7 @@
     },
     "labels": {
       "photos": "fotos",
+      "photo_count": "{count} fotos",
       "photo": "foto",
       "selected": "seleccionadas",
       "of": "de",
@@ -944,6 +947,7 @@
     "invalid_credentials": "Nombre de usuario o contraseña incorrectos"
   },
   "edition": {
+    "label": "Edición",
     "unlock_title": "Desbloquear modo edición",
     "unlock_description": "Introduce la contraseña de edición para habilitar las funciones de edición.",
     "unlock_button": "Desbloquear",
@@ -957,7 +961,10 @@
     "persons": "Personas",
     "compare": "Ajuste de pesos",
     "albums": "Álbumes",
-    "culling": "Selección"
+    "culling": "Selección",
+    "memories": "Recuerdos",
+    "timeline": "Línea de tiempo",
+    "map": "Mapa"
   },
   "auth": {
     "logout": "Cerrar sesión",
@@ -1332,9 +1339,18 @@
     "select_merge_target_desc": "Elige la persona en la que se fusionarán todos los rostros:",
     "similarity_threshold": "Umbral de similitud",
     "clear_selection": "Limpiar",
-    "share_link": "Copiar enlace para compartir",
-    "link_copied": "Enlace para compartir copiado al portapapeles",
-    "link_copy_error": "Error al copiar el enlace para compartir"
+    "share_link": "Enlace para compartir",
+    "link_copied": "¡Enlace copiado al portapapeles!",
+    "link_copy_error": "Error al copiar el enlace para compartir",
+    "sort_count": "Cantidad de fotos",
+    "sort_name": "Nombre",
+    "share": "Compartir",
+    "share_description": "Cualquier persona con este enlace puede ver las fotos de esta persona.",
+    "copy_link": "Copiar enlace",
+    "generate_link": "Generar enlace",
+    "invalid_share_link": "Enlace para compartir no válido",
+    "share_link_error": "Este enlace para compartir no es válido.",
+    "load_error": "No se pudo cargar la persona."
   },
   "slideshow": {
     "start": "Presentacion",
@@ -1359,7 +1375,29 @@
     "save_smart": "Guardar como album inteligente",
     "smart_album": "Album inteligente",
     "confirm_delete_title": "Eliminar album",
-    "confirm_delete_message": "Eliminar album \"{name}\"? Las fotos no se eliminaran."
+    "confirm_delete_message": "Eliminar album \"{name}\"? Las fotos no se eliminaran.",
+    "share": "Compartir",
+    "share_description": "Cualquiera con este enlace puede ver el álbum.",
+    "share_link": "Enlace para compartir",
+    "link_copied": "¡Enlace copiado!",
+    "revoke_share": "Revocar",
+    "copy_link": "Copiar enlace",
+    "generate_link": "Generar enlace",
+    "photos_count": "{count} fotos",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "search": "Buscar álbumes",
+    "sort_by": "Ordenar por",
+    "sort_recent": "Reciente",
+    "sort_name": "Nombre",
+    "sort_photos": "Cantidad de fotos",
+    "filter_type": "Tipo",
+    "type_all": "Todos",
+    "type_manual": "Manual",
+    "type_smart": "Inteligente",
+    "invalid_share_link": "Enlace de compartir no válido",
+    "share_link_revoked": "Este enlace de compartir no es válido o ha sido revocado.",
+    "load_error": "No se pudo cargar el álbum."
   },
   "critique": {
     "title": "Por que esta puntuación?",
@@ -1455,6 +1493,73 @@
     "next": "Siguiente",
     "error_loading": "Error al cargar los grupos",
     "error_confirming": "Error al confirmar la selección",
-    "error_auto_select": "Error en la selección automática"
+    "error_auto_select": "Error en la selección automática",
+    "burst_groups": "Grupos de ráfagas",
+    "similar_groups": "Grupos similares",
+    "similarity_threshold": "Umbral de similitud",
+    "burst_help": "Las fotos tomadas en ráfaga se agrupan juntas. Haz clic en las fotos para conservarlas (borde verde), las fotos no seleccionadas (borde rojo) se ocultarán. La mejor foto se selecciona automáticamente según la nitidez y la calidad.",
+    "similar_help": "Las fotos visualmente similares de tu biblioteca se agrupan mediante embeddings de IA. Revisa cada grupo, conserva las mejores tomas y descarta los casi-duplicados. Ajusta el control deslizante del umbral para controlar cuán similares deben ser las fotos para formar un grupo.",
+    "help": "Ayuda"
+  },
+  "memories": {
+    "title": "En este día",
+    "empty": "Sin recuerdos para este día",
+    "years_ago": "Hace {count} año",
+    "years_ago_plural": "Hace {count} años",
+    "no_memories": "No hay recuerdos para este día.",
+    "photos_count": "fotos"
+  },
+  "caption": {
+    "title": "Descripción",
+    "generate": "Generar descripción",
+    "generating": "Generando descripción...",
+    "unavailable": "La generación de descripciones requiere un modelo VLM (16 GB+ VRAM)"
+  },
+  "timeline": {
+    "title": "Línea de tiempo",
+    "no_photos": "No se encontraron fotos con fecha",
+    "jump_to_date": "Ir a la fecha",
+    "photos_on_date": "{count} fotos",
+    "empty": "No se encontraron fotos con fechas.",
+    "more": "más",
+    "load_more": "Cargar más"
+  },
+  "albums_sharing": {
+    "share": "Compartir álbum",
+    "copy_link": "Copiar enlace",
+    "link_copied": "Enlace copiado al portapapeles",
+    "revoke_share": "Revocar compartición",
+    "shared_album": "Álbum compartido",
+    "invalid_link": "Enlace de compartición inválido o expirado"
+  },
+  "auto_albums": {
+    "auto_generate": "Generar álbumes automáticamente",
+    "auto_generate_confirm": "Se crearán álbumes basados en fecha y similitud visual. ¿Continuar?",
+    "auto_generating": "Generando álbumes...",
+    "auto_generated": "{count} álbumes creados",
+    "error_generating": "Error al generar álbumes automáticamente"
+  },
+  "map": {
+    "title": "Mapa",
+    "no_gps": "No se encontraron fotos con datos GPS",
+    "photos_count": "{count} fotos con ubicación",
+    "cluster_photos": "{count} fotos",
+    "score": "Puntuación: {score}"
+  },
+  "photo_detail": {
+    "back": "Volver",
+    "download": "Descargar",
+    "caption": "Descripción",
+    "no_caption": "Sin descripción disponible",
+    "persons": "Personas",
+    "quality": "Calidad",
+    "composition": "Composición",
+    "saliency": "Saliencia del sujeto",
+    "technical": "Técnico",
+    "exif": "Datos EXIF",
+    "tags": "Etiquetas",
+    "rating": "Valoración",
+    "favorite": "Favorito",
+    "rejected": "Rechazado"
   }
 }

@@ -37,7 +37,9 @@
       "merge": "Fusionner",
       "back": "Retour",
       "cancel": "Annuler",
-      "download": "Telecharger"
+      "download": "Telecharger",
+      "save": "Enregistrer",
+      "load_more": "Charger plus"
     },
     "sort": {
       "toggle_direction": "Inverser le tri",
@@ -45,6 +47,7 @@
     },
     "labels": {
       "photos": "photos",
+      "photo_count": "{count} photos",
       "photo": "photo",
       "selected": "selectionnes",
       "of": "sur",
@@ -944,6 +947,7 @@
     "invalid_credentials": "Nom d'utilisateur ou mot de passe invalide"
   },
   "edition": {
+    "label": "Édition",
     "unlock_title": "Deverrouiller le mode edition",
     "unlock_description": "Entrez le mot de passe d'edition pour activer les fonctionnalites de modification.",
     "unlock_button": "Deverrouiller",
@@ -957,7 +961,10 @@
     "persons": "Personnes",
     "compare": "Reglage des poids",
     "albums": "Albums",
-    "culling": "Tri"
+    "culling": "Tri",
+    "memories": "Souvenirs",
+    "timeline": "Chronologie",
+    "map": "Carte"
   },
   "auth": {
     "logout": "Se deconnecter",
@@ -1332,9 +1339,18 @@
     "select_merge_target_desc": "Choisissez la personne dans laquelle toutes les faces seront fusionnees :",
     "similarity_threshold": "Seuil de similarite",
     "clear_selection": "Effacer",
-    "share_link": "Copier le lien de partage",
-    "link_copied": "Lien de partage copie dans le presse-papiers",
-    "link_copy_error": "Echec de la copie du lien"
+    "share_link": "Lien de partage",
+    "link_copied": "Lien copié dans le presse-papiers !",
+    "link_copy_error": "Echec de la copie du lien",
+    "sort_count": "Nombre de photos",
+    "sort_name": "Nom",
+    "share": "Partager",
+    "share_description": "Toute personne disposant de ce lien peut voir les photos de cette personne.",
+    "copy_link": "Copier le lien",
+    "generate_link": "Générer un lien",
+    "invalid_share_link": "Lien de partage invalide",
+    "share_link_error": "Ce lien de partage est invalide.",
+    "load_error": "Impossible de charger la personne."
   },
   "slideshow": {
     "start": "Diaporama",
@@ -1359,7 +1375,29 @@
     "save_smart": "Enregistrer comme album intelligent",
     "smart_album": "Album intelligent",
     "confirm_delete_title": "Supprimer l'album",
-    "confirm_delete_message": "Supprimer l'album \"{name}\" ? Les photos ne seront pas supprimees."
+    "confirm_delete_message": "Supprimer l'album \"{name}\" ? Les photos ne seront pas supprimees.",
+    "share": "Partager",
+    "share_description": "Toute personne disposant de ce lien peut voir l'album.",
+    "share_link": "Lien de partage",
+    "link_copied": "Lien copié !",
+    "revoke_share": "Révoquer",
+    "copy_link": "Copier le lien",
+    "generate_link": "Générer un lien",
+    "photos_count": "{count} photos",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "search": "Rechercher des albums",
+    "sort_by": "Trier par",
+    "sort_recent": "Récent",
+    "sort_name": "Nom",
+    "sort_photos": "Nombre de photos",
+    "filter_type": "Type",
+    "type_all": "Tous",
+    "type_manual": "Manuel",
+    "type_smart": "Intelligent",
+    "invalid_share_link": "Lien de partage invalide",
+    "share_link_revoked": "Ce lien de partage est invalide ou a été révoqué.",
+    "load_error": "Impossible de charger l'album."
   },
   "critique": {
     "title": "Pourquoi ce score ?",
@@ -1455,6 +1493,73 @@
     "next": "Suivant",
     "error_loading": "Échec du chargement des groupes",
     "error_confirming": "Échec de la confirmation",
-    "error_auto_select": "Échec de la sélection automatique"
+    "error_auto_select": "Échec de la sélection automatique",
+    "burst_groups": "Groupes de rafales",
+    "similar_groups": "Groupes similaires",
+    "similarity_threshold": "Seuil de similarité",
+    "burst_help": "Les photos prises en rafale sont regroupées ensemble. Cliquez sur les photos à conserver (bordure verte), les photos non sélectionnées (bordure rouge) seront masquées. La meilleure photo est automatiquement sélectionnée en fonction de la netteté et de la qualité.",
+    "similar_help": "Les photos visuellement similaires de votre bibliothèque sont regroupées grâce aux embeddings IA. Examinez chaque groupe, conservez les meilleurs clichés et écartez les quasi-doublons. Ajustez le curseur de seuil pour contrôler le degré de similarité nécessaire pour former un groupe.",
+    "help": "Aide"
+  },
+  "memories": {
+    "title": "Ce jour-là",
+    "empty": "Aucun souvenir pour ce jour",
+    "years_ago": "Il y a {count} an",
+    "years_ago_plural": "Il y a {count} ans",
+    "no_memories": "Pas de souvenirs pour ce jour.",
+    "photos_count": "photos"
+  },
+  "caption": {
+    "title": "Légende",
+    "generate": "Générer une légende",
+    "generating": "Génération en cours...",
+    "unavailable": "La génération de légende nécessite un modèle VLM (16 Go+ VRAM)"
+  },
+  "timeline": {
+    "title": "Chronologie",
+    "no_photos": "Aucune photo avec date trouvée",
+    "jump_to_date": "Aller à la date",
+    "photos_on_date": "{count} photos",
+    "empty": "Aucune photo avec des dates trouvée.",
+    "more": "plus",
+    "load_more": "Charger plus"
+  },
+  "albums_sharing": {
+    "share": "Partager l'album",
+    "copy_link": "Copier le lien",
+    "link_copied": "Lien copié dans le presse-papier",
+    "revoke_share": "Révoquer le partage",
+    "shared_album": "Album partagé",
+    "invalid_link": "Lien de partage invalide ou expiré"
+  },
+  "auto_albums": {
+    "auto_generate": "Générer des albums automatiquement",
+    "auto_generate_confirm": "Cela créera des albums basés sur la date et la similarité visuelle. Continuer ?",
+    "auto_generating": "Génération des albums...",
+    "auto_generated": "{count} albums créés",
+    "error_generating": "Échec de la génération automatique des albums"
+  },
+  "map": {
+    "title": "Carte",
+    "no_gps": "Aucune photo avec données GPS trouvée",
+    "photos_count": "{count} photos avec localisation",
+    "cluster_photos": "{count} photos",
+    "score": "Score : {score}"
+  },
+  "photo_detail": {
+    "back": "Retour",
+    "download": "Télécharger",
+    "caption": "Légende",
+    "no_caption": "Aucune légende disponible",
+    "persons": "Personnes",
+    "quality": "Qualité",
+    "composition": "Composition",
+    "saliency": "Saillance du sujet",
+    "technical": "Technique",
+    "exif": "Données EXIF",
+    "tags": "Mots-clés",
+    "rating": "Note",
+    "favorite": "Favori",
+    "rejected": "Rejeté"
   }
 }

@@ -158,7 +158,7 @@ class SignalErrorMatcher {
         <mat-card-title class="flex items-center gap-2">
           {{ 'comparison.preview' | translate }}
           @if (previewLoading()) {
-            <mat-spinner diameter="18" />
+            <mat-spinner diameter="18" class="inline-flex !w-[18px] !h-[18px]" />
           }
         </mat-card-title>
         <mat-card-subtitle>{{ 'comparison.top_n_photos' | translate:{ count: previewCount } }}</mat-card-subtitle>

@@ -266,13 +266,11 @@ function saveSectionStates(states: Record<string, boolean>): void {
           </mat-panel-title>
         </mat-expansion-panel-header>
         <div class="flex flex-col gap-2 pb-2">
-          @if (store.galleryMode() === 'grid') {
-            <mat-checkbox
-              [checked]="store.filters().hide_details"
-              (change)="store.updateFilter('hide_details', $event.checked)"
-            >{{ 'gallery.hide_details' | translate }}</mat-checkbox>
-          }
-          <mat-checkbox class="hidden md:block"
+          <mat-checkbox
+            [checked]="store.filters().hide_details"
+            (change)="store.updateFilter('hide_details', $event.checked)"
+          >{{ 'gallery.hide_details' | translate }}</mat-checkbox>
+          <mat-checkbox class="!hidden lg:!block"
             [checked]="store.filters().hide_tooltip"
             (change)="store.updateFilter('hide_tooltip', $event.checked)"
           >{{ 'gallery.hide_tooltip' | translate }}</mat-checkbox>

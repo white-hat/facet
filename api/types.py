@@ -5,9 +5,9 @@ Sort/type/filter definitions for the API server.
 
 import time
 from config import ScoringConfig
-from api.config import VIEWER_CONFIG, _photo_types_cache
+from api.config import VIEWER_CONFIG, _photo_types_cache, _photo_types_lock
 from api.top_picks import get_top_picks_score_sql
-from api.db_helpers import HIDE_BLINKS_SQL, HIDE_BURSTS_SQL, HIDE_DUPLICATES_SQL
+from api.db_helpers import build_hide_clauses
 
 
 # --- SORT OPTIONS (loaded from config) ---
@@ -156,21 +156,20 @@ def get_photo_types(hide_blinks=False, hide_bursts=False, hide_duplicates=False,
     from api.db_helpers import get_db_connection, get_existing_columns, get_visibility_clause
 
     cache_key = (hide_blinks, hide_bursts, hide_duplicates, user_id or '')
-    if time.time() < _photo_types_cache['expires'] and cache_key in _photo_types_cache['data']:
-        return _photo_types_cache['data'][cache_key]
+    with _photo_types_lock:
+        if time.time() < _photo_types_cache['expires'] and cache_key in _photo_types_cache['data']:
+            return _photo_types_cache['data'][cache_key]
 
     conn = get_db_connection()
     try:
         existing_cols = get_existing_columns(conn)
 
-        base_filters = []
+        base_filters = build_hide_clauses(
+            '1' if hide_blinks else '0',
+            '1' if hide_bursts else '0',
+            '1' if hide_duplicates else '0',
+        )
         sql_params = []
-        if hide_blinks:
-            base_filters.append(HIDE_BLINKS_SQL)
-        if hide_bursts:
-            base_filters.append(HIDE_BURSTS_SQL)
-        if hide_duplicates:
-            base_filters.append(HIDE_DUPLICATES_SQL)
 
         if user_id:
             vis_sql, vis_params = get_visibility_clause(user_id)
@@ -228,8 +227,9 @@ def get_photo_types(hide_blinks=False, hide_bursts=False, hide_duplicates=False,
             label = type_label_map.get(type_id, type_id)
             types.append({'id': type_id, 'label': label, 'count': count})
 
-    _photo_types_cache['data'][cache_key] = types
-    _photo_types_cache['expires'] = time.time() + VIEWER_CONFIG['cache_ttl_seconds']
+    with _photo_types_lock:
+        _photo_types_cache['data'][cache_key] = types
+        _photo_types_cache['expires'] = time.time() + VIEWER_CONFIG['cache_ttl_seconds']
 
     return types
 

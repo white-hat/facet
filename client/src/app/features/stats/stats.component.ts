@@ -99,7 +99,7 @@ const COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'
           <!-- Gear tab -->
           <mat-tab>
             <ng-template mat-tab-label>
-              <mat-icon class="sm:mr-2">camera_alt</mat-icon>
+              <mat-icon class="sm:mr-2" [matTooltip]="'stats.gear' | translate">camera_alt</mat-icon>
               <span class="hidden sm:inline">{{ 'stats.gear' | translate }}</span>
             </ng-template>
             <div class="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-4 mt-4">
@@ -114,7 +114,7 @@ const COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'
           <!-- Categories tab -->
           <mat-tab>
             <ng-template mat-tab-label>
-              <mat-icon class="sm:mr-2">category</mat-icon>
+              <mat-icon class="sm:mr-2" [matTooltip]="'stats.categories.tab' | translate">category</mat-icon>
               <span class="hidden sm:inline">{{ 'stats.categories.tab' | translate }}</span>
             </ng-template>
             <div class="mt-4 flex flex-col gap-4">
@@ -202,12 +202,12 @@ const COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'
                       <tbody>
                         @for (cat of categoryScoreProfile(); track cat.category) {
                           <tr class="border-b border-[var(--mat-sys-outline-variant)] hover:bg-[var(--mat-sys-surface-container)]">
-                            <td class="py-1.5 pr-4 font-medium">{{ ('category_names.' + cat.category) | translate }}</td>
-                            <td class="py-1.5 pr-4 text-gray-300 truncate max-w-40">{{ cat.top_camera || '—' }}</td>
-                            <td class="py-1.5 pr-4 text-gray-300 truncate max-w-40">{{ cat.top_lens || '—' }}</td>
-                            <td class="py-1.5 pr-4 text-gray-300">{{ cat.avg_iso > 0 ? (cat.avg_iso | number:'1.0-0') : '—' }}</td>
-                            <td class="py-1.5 pr-4 text-gray-300">{{ cat.avg_f_stop > 0 ? (cat.avg_f_stop | number:'1.1-1') : '—' }}</td>
-                            <td class="py-1.5 text-gray-300">{{ cat.avg_focal_length > 0 ? (cat.avg_focal_length | number:'1.0-0') : '—' }}</td>
+                            <td class="py-1.5 pr-4 font-medium" [matTooltip]="('category_names.' + cat.category) | translate">{{ ('category_names.' + cat.category) | translate }}</td>
+                            <td class="py-1.5 pr-4 text-gray-300 truncate max-w-40" [matTooltip]="cat.top_camera || '—'">{{ cat.top_camera || '—' }}</td>
+                            <td class="py-1.5 pr-4 text-gray-300 truncate max-w-40" [matTooltip]="cat.top_lens || '—'">{{ cat.top_lens || '—' }}</td>
+                            <td class="py-1.5 pr-4 text-gray-300" [matTooltip]="cat.avg_iso > 0 ? (cat.avg_iso | number:'1.0-0') : '—'">{{ cat.avg_iso > 0 ? (cat.avg_iso | number:'1.0-0') : '—' }}</td>
+                            <td class="py-1.5 pr-4 text-gray-300" [matTooltip]="cat.avg_f_stop > 0 ? (cat.avg_f_stop | number:'1.1-1') : '—'">{{ cat.avg_f_stop > 0 ? (cat.avg_f_stop | number:'1.1-1') : '—' }}</td>
+                            <td class="py-1.5 text-gray-300" [matTooltip]="cat.avg_focal_length > 0 ? (cat.avg_focal_length | number:'1.0-0') : '—'">{{ cat.avg_focal_length > 0 ? (cat.avg_focal_length | number:'1.0-0') : '—' }}</td>
                           </tr>
                         }
                       </tbody>
@@ -221,7 +221,7 @@ const COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'
           <!-- Timeline tab -->
           <mat-tab>
             <ng-template mat-tab-label>
-              <mat-icon class="sm:mr-2">timeline</mat-icon>
+              <mat-icon class="sm:mr-2" [matTooltip]="'stats.timeline' | translate">timeline</mat-icon>
               <span class="hidden sm:inline">{{ 'stats.timeline' | translate }}</span>
             </ng-template>
             <app-stats-timeline-tab />
@@ -230,7 +230,7 @@ const COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'
           <!-- Correlations tab -->
           <mat-tab>
             <ng-template mat-tab-label>
-              <mat-icon class="sm:mr-2">insights</mat-icon>
+              <mat-icon class="sm:mr-2" [matTooltip]="'stats.tabs.correlations' | translate">insights</mat-icon>
               <span class="hidden sm:inline">{{ 'stats.tabs.correlations' | translate }}</span>
             </ng-template>
             <app-stats-correlations-tab />

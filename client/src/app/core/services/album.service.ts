@@ -10,6 +10,7 @@ export interface Album {
   cover_photo_path: string | null;
   first_photo_path: string | null;
   is_smart: boolean;
+  is_shared: boolean;
   smart_filter_json: string | null;
   photo_count: number;
   created_at: string;
@@ -28,8 +29,8 @@ export interface AlbumPhotosResponse {
 export class AlbumService {
   private api = inject(ApiService);
 
-  list(): Observable<{ albums: Album[] }> {
-    return this.api.get('/albums');
+  list(params?: Record<string, string | number>): Observable<{ albums: Album[]; total: number; has_more: boolean }> {
+    return this.api.get('/albums', params);
   }
 
   create(name: string, description = '', is_smart = false, smart_filter_json: string | null = null): Observable<Album> {
@@ -58,5 +59,21 @@ export class AlbumService {
 
   getPhotos(albumId: number, params?: Record<string, string | number | boolean>): Observable<AlbumPhotosResponse> {
     return this.api.get(`/albums/${albumId}/photos`, params);
+  }
+
+  share(albumId: number): Observable<{ share_url: string; share_token: string }> {
+    return this.api.post(`/albums/${albumId}/share`, {});
+  }
+
+  revokeShare(albumId: number): Observable<{ ok: boolean }> {
+    return this.api.delete(`/albums/${albumId}/share`);
+  }
+
+  getShared(albumId: number, token: string): Observable<{ album: Album; photos: Photo[]; total: number }> {
+    return this.api.get(`/shared/album/${albumId}`, { token });
+  }
+
+  autoGenerate(dryRun = false): Observable<{ albums_created: number; albums: { name: string; photo_count: number }[]; dry_run: boolean }> {
+    return this.api.post(`/albums/auto-generate?dry_run=${dryRun}`, {});
   }
 }

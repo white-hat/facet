@@ -104,6 +104,13 @@ PHOTOS_COLUMNS = [
     ('star_rating', 'INTEGER DEFAULT 0 CHECK (star_rating >= 0 AND star_rating <= 5)'),
     ('is_favorite', 'INTEGER DEFAULT 0 CHECK (is_favorite IN (0, 1))'),
     ('is_rejected', 'INTEGER DEFAULT 0 CHECK (is_rejected IN (0, 1))'),
+
+    # AI captioning
+    ('caption', 'TEXT'),
+
+    # GPS coordinates
+    ('gps_latitude', 'REAL'),
+    ('gps_longitude', 'REAL'),
 ]
 
 FACES_COLUMNS = [
@@ -171,6 +178,8 @@ INDEXES = [
     ('idx_star_rating', 'photos', 'star_rating'),
     ('idx_is_favorite', 'photos', 'is_favorite'),
     ('idx_is_rejected', 'photos', 'is_rejected'),
+    # GPS indexes
+    ('idx_gps', 'photos', 'gps_latitude, gps_longitude'),
 ]
 
 # Photo tags lookup table for fast exact-match queries (replaces LIKE '%tag%')
@@ -287,6 +296,7 @@ ALBUMS_COLUMNS = [
     ('cover_photo_path', 'TEXT'),
     ('is_smart', 'INTEGER DEFAULT 0'),
     ('smart_filter_json', 'TEXT'),
+    ('share_token', 'TEXT'),
     ('created_at', "TEXT DEFAULT (datetime('now'))"),
     ('updated_at', "TEXT DEFAULT (datetime('now'))"),
 ]
@@ -301,6 +311,7 @@ ALBUM_PHOTOS_COLUMNS = [
 
 ALBUM_INDEXES = [
     ('idx_albums_user', 'albums', 'user_id'),
+    ('idx_albums_share_token', 'albums', 'share_token'),
     ('idx_album_photos_album', 'album_photos', 'album_id'),
     ('idx_album_photos_path', 'album_photos', 'photo_path'),
     ('idx_album_photos_position', 'album_photos', 'album_id, position'),
