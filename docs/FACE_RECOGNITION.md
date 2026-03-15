@@ -55,7 +55,7 @@ Opens browser to merge suggestions page.
 ### Step 4: Manual Management
 
 In the web viewer:
-- Access `/manage_persons` for person management
+- Access `/persons` for person management
 - Merge: Select source person, click target, confirm
 - Rename: Click person name to edit inline
 - Delete: Remove person cluster
@@ -286,7 +286,7 @@ Both commands use parallel processing for speed.
 
 ### Manage Persons Page
 
-Access via header button or `/manage_persons`:
+Access via header button or `/persons`:
 
 - **Grid View** - All recognized persons
 - **Merge** - Select source, click target, confirm

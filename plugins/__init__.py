@@ -296,7 +296,7 @@ class PluginManager:
         port = parsed.port or (443 if scheme == "https" else 80)
         # Re-encode path to prevent injection via path components
         path = quote(parsed.path, safe="/:@!$&'()*+,;=-._~")
-        query = parsed.query
+        query = quote(parsed.query, safe="=&+%")
         safe_url = f"{scheme}://{resolved_ip}:{port}{path}"
         if query:
             safe_url = f"{safe_url}?{query}"

@@ -61,6 +61,26 @@ Organize photos into manual or smart albums. Manual albums let you drag-and-drop
 
 <img src="docs/screenshots/albums.jpg" alt="Albums page" width="100%">
 
+### Map View
+
+Browse geotagged photos on an interactive Leaflet map. Markers cluster at low zoom levels and expand as you zoom in. Click any marker to view the photo. Extract GPS coordinates from existing photos with `python facet.py --extract-gps` — new photos are extracted automatically during scoring.
+
+### Timeline View
+
+Chronological photo browser with a year/month sidebar for date-based navigation. Scroll through photos organized by date with cursor-based infinite scroll. Access at `/timeline`.
+
+### Memories ("On This Day")
+
+A retrospective dialog showing photos taken on the same calendar date in previous years. Accessible from the gallery header when photos span multiple years.
+
+### AI Captions
+
+VLM-generated natural-language descriptions for each photo — viewable on the photo detail page and editable in edition mode. Generate captions in bulk with `python facet.py --generate-captions`. Requires 16gb or 24gb VRAM profile.
+
+### Photo Sharing
+
+Share albums via tokenized links that require no authentication. Generate a shareable link from any album, and revoke access at any time. Recipients browse the shared album at `/shared/album/:id`.
+
 ### AI Critique
 
 Get a detailed score breakdown for any photo. The rule-based critique shows each metric's raw score, category weight, and weighted contribution to the aggregate. Available on all VRAM profiles. VLM-powered critique (16gb/24gb) adds a natural-language assessment.

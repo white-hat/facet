@@ -5,6 +5,7 @@ All settings are in `scoring_config.json`. After modifying, run `python facet.py
 ## Table of Contents
 
 - [Users](#users)
+- [Scanning](#scanning)
 - [Categories](#categories)
 - [Scoring](#scoring)
 - [Thresholds](#thresholds)
@@ -16,12 +17,14 @@ All settings are in `scoring_config.json`. After modifying, run `python facet.py
 - [Models](#models)
 - [Processing](#processing)
 - [Burst Detection](#burst-detection)
+- [Burst Scoring](#burst-scoring)
 - [Duplicate Detection](#duplicate-detection)
 - [Face Detection](#face-detection)
 - [Face Clustering](#face-clustering)
 - [Face Processing](#face-processing)
 - [Monochrome Detection](#monochrome-detection)
 - [Tagging](#tagging)
+- [Standalone Tags](#standalone-tags)
 - [Analysis](#analysis)
 - [Viewer](#viewer)
 - [Performance](#performance)
@@ -96,6 +99,24 @@ After adding a user, edit `scoring_config.json` to configure their `directories`
 - No `users` key = legacy single-user mode (unchanged behavior)
 - `viewer.password` and `viewer.edition_password` are ignored in multi-user mode
 - Existing ratings in the `photos` table remain for single-user mode; use `--migrate-user-preferences` to copy them
+
+---
+
+## Scanning
+
+Controls directory scanning behavior.
+
+```json
+{
+  "scanning": {
+    "skip_hidden_directories": true
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `skip_hidden_directories` | `true` | Skip directories starting with `.` during photo scanning |
 
 ---
 
@@ -670,6 +691,30 @@ Groups similar photos taken in quick succession.
 
 ---
 
+## Burst Scoring
+
+Weights used by burst culling to compute a composite score for selecting the best shot within each burst group. Weights should sum to 1.0.
+
+```json
+{
+  "burst_scoring": {
+    "weight_aggregate": 0.4,
+    "weight_aesthetic": 0.25,
+    "weight_sharpness": 0.2,
+    "weight_blink": 0.15
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `weight_aggregate` | `0.4` | Weight of the overall aggregate score |
+| `weight_aesthetic` | `0.25` | Weight of the aesthetic quality score |
+| `weight_sharpness` | `0.2` | Weight of the technical sharpness score |
+| `weight_blink` | `0.15` | Penalty weight for detected blinks (higher = stronger penalty) |
+
+---
+
 ## Duplicate Detection
 
 Detect duplicate photos globally using perceptual hash (pHash) comparison.
@@ -865,6 +910,26 @@ Configured via `models.profiles.*.tagging_model`:
 python facet.py --recompute-tags       # Re-tag using configured model per profile
 python facet.py --recompute-tags-vlm   # Re-tag using VLM tagger
 ```
+
+---
+
+## Standalone Tags
+
+Tags with synonym lists that are not tied to any specific category. These are available for all photos regardless of category assignment. Each key is the tag name; the value is a list of synonyms for CLIP/VLM matching.
+
+```json
+{
+  "standalone_tags": {
+    "bokeh": ["bokeh", "shallow depth of field", "background blur", "out of focus"],
+    "surreal": ["surreal", "dreamlike", "fantasy", "composite", "double exposure"],
+    "flat_lay": ["flat lay", "overhead shot", "top down", "bird's eye product"],
+    "golden_hour": ["golden hour", "magic hour", "warm light", "sunset light"],
+    "portrait_tag": ["portrait", "headshot", "face portrait", "close-up portrait"]
+  }
+}
+```
+
+Add new standalone tags by providing a key and a list of synonyms. Tags defined here are merged with category-specific tags to form the full tag vocabulary.
 
 ---
 

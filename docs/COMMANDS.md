@@ -74,6 +74,10 @@ These commands update specific metrics without full photo reprocessing.
 | `python facet.py --generate-captions` | Generate AI captions for photos using VLM (requires 16gb/24gb) |
 | `python facet.py --auto-albums` | Auto-generate albums from photo clusters (time, location, content) |
 | `python facet.py --extract-gps` | Extract GPS coordinates from EXIF data into database columns |
+| `python facet.py --rescan-gps` | Re-extract GPS coordinates from EXIF for all photos (overwrites existing) |
+| `python facet.py --recompute-embeddings` | Recompute CLIP/SigLIP embeddings for all photos (required after model switch) |
+| `python facet.py --score-topiq` | Backfill TOPIQ quality scores from stored thumbnails (GPU required) |
+| `python facet.py --backfill-focal-35mm` | Backfill 35mm-equivalent focal length from EXIF for photos missing it |
 | `python facet.py --compute-recommendations` | Analyze database, show scoring summary |
 | `python facet.py --compute-recommendations --verbose` | Show detailed statistics |
 | `python facet.py --compute-recommendations --apply-recommendations` | Auto-apply scoring fixes |

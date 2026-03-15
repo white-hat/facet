@@ -211,7 +211,7 @@ Dropdown shows persons with face thumbnails. Click to filter gallery.
 
 ### Person Gallery
 
-Click person name to view all their photos at `/persons/<id>`.
+Click person name to view all their photos at `/person/<id>`.
 
 ### Manage Persons Page
 
@@ -324,13 +324,14 @@ Controlled by `viewer.features.show_critique` (default: `true`) and `viewer.feat
 
 ## AI Captioning
 
-Get an AI-generated natural language caption for any photo. Captions are generated on first request and cached in the `caption` database column.
+Get an AI-generated natural language caption for any photo. Captions are generated on first request and cached in the `caption` database column. Captions can be edited manually in edition mode via the photo detail page.
 
 ### API
 
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/caption?path=<photo_path>` | Get or generate caption for a photo |
+| `PUT /api/caption` | Update caption text (edition mode required) |
 
 Also available via CLI for bulk generation:
 
@@ -724,6 +725,7 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 |----------|-------------|
 | `GET /api/memories?date=` | Photos taken on this date in previous years |
 | `GET /api/caption?path=` | Get or generate AI caption |
+| `PUT /api/caption` | Update photo caption (edition mode) |
 | `GET /api/timeline?cursor=&limit=&direction=` | Paginated timeline photos |
 | `GET /api/timeline/dates?year=&month=` | Available dates for navigation |
 | `GET /api/photos/map?bounds=&zoom=&limit=` | Geotagged photos within bounds |
