@@ -76,10 +76,12 @@ def compute_similarity_groups(conn=None, threshold=None, min_size=None, user_id=
 
         # Load embeddings — cap for performance (O(n²) computation)
         # Exclude burst non-leads to avoid overlap with burst culling
+        # Exclude similarity_reviewed photos so reviewed groups don't reappear
         rows = conn.execute(
             f"""SELECT path, clip_embedding, aggregate FROM photos
                WHERE clip_embedding IS NOT NULL
                  AND (is_burst_lead = 1 OR is_burst_lead IS NULL)
+                 AND (similarity_reviewed IS NULL OR similarity_reviewed = 0)
                  AND {vis_sql}
                ORDER BY date_taken DESC
                LIMIT ?""",

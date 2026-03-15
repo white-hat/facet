@@ -107,9 +107,6 @@ export interface Person {
           >
             <mat-icon class="!text-lg">photo_library</mat-icon>
           </a>
-          <button mat-icon-button [matTooltip]="'persons.share_link' | translate" (click)="share.emit(person().id)">
-            <mat-icon class="!text-lg">link</mat-icon>
-          </button>
           <button mat-icon-button [matTooltip]="'persons.delete' | translate" (click)="deleted.emit(person().id)">
             <mat-icon class="!text-lg">delete</mat-icon>
           </button>
@@ -130,7 +127,6 @@ export class PersonCardComponent {
   readonly editStart = output<number>();
   readonly editSave = output<{ id: number; name: string }>();
   readonly editCancel = output<void>();
-  readonly share = output<number>();
   readonly deleted = output<number>();
 
   onSave(): void {

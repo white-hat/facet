@@ -64,12 +64,17 @@ export class CategoryLabelPipe implements PipeTransform {
             </div>
 
             <!-- Category + aggregate + star rating -->
-            <div class="text-[var(--mat-sys-primary)] font-semibold mb-1.5">
+            <div class="flex items-baseline justify-between mb-1.5">
+              <span class="text-[var(--mat-sys-primary)] font-semibold">[{{ p.category | categoryLabel }}] {{ 'tooltip.aggregate' | translate }}: {{ p.aggregate | fixed:1 }}</span>
               @if (p.star_rating) {
-                <span class="text-yellow-400">★{{ p.star_rating }}</span>
+                <span class="text-yellow-400 font-semibold shrink-0 ml-2">★{{ p.star_rating }}</span>
               }
-              [{{ p.category | categoryLabel }}] {{ 'tooltip.aggregate' | translate }}: {{ p.aggregate | fixed:1 }}
             </div>
+
+            <!-- Caption (after score) -->
+            @if (p.caption) {
+              <div class="text-xs italic text-[var(--facet-tooltip-text-muted)] mb-1.5 line-clamp-2 max-w-[300px]">{{ p.caption }}</div>
+            }
 
             <!-- Scoring sections: 2-col grid for landscape, stacked for portrait -->
             <div [class.grid]="isLandscape()" [class.grid-cols-2]="isLandscape()" [class.gap-3]="isLandscape()">
@@ -230,6 +235,7 @@ export class CategoryLabelPipe implements PipeTransform {
             }
           </div>
         }
+
       </div>
     }
   `,

@@ -54,9 +54,9 @@ const GEAR_METRIC_OPTIONS = [
   ],
   template: `
     <mat-card>
-      <mat-card-header class="!flex !items-center !justify-between">
-        <mat-card-title>{{ titleKey() | translate }}</mat-card-title>
-        <mat-form-field class="w-52 !-mt-2" subscriptSizing="dynamic">
+      <mat-card-header class="!flex !items-center !justify-between !gap-4">
+        <mat-card-title class="shrink-0">{{ titleKey() | translate }}</mat-card-title>
+        <mat-form-field class="flex-1 min-w-0 !-mt-2" subscriptSizing="dynamic">
           <mat-select [ngModel]="selectedMetric()" (ngModelChange)="selectedMetric.set($event)">
             @for (opt of metricOptions; track opt.key) {
               <mat-option [value]="opt.key">{{ 'stats.gear_metrics.' + opt.key | translate }}</mat-option>
@@ -77,8 +77,8 @@ const GEAR_METRIC_OPTIONS = [
   `,
 })
 export class GearChartCardComponent {
-  private destroyRef = inject(DestroyRef);
-  private themeService = inject(ThemeService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly themeService = inject(ThemeService);
   private chart: Chart | null = null;
 
   /** i18n key for the card title, e.g. 'stats.cameras' or 'stats.lenses' */
@@ -105,8 +105,8 @@ export class GearChartCardComponent {
     effect(() => {
       const key = this.titleKey();
       const saved = localStorage.getItem(`gear_metric_${key}`);
-      if (saved && (this as any).metricOptions.some((opt: any) => opt.key === saved)) {
-        (this as any).selectedMetric.set(saved);
+      if (saved && this.metricOptions.some(opt => opt.key === saved)) {
+        this.selectedMetric.set(saved);
       } else {
         // Apply default based on type if no saved value
         if (key === 'stats.cameras') this.selectedMetric.set('usage_timeline');

@@ -79,7 +79,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
       @for (album of albums(); track album.id) {
         <a [routerLink]="['/album', album.id]"
-           class="group relative rounded-xl overflow-hidden bg-[var(--mat-sys-surface-container)] hover:shadow-lg transition-shadow cursor-pointer">
+           class="group flex flex-col rounded-xl overflow-hidden bg-[var(--mat-sys-surface-container)] hover:shadow-lg transition-shadow cursor-pointer">
           @if (album.first_photo_path) {
             <img [src]="album.first_photo_path | thumbnailUrl:320"
                  [alt]="album.name"
@@ -101,7 +101,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
             }
           </div>
           @if (auth.isEdition()) {
-            <div class="flex justify-end gap-0.5 px-1.5 pb-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex justify-end gap-0.5 px-1.5 pb-1.5 mt-auto opacity-0 group-hover:opacity-100 transition-opacity">
               <button mat-icon-button
                       class="!w-7 !h-7 !p-0"
                       [matTooltip]="'albums.edit' | translate"
@@ -250,18 +250,17 @@ export class AlbumsComponent {
   }
 
   protected async autoGenerateAlbums(): Promise<void> {
-    const ref = this.dialog.open(ConfirmDialogComponent, {
-      data: {
-        title: this.i18n.t('auto_albums.auto_generate'),
-        message: this.i18n.t('auto_albums.auto_generate_confirm'),
-      },
+    const { AutoAlbumSettingsDialogComponent } = await import('./auto-album-settings-dialog.component');
+    const ref = this.dialog.open(AutoAlbumSettingsDialogComponent, {
+      width: '95vw',
+      maxWidth: '400px',
     });
-    const confirmed = await firstValueFrom(ref.afterClosed());
-    if (!confirmed) return;
+    const settings = await firstValueFrom(ref.afterClosed());
+    if (!settings) return;
 
     this.autoGenerating.set(true);
     try {
-      const result = await firstValueFrom(this.albumService.autoGenerate());
+      const result = await firstValueFrom(this.albumService.autoGenerate(false, settings));
       this.snackBar.open(
         this.i18n.t('auto_albums.auto_generated', { count: result.albums_created }),
         '', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' },

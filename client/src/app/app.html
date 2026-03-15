@@ -29,7 +29,7 @@
           <a mat-icon-button class="lg:!hidden" routerLink="/stats" routerLinkActive #rlStatsM="routerLinkActive" [style.color]="rlStatsM.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.stats' | translate">
             <mat-icon>bar_chart</mat-icon>
           </a>
-          @if (auth.isEdition() && hasBurstGroups()) {
+          @if (auth.isEdition()) {
             <a mat-icon-button class="lg:!hidden" routerLink="/culling" routerLinkActive #rlCullingM="routerLinkActive" [style.color]="rlCullingM.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.culling' | translate">
               <mat-icon>burst_mode</mat-icon>
             </a>
@@ -68,7 +68,7 @@
           <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/stats" routerLinkActive #rlStats="routerLinkActive" [style.color]="rlStats.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.stats' | translate">
             <mat-icon>bar_chart</mat-icon>
           </a>
-          @if (auth.isEdition() && hasBurstGroups()) {
+          @if (auth.isEdition()) {
             <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/culling" routerLinkActive #rlCulling="routerLinkActive" [style.color]="rlCulling.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.culling' | translate">
               <mat-icon>burst_mode</mat-icon>
             </a>
@@ -144,7 +144,7 @@
         }
 
         <!-- Search -->
-        <mat-form-field class="!hidden lg:!inline-flex w-44 xl:w-56" subscriptSizing="dynamic">
+        <mat-form-field class="!hidden lg:!inline-flex flex-1 min-w-32 max-w-xs" subscriptSizing="dynamic">
           <input
             matInput
             [placeholder]="'gallery.search_placeholder' | translate"
@@ -188,11 +188,11 @@
         </mat-form-field>
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'stats.filter.date_from' | translate }}</mat-label>
-          <input matInput type="date" [value]="statsFilters.dateFrom()" (change)="onStatsDateChange('from', $event)" />
+          <input matInput type="date" [value]="statsFilters.dateFrom()" (change)="onDateFilterChange(statsFilters, 'from', $event)" />
         </mat-form-field>
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'stats.filter.date_to' | translate }}</mat-label>
-          <input matInput type="date" [value]="statsFilters.dateTo()" (change)="onStatsDateChange('to', $event)" />
+          <input matInput type="date" [value]="statsFilters.dateTo()" (change)="onDateFilterChange(statsFilters, 'to', $event)" />
         </mat-form-field>
       }
 
@@ -225,11 +225,11 @@
       @if (auth.isAuthenticated() && isTimelineRoute()) {
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'stats.filter.date_from' | translate }}</mat-label>
-          <input matInput type="date" [value]="timelineFilters.dateFrom()" (change)="onTimelineDateChange('from', $event)" />
+          <input matInput type="date" [value]="timelineFilters.dateFrom()" (change)="onDateFilterChange(timelineFilters, 'from', $event)" />
         </mat-form-field>
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'stats.filter.date_to' | translate }}</mat-label>
-          <input matInput type="date" [value]="timelineFilters.dateTo()" (change)="onTimelineDateChange('to', $event)" />
+          <input matInput type="date" [value]="timelineFilters.dateTo()" (change)="onDateFilterChange(timelineFilters, 'to', $event)" />
         </mat-form-field>
         <button
           class="!hidden lg:!inline-flex"
@@ -239,6 +239,18 @@
         >
           <mat-icon>{{ timelineFilters.sortDirection() === 'older' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
         </button>
+      }
+
+      <!-- Map filters (visible only on map route, lg+) -->
+      @if (auth.isAuthenticated() && isMapRoute()) {
+        <mat-form-field class="!hidden lg:!inline-flex w-44 ml-2" subscriptSizing="dynamic">
+          <mat-label>{{ 'map.date_from' | translate }}</mat-label>
+          <input matInput type="date" [value]="mapFilters.dateFrom()" (change)="onDateFilterChange(mapFilters, 'from', $event)" />
+        </mat-form-field>
+        <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
+          <mat-label>{{ 'map.date_to' | translate }}</mat-label>
+          <input matInput type="date" [value]="mapFilters.dateTo()" (change)="onDateFilterChange(mapFilters, 'to', $event)" />
+        </mat-form-field>
       }
 
       <!-- Persons search & sort (visible only on persons route, lg+) -->
@@ -506,7 +518,7 @@
   }
 
   <!-- Main content -->
-  <main class="flex-1 overflow-auto lg:pb-0" [class.pb-14]="isGalleryRoute() || isAlbumsRoute() || isPersonsRoute() || isTimelineRoute()">
+  <main class="flex-1 overflow-auto lg:pb-0" [class.pb-14]="isGalleryRoute() || isAlbumsRoute() || isPersonsRoute() || isTimelineRoute() || isMapRoute()">
     <router-outlet />
   </main>
 
@@ -691,13 +703,35 @@
 
   <!-- Mobile timeline bottom bar -->
   @if (auth.isAuthenticated() && isTimelineRoute()) {
-    <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center gap-0 px-2 py-1 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] safe-area-pb">
-      <button mat-icon-button class="!w-10 !h-10"
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center gap-1 px-2 py-1 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] safe-area-pb">
+      <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
+        <mat-label>{{ 'ui.labels.from' | translate }}</mat-label>
+        <input matInput type="date" [value]="timelineFilters.dateFrom()" (change)="onDateFilterChange(timelineFilters, 'from', $event)" />
+      </mat-form-field>
+      <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
+        <mat-label>{{ 'ui.labels.to' | translate }}</mat-label>
+        <input matInput type="date" [value]="timelineFilters.dateTo()" (change)="onDateFilterChange(timelineFilters, 'to', $event)" />
+      </mat-form-field>
+      <button mat-icon-button class="!w-10 !h-10 shrink-0"
         (click)="timelineFilters.sortDirection.set(timelineFilters.sortDirection() === 'older' ? 'newer' : 'older')"
         [matTooltip]="timelineFilters.sortDirection() === 'older' ? ('gallery.sort_desc' | translate) : ('gallery.sort_asc' | translate)"
       >
         <mat-icon>{{ timelineFilters.sortDirection() === 'older' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
       </button>
+    </div>
+  }
+
+  <!-- Mobile map bottom bar -->
+  @if (auth.isAuthenticated() && isMapRoute()) {
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center gap-1 px-2 py-1 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] safe-area-pb">
+      <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
+        <mat-label>{{ 'ui.labels.from' | translate }}</mat-label>
+        <input matInput type="date" [value]="mapFilters.dateFrom()" (change)="onDateFilterChange(mapFilters, 'from', $event)" />
+      </mat-form-field>
+      <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
+        <mat-label>{{ 'ui.labels.to' | translate }}</mat-label>
+        <input matInput type="date" [value]="mapFilters.dateTo()" (change)="onDateFilterChange(mapFilters, 'to', $event)" />
+      </mat-form-field>
     </div>
   }
 </div>

@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSliderModule } from '@angular/material/slider';
@@ -107,6 +108,7 @@ function saveSectionStates(states: Record<string, boolean>): void {
   standalone: true,
   host: { class: 'block h-full' },
   imports: [
+    DecimalPipe,
     FormsModule,
     MatSelectModule,
     MatSliderModule,
@@ -123,23 +125,6 @@ function saveSectionStates(states: Record<string, boolean>): void {
   ],
   template: `
 <div data-scroll class="overflow-y-auto px-2 h-full">
-
-      <!-- Semantic Search -->
-      @if (store.config()?.features?.show_semantic_search) {
-        <mat-form-field subscriptSizing="dynamic" class="w-full mt-4 mb-2">
-          <mat-label>{{ 'gallery.semantic_search' | translate }}</mat-label>
-          <mat-icon matPrefix class="mr-1 opacity-60">image_search</mat-icon>
-          <input matInput
-            [value]="store.filters().semanticQuery"
-            (input)="onSemanticSearch($event)"
-            [placeholder]="'gallery.semantic_search_placeholder' | translate" />
-          @if (store.filters().semanticQuery) {
-            <button matSuffix mat-icon-button class="!w-6 !h-6 !p-0" (click)="store.updateFilter('semanticQuery', '')">
-              <mat-icon class="!text-sm !w-4 !h-4">close</mat-icon>
-            </button>
-          }
-        </mat-form-field>
-      }
 
       <!-- Date Range -->
       <mat-expansion-panel class="!mb-1 mt-4" [expanded]="sectionStates()['date'] !== false"
@@ -354,6 +339,40 @@ function saveSectionStates(states: Record<string, boolean>): void {
         </mat-expansion-panel>
       }
 
+      <!-- Location filter -->
+      @if (store.config()?.features?.show_map) {
+        <mat-expansion-panel class="!mb-1" [expanded]="sectionStates()['location'] === true"
+                             (opened)="onSectionToggle('location', true)"
+                             (closed)="onSectionToggle('location', false)"
+                             [style.background-color]="sectionStates()['location'] === true ? 'var(--mat-sys-surface-container)' : null">
+          <mat-expansion-panel-header>
+            <mat-panel-title class="flex items-center gap-2">
+              <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">place</mat-icon>
+              {{ 'gallery.sidebar.location' | translate }}
+              @if (store.filters().gps_lat) {
+                <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">1</span>
+              }
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <div class="flex flex-col gap-2 pb-2">
+            @if (store.filters().gps_lat) {
+              <div class="text-xs opacity-60 px-1">
+                {{ +store.filters().gps_lat | number:'1.4-4' }}, {{ +store.filters().gps_lng | number:'1.4-4' }}
+                — {{ store.filters().gps_radius_km }} km
+              </div>
+              <button mat-stroked-button class="w-full" (click)="clearGpsFilter()">
+                <mat-icon>close</mat-icon>
+                {{ 'gallery.gps_clear' | translate }}
+              </button>
+            }
+            <button mat-stroked-button class="w-full" (click)="openGpsFilterMap()">
+              <mat-icon>map</mat-icon>
+              {{ 'gallery.select_on_map' | translate }}
+            </button>
+          </div>
+        </mat-expansion-panel>
+      }
+
       <!-- Metric filter sections (collapsed by default) -->
       @for (group of filterGroups; track group.sectionKey) {
         <mat-expansion-panel class="!mb-1" [expanded]="sectionStates()[group.sectionKey] === true"
@@ -386,6 +405,37 @@ function saveSectionStates(states: Record<string, boolean>): void {
                 </div>
               </div>
             }
+          </div>
+        </mat-expansion-panel>
+      }
+
+      <!-- Semantic Search (in accordion, below metric filters) -->
+      @if (store.config()?.features?.show_semantic_search) {
+        <mat-expansion-panel class="!mb-1" [expanded]="sectionStates()['semantic'] === true"
+                             (opened)="onSectionToggle('semantic', true)"
+                             (closed)="onSectionToggle('semantic', false)"
+                             [style.background-color]="sectionStates()['semantic'] === true ? 'var(--mat-sys-surface-container)' : null">
+          <mat-expansion-panel-header>
+            <mat-panel-title class="flex items-center gap-2">
+              <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">image_search</mat-icon>
+              {{ 'gallery.sidebar.semantic_search' | translate }}
+            </mat-panel-title>
+          </mat-expansion-panel-header>
+          <div class="flex flex-col gap-2 pb-2">
+            <mat-form-field subscriptSizing="dynamic" class="w-full">
+              <mat-label>{{ 'gallery.semantic_search' | translate }}</mat-label>
+              <mat-icon matPrefix class="mr-1 opacity-60">image_search</mat-icon>
+              <input matInput
+                [value]="store.filters().semanticQuery"
+                (input)="onSemanticSearch($event)"
+                [placeholder]="'gallery.semantic_search_placeholder' | translate" />
+              @if (store.filters().semanticQuery) {
+                <button matSuffix mat-icon-button class="!w-6 !h-6 !p-0" (click)="store.updateFilter('semanticQuery', '')">
+                  <mat-icon class="!text-sm !w-4 !h-4">close</mat-icon>
+                </button>
+              }
+            </mat-form-field>
+            <p class="text-xs opacity-50 px-1">{{ 'gallery.semantic_search_info' | translate }}</p>
           </div>
         </mat-expansion-panel>
       }
@@ -482,6 +532,33 @@ export class GalleryFilterSidebarComponent {
     this.searchTimeout = setTimeout(() => {
       this.store.updateFilter('semanticQuery', value);
     }, 400);
+  }
+
+  openGpsFilterMap(): void {
+    import('./gps-filter-map-dialog.component').then(m => {
+      const ref = this.dialog.open(m.GpsFilterMapDialogComponent, {
+        width: '95vw',
+        maxWidth: '600px',
+        data: {
+          lat: this.store.filters().gps_lat ? +this.store.filters().gps_lat : undefined,
+          lng: this.store.filters().gps_lng ? +this.store.filters().gps_lng : undefined,
+          radius_km: this.store.filters().gps_radius_km ? +this.store.filters().gps_radius_km : undefined,
+        },
+      });
+      ref.afterClosed().subscribe(result => {
+        if (result) {
+          this.store.updateFilters({
+            gps_lat: String(result.lat),
+            gps_lng: String(result.lng),
+            gps_radius_km: String(result.radius_km),
+          });
+        }
+      });
+    });
+  }
+
+  clearGpsFilter(): void {
+    this.store.updateFilters({ gps_lat: '', gps_lng: '', gps_radius_km: '' });
   }
 
   saveAsSmartAlbum(): void {

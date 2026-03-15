@@ -188,6 +188,7 @@
     "subject_prominence": "Hervorhebung",
     "subject_placement": "Platzierung",
     "bg_separation": "Hintergrundtrennung",
+    "caption": "Beschreibung",
     "histogram_spread": "Histogramm",
     "star_rating": "Bewertung",
     "topiq_score": "TOPIQ"
@@ -985,7 +986,7 @@
     "sort_desc": "Absteigend",
     "sort_asc": "Aufsteigend",
     "filters": "Filter",
-    "search_placeholder": "Fotos suchen...",
+    "search_placeholder": "Dateiname, Beschreibung suchen...",
     "semantic_search": "Semantische Suche",
     "semantic_search_placeholder": "Sonnenuntergang am Strand...",
     "photo_count": "{count} Fotos",
@@ -1039,8 +1040,14 @@
       "technical": "Technik",
       "exposure_range": "Belichtung & Bereich",
       "ratings": "Bewertungen",
-      "add_filter": "Filter hinzufügen..."
+      "add_filter": "Filter hinzufügen...",
+      "semantic_search": "Semantische Suche",
+      "location": "Standort"
     },
+    "semantic_search_info": "Die semantische Suche lädt beim ersten Gebrauch Embeddings in den RAM. Bei großen Bibliotheken kann dies einen Moment dauern.",
+    "select_on_map": "Auf Karte auswählen",
+    "gps_radius": "Radius",
+    "gps_clear": "Standort löschen",
     "hide_rejected": "Abgelehnte ausblenden",
     "favorites_only": "Nur Favoriten",
     "monochrome_only": "Nur Schwarzweiß",
@@ -1478,11 +1485,11 @@
     }
   },
   "culling": {
-    "title": "Serienbildauswahl",
-    "no_bursts": "Keine Serienbildgruppen gefunden",
+    "title": "Aussortierung",
+    "no_bursts": "Keine Gruppen zu prüfen",
     "group_progress": "Gruppe {current} von {total}",
-    "auto_best": "AUTO BESTE",
-    "confirm": "Auswahl bestatigen",
+    "auto_best": "BESTE",
+    "confirm": "Bestätigen",
     "skip": "Überspringen",
     "auto_select_all": "Alle automatisch auswählen",
     "confirm_tooltip": "Ausgewählte Fotos behalten, Rest verwerfen",
@@ -1499,7 +1506,15 @@
     "similarity_threshold": "Ähnlichkeitsschwelle",
     "burst_help": "Fotos, die in schneller Folge aufgenommen wurden, werden zusammengefasst. Klicken Sie auf Fotos, um sie zu behalten (grüner Rahmen). Nicht ausgewählte Fotos (roter Rahmen) werden ausgeblendet. Das beste Foto wird automatisch anhand von Schärfe und Qualität ausgewählt.",
     "similar_help": "Visuell ähnliche Fotos in Ihrer Bibliothek werden mithilfe von KI-Embeddings gruppiert. Überprüfen Sie jede Gruppe, behalten Sie die besten Aufnahmen und verwerfen Sie Fast-Duplikate. Passen Sie den Schwellenwert-Regler an, um zu steuern, wie ähnlich Fotos sein müssen, um eine Gruppe zu bilden.",
-    "help": "Hilfe"
+    "help": "Hilfe",
+    "help_text": "Überprüfen Sie Gruppen ähnlicher oder Serienfotos. Klicken zum Auswählen, Doppelklick zum exklusiven Auswählen. Bestätigte Gruppen verbergen abgelehnte Fotos aus der Galerie.",
+    "type_burst": "Serie",
+    "type_similar": "Ähnlich",
+    "confirm_all": "Alle bestätigen",
+    "confirmed_badge": "Bestätigt",
+    "photos": "Fotos",
+    "threshold": "Ähnlichkeit",
+    "load_more": "Mehr laden"
   },
   "memories": {
     "title": "An diesem Tag",
@@ -1522,7 +1537,14 @@
     "photos_on_date": "{count} Fotos",
     "empty": "Keine Fotos mit Datumsangaben gefunden.",
     "more": "mehr",
-    "load_more": "Mehr laden"
+    "load_more": "Mehr laden",
+    "granularity": "Gruppieren",
+    "granularity_day": "Tag",
+    "granularity_week": "Woche",
+    "granularity_month": "Monat",
+    "sort_within": "Sortierung",
+    "sort_filename": "Dateiname",
+    "photos_per_group": "Fotos"
   },
   "albums_sharing": {
     "share": "Album teilen",
@@ -1537,14 +1559,20 @@
     "auto_generate_confirm": "Es werden Alben basierend auf Datum und visueller Ähnlichkeit erstellt. Fortfahren?",
     "auto_generating": "Alben werden generiert...",
     "auto_generated": "{count} Alben erstellt",
-    "error_generating": "Automatische Albumgenerierung fehlgeschlagen"
+    "error_generating": "Automatische Albumgenerierung fehlgeschlagen",
+    "settings_title": "Einstellungen für automatische Generierung",
+    "min_photos": "Mindestanzahl Fotos pro Album",
+    "time_gap": "Zeitabstand zwischen Ereignissen (Stunden)",
+    "embedding_threshold": "Schwellenwert visuelle Ähnlichkeit"
   },
   "map": {
     "title": "Karte",
     "no_gps": "Keine Fotos mit GPS-Daten gefunden",
     "photos_count": "{count} Fotos mit Standort",
     "cluster_photos": "{count} Fotos",
-    "score": "Bewertung: {score}"
+    "score": "Bewertung: {score}",
+    "date_from": "Von",
+    "date_to": "Bis"
   },
   "photo_detail": {
     "back": "Zurück",
@@ -1560,6 +1588,11 @@
     "tags": "Schlagwörter",
     "rating": "Bewertung",
     "favorite": "Favorit",
-    "rejected": "Abgelehnt"
+    "rejected": "Abgelehnt",
+    "generate_caption": "Generieren",
+    "edit_caption": "Bearbeiten",
+    "caption_edit_title": "Beschreibung bearbeiten",
+    "caption_error": "Beschreibung konnte nicht generiert werden",
+    "location": "Standort"
   }
 }

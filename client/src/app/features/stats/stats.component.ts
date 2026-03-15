@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, viewChild, ElementRef, effect, DestroyRef } from '@angular/core';
+import { Component, inject, signal, computed, viewChild, ElementRef, effect, DestroyRef, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
@@ -121,9 +121,9 @@ const COLORS = ['#22c55e', '#3b82f6', '#a855f7', '#f59e0b', '#ef4444', '#06b6d4'
               <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4">
                 @if (categoryMetricData().length > 0) {
                   <mat-card>
-                    <mat-card-header class="!flex !items-center !justify-between">
+                    <mat-card-header class="!flex !items-center !justify-between !gap-4">
                       <mat-card-title>{{ 'stats.category_metric_title' | translate }}</mat-card-title>
-                      <mat-form-field class="w-44 !-mt-2" subscriptSizing="dynamic">
+                      <mat-form-field class="flex-1 min-w-0 !-mt-2" subscriptSizing="dynamic">
                         <mat-select [ngModel]="categoryMetric()" (ngModelChange)="categoryMetric.set($event)">
                           @for (opt of categoryMetricOptions; track opt.key) {
                             <mat-option [value]="opt.key">{{ 'stats.category_metrics.' + opt.key | translate }}</mat-option>
@@ -248,6 +248,7 @@ export class StatsComponent {
   readonly statsFilters = inject(StatsFiltersService);
   readonly themeService = inject(ThemeService);
   private charts = new Map<string, Chart>();
+  private chartRefs = new Map<string, ElementRef<HTMLCanvasElement>>();
 
   // Canvas refs
   protected readonly categoriesCanvas = viewChild<ElementRef<HTMLCanvasElement>>('categoriesCanvas');
@@ -255,23 +256,23 @@ export class StatsComponent {
   protected readonly categoryScoreProfileCanvas = viewChild<ElementRef<HTMLCanvasElement>>('categoryScoreProfileCanvas');
   protected readonly categoryMetricCanvas = viewChild<ElementRef<HTMLCanvasElement>>('categoryMetricCanvas');
 
-  selectedTab = signal(0);
+  protected readonly selectedTab = signal(0);
 
   // Filter controls (shared with app header via StatsFiltersService)
   protected get dateFrom() { return this.statsFilters.dateFrom; }
   protected get dateTo() { return this.statsFilters.dateTo; }
   protected get filterCategory() { return this.statsFilters.filterCategory; }
 
-  loading = signal(true);
+  protected readonly loading = signal(true);
 
-  cameras = signal<GearItem[]>([]);
-  lenses = signal<GearItem[]>([]);
-  combos = signal<GearItem[]>([]);
-  gearLoading = signal(false);
+  protected readonly cameras = signal<GearItem[]>([]);
+  protected readonly lenses = signal<GearItem[]>([]);
+  protected readonly combos = signal<GearItem[]>([]);
+  protected readonly gearLoading = signal(false);
 
-  categoryStats = signal<CategoryStat[]>([]);
-  categoriesLoading = signal(false);
-  showGearProfileHelp = signal(false);
+  protected readonly categoryStats = signal<CategoryStat[]>([]);
+  protected readonly categoriesLoading = signal(false);
+  protected readonly showGearProfileHelp = signal(false);
 
   categoryScoreProfile = computed(() => [...this.categoryStats()].filter(c => c.avg_score > 0).sort((a, b) => b.avg_score - a.avg_score));
 
@@ -279,7 +280,7 @@ export class StatsComponent {
     { key: 'avg_f_stop' }, { key: 'avg_focal_length' }, { key: 'avg_iso' },
     { key: 'avg_score' }, { key: 'avg_aesthetic' }, { key: 'avg_sharpness' }, { key: 'avg_contrast' },
   ];
-  protected categoryMetric = signal('avg_f_stop');
+  protected readonly categoryMetric = signal('avg_f_stop');
   protected readonly categoryMetricData = computed(() => {
     const metric = this.categoryMetric() as keyof CategoryStat;
     return [...this.categoryStats()]
@@ -287,10 +288,10 @@ export class StatsComponent {
       .sort((a, b) => (b[metric] as number) - (a[metric] as number));
   });
 
-  scoreBins = signal<ScoreBin[]>([]);
-  scoreLoading = signal(false);
+  protected readonly scoreBins = signal<ScoreBin[]>([]);
+  protected readonly scoreLoading = signal(false);
 
-  topCameras = signal<TopCamera[]>([]);
+  protected readonly topCameras = signal<TopCamera[]>([]);
 
   constructor() {
     // Initialize filters from URL
@@ -317,7 +318,7 @@ export class StatsComponent {
       this.statsFilters.filterCategory();
       this.statsFilters.dateFrom();
       this.statsFilters.dateTo();
-      this.loadAll();
+      untracked(() => this.loadAll());
     });
 
     // Destroy Chart.js instances and clear shared state on component teardown
@@ -327,7 +328,7 @@ export class StatsComponent {
       this.statsFilters.overview.set(null);
     });
 
-    // Chart effects
+    // Chart effects — canvas refs must be tracked so charts render on tab switch
     effect(() => {
       const cats = this.categoryStats();
       const color = this.themeService.complementaryColor();
@@ -447,7 +448,18 @@ export class StatsComponent {
 
   private buildHorizontalBar(id: string, ref: ElementRef<HTMLCanvasElement> | undefined, labels: string[], data: number[], color: string): void {
     if (!ref || data.length === 0) return;
+    // Skip rebuild if same canvas ref and chart already exists — just update data
+    const existing = this.charts.get(id);
+    if (existing && this.chartRefs.get(id) === ref) {
+      existing.data.labels = labels;
+      existing.data.datasets[0].data = data;
+      existing.data.datasets[0].backgroundColor = color + 'cc';
+      existing.data.datasets[0].borderColor = color;
+      existing.update('none');
+      return;
+    }
     this.destroyChart(id);
+    this.chartRefs.set(id, ref);
     const ctx = ref.nativeElement.getContext('2d');
     if (!ctx) return;
     this.charts.set(id, new Chart(ctx, {
@@ -479,7 +491,21 @@ export class StatsComponent {
     datasets: { label: string; data: number[]; color: string }[],
   ): void {
     if (!ref || labels.length === 0) return;
+    const existing = this.charts.get(id);
+    if (existing && this.chartRefs.get(id) === ref) {
+      existing.data.labels = labels;
+      datasets.forEach((d, i) => {
+        if (existing.data.datasets[i]) {
+          existing.data.datasets[i].data = d.data;
+          (existing.data.datasets[i] as any).backgroundColor = d.color + 'bb';
+          (existing.data.datasets[i] as any).borderColor = d.color;
+        }
+      });
+      existing.update('none');
+      return;
+    }
     this.destroyChart(id);
+    this.chartRefs.set(id, ref);
     const ctx = ref.nativeElement.getContext('2d');
     if (!ctx) return;
     this.charts.set(id, new Chart(ctx, {
@@ -509,7 +535,17 @@ export class StatsComponent {
 
   private buildVerticalBar(id: string, ref: ElementRef<HTMLCanvasElement> | undefined, labels: string[], data: number[], color: string): void {
     if (!ref || data.length === 0) return;
+    const existing = this.charts.get(id);
+    if (existing && this.chartRefs.get(id) === ref) {
+      existing.data.labels = labels;
+      existing.data.datasets[0].data = data;
+      existing.data.datasets[0].backgroundColor = color + 'cc';
+      existing.data.datasets[0].borderColor = color;
+      existing.update('none');
+      return;
+    }
     this.destroyChart(id);
+    this.chartRefs.set(id, ref);
     const ctx = ref.nativeElement.getContext('2d');
     if (!ctx) return;
     this.charts.set(id, new Chart(ctx, {
@@ -538,6 +574,7 @@ export class StatsComponent {
     if (existing) {
       existing.destroy();
       this.charts.delete(id);
+      this.chartRefs.delete(id);
     }
   }
 }

@@ -3,14 +3,12 @@ import { RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ThumbnailUrlPipe, PersonThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
 import { InfiniteScrollDirective } from '../../shared/directives/infinite-scroll.directive';
-import { ShareDialogComponent, ShareDialogData } from '../../shared/components/share-dialog/share-dialog.component';
 
 interface PersonPhoto {
   path: string;
@@ -33,7 +31,6 @@ interface PersonPhotosResponse {
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule,
-    MatDialogModule,
     TranslatePipe,
     ThumbnailUrlPipe,
     PersonThumbnailUrlPipe,
@@ -62,9 +59,6 @@ interface PersonPhotosResponse {
               {{ 'persons.photo_count' | translate:{ count: total() } }}
             </p>
           </div>
-          <button mat-icon-button class="ml-auto" (click)="openShareDialog()">
-            <mat-icon>share</mat-icon>
-          </button>
         }
       </div>
 
@@ -113,7 +107,6 @@ interface PersonPhotosResponse {
 })
 export class PersonPageComponent implements OnInit {
   private readonly api = inject(ApiService);
-  private readonly dialog = inject(MatDialog);
 
   /** Route param bound via withComponentInputBinding() */
   readonly personId = input.required<string>();
@@ -167,23 +160,4 @@ export class PersonPageComponent implements OnInit {
     }
   }
 
-  openShareDialog(): void {
-    const personId = +this.personId();
-    this.dialog.open(ShareDialogComponent, {
-      data: {
-        entityType: 'person',
-        entityId: personId,
-        autoGenerate: true,
-        i18nPrefix: 'persons',
-        generateApi: {
-          method: 'get',
-          url: `/auth/person/${personId}/share-token`,
-          extractUrl: (res: Record<string, unknown>) =>
-            `/shared/person/${personId}?token=${res['token']}`,
-        },
-      } satisfies ShareDialogData,
-      width: '95vw',
-      maxWidth: '450px',
-    });
-  }
 }

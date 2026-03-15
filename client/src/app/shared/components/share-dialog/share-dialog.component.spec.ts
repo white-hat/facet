@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { of } from 'rxjs';
+import { ApiService } from '../../../core/services/api.service';
 import { ShareDialogComponent, ShareDialogData } from './share-dialog.component';
 
 describe('ShareDialogComponent', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
-  let mockHttp: { post: jest.Mock; get: jest.Mock; delete: jest.Mock };
+  let mockApi: { post: jest.Mock; get: jest.Mock; delete: jest.Mock };
   let mockDialogRef: { close: jest.Mock };
 
   function createComponent(data: ShareDialogData) {
@@ -15,7 +15,7 @@ describe('ShareDialogComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         ShareDialogComponent,
-        { provide: HttpClient, useValue: mockHttp },
+        { provide: ApiService, useValue: mockApi },
         { provide: MatDialogRef, useValue: mockDialogRef },
         { provide: MAT_DIALOG_DATA, useValue: data },
       ],
@@ -24,7 +24,7 @@ describe('ShareDialogComponent', () => {
   }
 
   beforeEach(() => {
-    mockHttp = {
+    mockApi = {
       post: jest.fn(() => of({ share_url: '/shared/album/1?token=abc', share_token: 'abc' })),
       get: jest.fn(() => of({ token: 'xyz' })),
       delete: jest.fn(() => of({})),
@@ -52,7 +52,7 @@ describe('ShareDialogComponent', () => {
 
       await component.ngOnInit();
 
-      expect(mockHttp.post).toHaveBeenCalledWith('/api/albums/1/share', {});
+      expect(mockApi.post).toHaveBeenCalledWith('/api/albums/1/share', {});
       expect(component.shareUrl()).toBe('/shared/album/1?token=abc');
     });
 
@@ -61,7 +61,7 @@ describe('ShareDialogComponent', () => {
 
       await component.ngOnInit();
 
-      expect(mockHttp.post).not.toHaveBeenCalled();
+      expect(mockApi.post).not.toHaveBeenCalled();
       expect(component.shareUrl()).toBe('');
     });
 
@@ -70,7 +70,7 @@ describe('ShareDialogComponent', () => {
 
       await component.generateLink();
 
-      expect(mockHttp.post).toHaveBeenCalledWith('/api/albums/5/share', {});
+      expect(mockApi.post).toHaveBeenCalledWith('/api/albums/5/share', {});
       expect(component.shareUrl()).toBe('/shared/album/1?token=abc');
       expect(component.loading()).toBe(false);
     });
@@ -91,7 +91,7 @@ describe('ShareDialogComponent', () => {
 
       await component.revoke();
 
-      expect(mockHttp.delete).toHaveBeenCalledWith('/api/albums/3/share');
+      expect(mockApi.delete).toHaveBeenCalledWith('/api/albums/3/share');
       expect(component.shareUrl()).toBe('');
       expect(mockDialogRef.close).toHaveBeenCalledWith('revoked');
     });
@@ -115,7 +115,7 @@ describe('ShareDialogComponent', () => {
 
       await component.ngOnInit();
 
-      expect(mockHttp.get).toHaveBeenCalledWith('/api/auth/person/42/share-token');
+      expect(mockApi.get).toHaveBeenCalledWith('/api/auth/person/42/share-token');
       expect(component.shareUrl()).toBe('/shared/person/42?token=xyz');
     });
 
@@ -125,7 +125,7 @@ describe('ShareDialogComponent', () => {
 
       await component.revoke();
 
-      expect(mockHttp.delete).not.toHaveBeenCalled();
+      expect(mockApi.delete).not.toHaveBeenCalled();
       expect(mockDialogRef.close).not.toHaveBeenCalled();
     });
   });

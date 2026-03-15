@@ -41,12 +41,30 @@ async def api_timeline(
     hide_blinks: str = Query('0'),
     hide_bursts: str = Query('0'),
     hide_duplicates: str = Query('0'),
+    photos_per_group: Optional[int] = Query(None, ge=1, le=100),
+    sort_by: str = Query('aggregate'),
+    granularity: str = Query('day'),
     user: Optional[CurrentUser] = Depends(get_optional_user),
 ):
     """Return photos grouped by date for timeline view.
 
     Uses cursor-based pagination on DATE(date_taken).
     """
+    # Validate sort_by to prevent injection
+    if sort_by not in ('aggregate', 'date_taken', 'filename'):
+        sort_by = 'aggregate'
+    if granularity not in ('day', 'week', 'month'):
+        granularity = 'day'
+
+    # Build date expression based on granularity
+    if granularity == 'week':
+        # ISO week: group by year + week number (Monday-based)
+        date_expr = "STRFTIME('%Y-W%W', REPLACE(SUBSTR(date_taken,1,10),':','-'))"
+    elif granularity == 'month':
+        date_expr = "SUBSTR(REPLACE(SUBSTR(date_taken,1,10),':','-'),1,7)"
+    else:
+        date_expr = "DATE(REPLACE(SUBSTR(date_taken,1,10),':','-'))"
+
     user_id = user.user_id if user else None
     conn = get_db_connection()
     try:
@@ -59,26 +77,26 @@ async def api_timeline(
         where_clauses.extend(build_hide_clauses(hide_blinks, hide_bursts, hide_duplicates))
 
         if date_from:
-            where_clauses.append("DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) >= ?")
+            where_clauses.append(f"{date_expr} >= ?")
             sql_params.append(date_from)
         if date_to:
-            where_clauses.append("DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) <= ?")
+            where_clauses.append(f"{date_expr} <= ?")
             sql_params.append(date_to)
 
         if cursor:
             if direction == "newer":
-                where_clauses.append("DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) > ?")
+                where_clauses.append(f"{date_expr} > ?")
             else:
-                where_clauses.append("DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) < ?")
+                where_clauses.append(f"{date_expr} < ?")
             sql_params.append(cursor)
 
         where_str = " WHERE " + " AND ".join(where_clauses)
 
         date_order = "ASC" if direction == "newer" else "DESC"
 
-        # Fetch distinct dates with counts
+        # Fetch distinct date groups with counts
         date_query = (
-            f"SELECT DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) as photo_date, COUNT(*) as cnt "
+            f"SELECT {date_expr} as photo_date, COUNT(*) as cnt "
             f"FROM {from_clause}{where_str} "
             f"GROUP BY photo_date "
             f"ORDER BY photo_date {date_order} "
@@ -103,13 +121,21 @@ async def api_timeline(
             date_counts = {row['photo_date']: row['cnt'] for row in date_rows}
 
             # Single query: fetch top photos for ALL dates using ROW_NUMBER()
-            photos_per_group = _get_photos_per_group()
+            ppg = photos_per_group if photos_per_group is not None else _get_photos_per_group()
             placeholders = ','.join('?' * len(date_list))
+
+            # Sort order within each group
+            if sort_by == 'date_taken':
+                inner_order = "date_taken ASC, path ASC"
+            elif sort_by == 'filename':
+                inner_order = "filename ASC, path ASC"
+            else:
+                inner_order = "aggregate DESC, path ASC"
 
             batch_where = [vis_sql, "date_taken IS NOT NULL", "date_taken != ''"]
             batch_params = list(from_params) + list(vis_params)
             batch_where.extend(build_hide_clauses(hide_blinks, hide_bursts, hide_duplicates))
-            batch_where.append(f"DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) IN ({placeholders})")
+            batch_where.append(f"{date_expr} IN ({placeholders})")
             batch_params.extend(date_list)
 
             batch_where_str = " WHERE " + " AND ".join(batch_where)
@@ -117,15 +143,15 @@ async def api_timeline(
             photo_query = (
                 f"SELECT * FROM ("
                 f"  SELECT {', '.join(select_cols)}, "
-                f"    DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) AS _photo_date, "
+                f"    {date_expr} AS _photo_date, "
                 f"    ROW_NUMBER() OVER ("
-                f"      PARTITION BY DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) "
-                f"      ORDER BY aggregate DESC, path ASC"
+                f"      PARTITION BY {date_expr} "
+                f"      ORDER BY {inner_order}"
                 f"    ) AS _rn "
                 f"  FROM {from_clause}{batch_where_str}"
                 f") WHERE _rn <= ?"
             )
-            batch_params.append(photos_per_group)
+            batch_params.append(ppg)
 
             rows = conn.execute(photo_query, batch_params).fetchall()
             all_photos = split_photo_tags(rows, tags_limit)

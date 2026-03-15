@@ -61,7 +61,7 @@ describe('EditAlbumDialogComponent', () => {
         ],
       });
       const comp = TestBed.inject(EditAlbumDialogComponent);
-      expect(comp.description).toBe('');
+      expect((comp as any).description).toBe('');
     });
   });
 

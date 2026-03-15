@@ -1,19 +1,25 @@
-import { Component, inject, signal, computed, OnInit, HostListener } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnInit, HostListener, DestroyRef, ElementRef, viewChild } from '@angular/core';
 import { Location } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { Photo } from '../../shared/models/photo.model';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { I18nService } from '../../core/services/i18n.service';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
 import { ShutterSpeedPipe } from '../../shared/pipes/shutter-speed.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
 import { PersonThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
 import { CategoryLabelPipe } from '../gallery/photo-tooltip.component';
+import * as L from 'leaflet';
+import { createLeafletMap } from '../../shared/leaflet';
 
 @Component({
   selector: 'app-photo-detail',
@@ -21,6 +27,9 @@ import { CategoryLabelPipe } from '../gallery/photo-tooltip.component';
     MatIconModule,
     MatButtonModule,
     MatTooltipModule,
+    MatDialogModule,
+    MatProgressSpinnerModule,
+    MatSnackBarModule,
     FixedPipe,
     ShutterSpeedPipe,
     TranslatePipe,
@@ -99,12 +108,32 @@ import { CategoryLabelPipe } from '../gallery/photo-tooltip.component';
           }
 
           <!-- Caption -->
-          @if (p.caption) {
-            <div class="border-t border-[var(--mat-sys-outline-variant)] pt-3">
-              <div class="text-[0.625rem] uppercase tracking-wider text-[var(--mat-sys-on-surface-variant)] mb-2">{{ 'photo_detail.caption' | translate }}</div>
-              <p class="text-[var(--mat-sys-on-surface-variant)]">{{ p.caption }}</p>
+          <div class="border-t border-[var(--mat-sys-outline-variant)] pt-3">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-[0.625rem] uppercase tracking-wider text-[var(--mat-sys-on-surface-variant)]">{{ 'photo_detail.caption' | translate }}</div>
+              @if (auth.isEdition()) {
+                <div class="flex gap-1">
+                  @if (!p.caption) {
+                    <button mat-icon-button class="!w-7 !h-7 !p-0" (click)="generateCaption(p.path)" [disabled]="generatingCaption()" [matTooltip]="'photo_detail.generate_caption' | translate">
+                      @if (generatingCaption()) {
+                        <mat-spinner diameter="16" />
+                      } @else {
+                        <mat-icon class="!text-base !w-4 !h-4 !leading-4">auto_fix_high</mat-icon>
+                      }
+                    </button>
+                  }
+                  <button mat-icon-button class="!w-7 !h-7 !p-0" (click)="editCaption(p)" [matTooltip]="'photo_detail.edit_caption' | translate">
+                    <mat-icon class="!text-base !w-4 !h-4 !leading-4">edit</mat-icon>
+                  </button>
+                </div>
+              }
             </div>
-          }
+            @if (p.caption) {
+              <p class="text-[var(--mat-sys-on-surface-variant)]">{{ p.caption }}</p>
+            } @else {
+              <p class="text-[var(--mat-sys-on-surface-variant)] opacity-40 italic text-xs">&mdash;</p>
+            }
+          </div>
 
           <!-- Quality section -->
           <div class="border-t border-[var(--mat-sys-outline-variant)] pt-3">
@@ -249,6 +278,15 @@ import { CategoryLabelPipe } from '../gallery/photo-tooltip.component';
             </div>
           }
 
+          <!-- Location -->
+          @if (p.gps_latitude != null && p.gps_longitude != null) {
+            <div class="border-t border-[var(--mat-sys-outline-variant)] pt-3">
+              <div class="text-[0.625rem] uppercase tracking-wider text-[var(--mat-sys-on-surface-variant)] mb-2">{{ 'photo_detail.location' | translate }}</div>
+              <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
+              <div #locationMapContainer class="w-full h-40 rounded-lg overflow-hidden"></div>
+            </div>
+          }
+
           <!-- Tags section -->
           @if (p.tags_list.length) {
             <div class="border-t border-[var(--mat-sys-outline-variant)] pt-3">
@@ -295,10 +333,57 @@ export class PhotoDetailComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
   protected readonly auth = inject(AuthService);
+  private readonly dialog = inject(MatDialog);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly i18n = inject(I18nService);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly photo = signal<Photo | null>(null);
   protected readonly fullImageLoaded = signal(false);
+  protected readonly generatingCaption = signal(false);
   protected readonly stars: readonly number[] = [1, 2, 3, 4, 5];
+
+  // Location map
+  private readonly locationMapContainer = viewChild<ElementRef<HTMLDivElement>>('locationMapContainer');
+  private locationMap: L.Map | null = null;
+  private locationMapTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  private locationMapEffect = effect(() => {
+    const container = this.locationMapContainer();
+    const p = this.photo();
+    if (!container || !p || p.gps_latitude == null || p.gps_longitude == null) return;
+
+    if (this.locationMapTimeout !== null) {
+      clearTimeout(this.locationMapTimeout);
+      this.locationMapTimeout = null;
+    }
+    if (this.locationMap) {
+      this.locationMap.remove();
+      this.locationMap = null;
+    }
+
+    this.locationMapTimeout = setTimeout(() => {
+      this.locationMapTimeout = null;
+      const map = createLeafletMap(container.nativeElement, {
+        zoomControl: false,
+        attributionControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        touchZoom: false,
+      }).setView([p.gps_latitude!, p.gps_longitude!], 13);
+
+      L.marker([p.gps_latitude!, p.gps_longitude!]).addTo(map);
+      this.locationMap = map;
+    }, 0);
+  });
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.locationMapTimeout !== null) clearTimeout(this.locationMapTimeout);
+      if (this.locationMap) { this.locationMap.remove(); this.locationMap = null; }
+    });
+  }
 
   protected readonly fullImageUrl = computed(() => {
     const p = this.photo();
@@ -378,5 +463,33 @@ export class PhotoDetailComponent implements OnInit {
     if (!p) return;
     const res = await firstValueFrom(this.api.post<{ is_rejected: boolean; is_favorite: boolean | null }>('/photo/toggle_rejected', { photo_path: path }));
     this.photo.set({ ...p, is_rejected: res.is_rejected, is_favorite: res.is_favorite === null ? p.is_favorite : res.is_favorite });
+  }
+
+  protected async generateCaption(path: string): Promise<void> {
+    this.generatingCaption.set(true);
+    try {
+      const res = await firstValueFrom(this.api.get<{ caption: string }>('/caption', { path }));
+      const p = this.photo();
+      if (p) this.photo.set({ ...p, caption: res.caption });
+    } catch {
+      this.snackBar.open(this.i18n.t('photo_detail.caption_error'), '', { duration: 3000 });
+    } finally {
+      this.generatingCaption.set(false);
+    }
+  }
+
+  protected editCaption(p: Photo): void {
+    import('./caption-edit-dialog.component').then(m => {
+      const ref = this.dialog.open(m.CaptionEditDialogComponent, {
+        width: '95vw',
+        maxWidth: '500px',
+        data: { path: p.path, filename: p.filename, caption: p.caption || '' },
+      });
+      ref.afterClosed().subscribe(result => {
+        if (result !== undefined) {
+          this.photo.set({ ...p, caption: result || null });
+        }
+      });
+    });
   }
 }

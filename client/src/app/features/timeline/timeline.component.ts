@@ -4,21 +4,17 @@ import {
   signal,
   effect,
   OnInit,
-  Pipe,
-  PipeTransform,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { DecimalPipe, DatePipe } from '@angular/common';
-
-@Pipe({ name: 'toLocalDate', standalone: true })
-export class ToLocalDatePipe implements PipeTransform {
-  transform(dateStr: string): Date {
-    return new Date(dateStr + 'T12:00:00');
-  }
-}
+import { DecimalPipe } from '@angular/common';
+import { TimelineDatePipe } from './timeline-date.pipe';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSliderModule } from '@angular/material/slider';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { TimelineFiltersService } from './timeline-filters.service';
@@ -43,15 +39,18 @@ interface TimelineResponse {
   selector: 'app-timeline',
   standalone: true,
   imports: [
+    FormsModule,
     MatIconModule,
     MatButtonModule,
     MatProgressSpinnerModule,
+    MatSliderModule,
+    MatFormFieldModule,
+    MatSelectModule,
     TranslatePipe,
     ThumbnailUrlPipe,
     InfiniteScrollDirective,
     DecimalPipe,
-    DatePipe,
-    ToLocalDatePipe,
+    TimelineDatePipe,
   ],
   host: { class: 'block h-full overflow-auto' },
   template: `
@@ -68,6 +67,35 @@ interface TimelineResponse {
       </div>
     }
 
+    @if (groups().length > 0 || !loading()) {
+      <!-- Inline settings toolbar -->
+      <div class="flex items-center gap-3 flex-wrap px-4 pt-3 pb-1 max-w-[1800px] mx-auto">
+        <mat-form-field class="w-32" subscriptSizing="dynamic">
+          <mat-label>{{ 'timeline.granularity' | translate }}</mat-label>
+          <mat-select [ngModel]="filters.granularity()" (ngModelChange)="filters.granularity.set($event)">
+            @for (g of granularityOptions; track g) {
+              <mat-option [value]="g">{{ 'timeline.granularity_' + g | translate }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field class="w-36" subscriptSizing="dynamic">
+          <mat-label>{{ 'timeline.sort_within' | translate }}</mat-label>
+          <mat-select [ngModel]="filters.sortBy()" (ngModelChange)="filters.sortBy.set($event)">
+            <mat-option value="aggregate">{{ 'gallery.sort_aggregate' | translate }}</mat-option>
+            <mat-option value="date_taken">{{ 'gallery.sort_date' | translate }}</mat-option>
+            <mat-option value="filename">{{ 'timeline.sort_filename' | translate }}</mat-option>
+          </mat-select>
+        </mat-form-field>
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs opacity-60 shrink-0">{{ 'timeline.photos_per_group' | translate }}</span>
+          <mat-slider class="!w-24 !min-w-0" [min]="5" [max]="50" [step]="5" [discrete]="true">
+            <input matSliderThumb [ngModel]="filters.photosPerGroup()" (ngModelChange)="onPhotosPerGroupChange($event)" />
+          </mat-slider>
+          <span class="text-xs font-medium w-6 text-right">{{ filters.photosPerGroup() }}</span>
+        </div>
+      </div>
+    }
+
     @if (groups().length > 0) {
       <div class="px-4 pt-2 pb-4 max-w-[1800px] mx-auto space-y-3">
         @for (group of groups(); track group.date) {
@@ -80,7 +108,7 @@ interface TimelineResponse {
               (click)="navigateToDate(group.date)">
               <mat-icon class="!text-lg !w-5 !h-5 !leading-5 opacity-70">calendar_today</mat-icon>
               <span class="font-semibold text-sm">
-                {{ group.date | toLocalDate | date:'fullDate' }}
+                {{ group.date | timelineDate }}
               </span>
               <span class="text-xs opacity-60 ml-1">
                 ({{ group.count | number }})
@@ -147,7 +175,7 @@ interface TimelineResponse {
 export class TimelineComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
-  private readonly filters = inject(TimelineFiltersService);
+  protected readonly filters = inject(TimelineFiltersService);
 
   protected readonly groups = signal<TimelineGroup[]>([]);
   protected readonly loading = signal(false);
@@ -155,14 +183,20 @@ export class TimelineComponent implements OnInit {
   protected readonly hasMore = signal(false);
   protected readonly nextCursor = signal<string | null>(null);
 
+  protected readonly granularityOptions: ('day' | 'week' | 'month')[] = ['day', 'week', 'month'];
+
   private initialized = false;
   private loadVersion = 0;
+  private ppgTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     effect(() => {
       this.filters.dateFrom();
       this.filters.dateTo();
       this.filters.sortDirection();
+      this.filters.photosPerGroup();
+      this.filters.sortBy();
+      this.filters.granularity();
       if (this.initialized) {
         this.groups.set([]);
         this.nextCursor.set(null);
@@ -171,18 +205,36 @@ export class TimelineComponent implements OnInit {
     });
   }
 
+  protected onPhotosPerGroupChange(value: number): void {
+    if (this.ppgTimeout) clearTimeout(this.ppgTimeout);
+    this.ppgTimeout = setTimeout(() => {
+      this.filters.photosPerGroup.set(value);
+    }, 300);
+  }
+
   ngOnInit(): void {
     this.initialized = true;
     this.loadInitial();
+  }
+
+  private buildParams(): Record<string, string | number> {
+    const params: Record<string, string | number> = {
+      limit: 30,
+      direction: this.filters.sortDirection(),
+      photos_per_group: this.filters.photosPerGroup(),
+      sort_by: this.filters.sortBy(),
+      granularity: this.filters.granularity(),
+    };
+    if (this.filters.dateFrom()) params['date_from'] = this.filters.dateFrom();
+    if (this.filters.dateTo()) params['date_to'] = this.filters.dateTo();
+    return params;
   }
 
   private async loadInitial(): Promise<void> {
     const version = ++this.loadVersion;
     this.loading.set(true);
     try {
-      const params: Record<string, string | number> = { limit: 30, direction: this.filters.sortDirection() };
-      if (this.filters.dateFrom()) params['date_from'] = this.filters.dateFrom();
-      if (this.filters.dateTo()) params['date_to'] = this.filters.dateTo();
+      const params = this.buildParams();
       const res = await firstValueFrom(
         this.api.get<TimelineResponse>('/timeline', params),
       );
@@ -203,9 +255,8 @@ export class TimelineComponent implements OnInit {
 
     this.loadingMore.set(true);
     try {
-      const params: Record<string, string | number> = { cursor, limit: 30, direction: this.filters.sortDirection() };
-      if (this.filters.dateFrom()) params['date_from'] = this.filters.dateFrom();
-      if (this.filters.dateTo()) params['date_to'] = this.filters.dateTo();
+      const params = this.buildParams();
+      params['cursor'] = cursor;
       const res = await firstValueFrom(
         this.api.get<TimelineResponse>('/timeline', params),
       );
@@ -223,11 +274,42 @@ export class TimelineComponent implements OnInit {
     }
   }
 
+  /** Convert a timeline group date key to a [from, to] date range. */
+  private dateRange(date: string): { from: string; to: string } {
+    // Week: "2025-W46" → Monday to Sunday of that ISO week
+    const weekMatch = date.match(/^(\d{4})-W(\d{2})$/);
+    if (weekMatch) {
+      const year = +weekMatch[1];
+      const week = +weekMatch[2];
+      // ISO week: Jan 4 is always in week 1. Find Monday of the given week.
+      const jan4 = new Date(year, 0, 4);
+      const dayOfWeek = jan4.getDay() || 7; // Monday=1..Sunday=7
+      const monday = new Date(jan4);
+      monday.setDate(jan4.getDate() - dayOfWeek + 1 + (week - 1) * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      return { from: this.formatYmd(monday), to: this.formatYmd(sunday) };
+    }
+    // Month: "2025-11" → first to last day
+    if (/^\d{4}-\d{2}$/.test(date)) {
+      const [y, m] = date.split('-').map(Number);
+      const last = new Date(y, m, 0).getDate(); // day 0 of next month = last day
+      return { from: `${date}-01`, to: `${date}-${String(last).padStart(2, '0')}` };
+    }
+    // Day: as-is
+    return { from: date, to: date };
+  }
+
+  private formatYmd(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   protected navigateToDate(date: string): void {
+    const range = this.dateRange(date);
     this.router.navigate(['/'], {
       queryParams: {
-        date_from: date,
-        date_to: date,
+        date_from: range.from,
+        date_to: range.to,
         sort: 'date_taken',
         sort_direction: 'DESC',
       },
@@ -235,10 +317,11 @@ export class TimelineComponent implements OnInit {
   }
 
   protected openPhoto(_photo: Photo, date: string): void {
+    const range = this.dateRange(date);
     this.router.navigate(['/'], {
       queryParams: {
-        date_from: date,
-        date_to: date,
+        date_from: range.from,
+        date_to: range.to,
         sort: 'aggregate',
         sort_direction: 'DESC',
       },

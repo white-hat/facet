@@ -190,7 +190,8 @@
     "subject_sharpness": "Netteté sujet",
     "subject_prominence": "Proéminence",
     "subject_placement": "Placement",
-    "bg_separation": "Séparation fond"
+    "bg_separation": "Séparation fond",
+    "caption": "Légende"
   },
   "notifications": {
     "copied": "Copie !",
@@ -985,7 +986,7 @@
     "sort_desc": "Decroissant",
     "sort_asc": "Croissant",
     "filters": "Filtres",
-    "search_placeholder": "Rechercher des photos...",
+    "search_placeholder": "Chercher nom, légende...",
     "semantic_search": "Recherche semantique",
     "semantic_search_placeholder": "coucher de soleil a la plage...",
     "photo_count": "{count} photos",
@@ -1039,8 +1040,14 @@
       "saliency": "Saillance du sujet",
       "exposure_range": "Exposition & Plage",
       "ratings": "Notes",
-      "add_filter": "Ajouter un filtre..."
+      "add_filter": "Ajouter un filtre...",
+      "semantic_search": "Recherche sémantique",
+      "location": "Localisation"
     },
+    "semantic_search_info": "La recherche sémantique charge les embeddings en mémoire au premier usage. Cela peut prendre un moment pour les grandes bibliothèques.",
+    "select_on_map": "Sélectionner sur la carte",
+    "gps_radius": "Rayon",
+    "gps_clear": "Effacer la localisation",
     "hide_rejected": "Masquer rejetes",
     "favorites_only": "Favoris uniquement",
     "monochrome_only": "Monochrome uniquement",
@@ -1478,11 +1485,11 @@
     }
   },
   "culling": {
-    "title": "Tri des rafales",
-    "no_bursts": "Aucun groupe de rafale trouve",
+    "title": "Sélection",
+    "no_bursts": "Aucun groupe à examiner",
     "group_progress": "Groupe {current} sur {total}",
-    "auto_best": "MEILLEUR AUTO",
-    "confirm": "Confirmer la selection",
+    "auto_best": "MEILLEUR",
+    "confirm": "Confirmer",
     "skip": "Passer",
     "auto_select_all": "Selection auto complete",
     "confirm_tooltip": "Garder les photos sélectionnées, écarter le reste",
@@ -1499,7 +1506,15 @@
     "similarity_threshold": "Seuil de similarité",
     "burst_help": "Les photos prises en rafale sont regroupées ensemble. Cliquez sur les photos à conserver (bordure verte), les photos non sélectionnées (bordure rouge) seront masquées. La meilleure photo est automatiquement sélectionnée en fonction de la netteté et de la qualité.",
     "similar_help": "Les photos visuellement similaires de votre bibliothèque sont regroupées grâce aux embeddings IA. Examinez chaque groupe, conservez les meilleurs clichés et écartez les quasi-doublons. Ajustez le curseur de seuil pour contrôler le degré de similarité nécessaire pour former un groupe.",
-    "help": "Aide"
+    "help": "Aide",
+    "help_text": "Examinez les groupes de photos similaires ou en rafale. Cliquez pour sélectionner, double-cliquez pour sélectionner exclusivement. Les groupes confirmés masquent les photos rejetées de la galerie.",
+    "type_burst": "Rafale",
+    "type_similar": "Similaire",
+    "confirm_all": "Tout confirmer",
+    "confirmed_badge": "Confirmé",
+    "photos": "photos",
+    "threshold": "Similarité",
+    "load_more": "Charger plus"
   },
   "memories": {
     "title": "Ce jour-là",
@@ -1522,7 +1537,14 @@
     "photos_on_date": "{count} photos",
     "empty": "Aucune photo avec des dates trouvée.",
     "more": "plus",
-    "load_more": "Charger plus"
+    "load_more": "Charger plus",
+    "granularity": "Grouper par",
+    "granularity_day": "Jour",
+    "granularity_week": "Semaine",
+    "granularity_month": "Mois",
+    "sort_within": "Tri",
+    "sort_filename": "Nom de fichier",
+    "photos_per_group": "Photos"
   },
   "albums_sharing": {
     "share": "Partager l'album",
@@ -1537,14 +1559,20 @@
     "auto_generate_confirm": "Cela créera des albums basés sur la date et la similarité visuelle. Continuer ?",
     "auto_generating": "Génération des albums...",
     "auto_generated": "{count} albums créés",
-    "error_generating": "Échec de la génération automatique des albums"
+    "error_generating": "Échec de la génération automatique des albums",
+    "settings_title": "Paramètres de génération automatique",
+    "min_photos": "Photos minimum par album",
+    "time_gap": "Écart temporel entre événements (heures)",
+    "embedding_threshold": "Seuil de similarité visuelle"
   },
   "map": {
     "title": "Carte",
     "no_gps": "Aucune photo avec données GPS trouvée",
     "photos_count": "{count} photos avec localisation",
     "cluster_photos": "{count} photos",
-    "score": "Score : {score}"
+    "score": "Score : {score}",
+    "date_from": "Du",
+    "date_to": "Au"
   },
   "photo_detail": {
     "back": "Retour",
@@ -1560,6 +1588,11 @@
     "tags": "Mots-clés",
     "rating": "Note",
     "favorite": "Favori",
-    "rejected": "Rejeté"
+    "rejected": "Rejeté",
+    "generate_caption": "Générer",
+    "edit_caption": "Modifier",
+    "caption_edit_title": "Modifier la légende",
+    "caption_error": "Échec de la génération de la légende",
+    "location": "Localisation"
   }
 }

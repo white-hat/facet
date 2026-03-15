@@ -3,7 +3,7 @@ import { of, throwError } from 'rxjs';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/services/api.service';
 import { I18nService } from '../../core/services/i18n.service';
-import { BurstCullingComponent, IsKeptPipe, IsDecidedPipe } from './burst-culling.component';
+import { BurstCullingComponent, IsKeptPipe, IsDecidedPipe, IsConfirmedPipe } from './burst-culling.component';
 
 describe('BurstCullingComponent', () => {
   let component: BurstCullingComponent;
@@ -11,10 +11,12 @@ describe('BurstCullingComponent', () => {
   let mockSnackBar: { open: jest.Mock };
   let mockI18n: { t: jest.Mock };
 
-  const mockBurstGroupsResponse = {
+  const mockCullingGroupsResponse = {
     groups: [
       {
-        burst_id: 1,
+        group_id: 1,
+        type: 'burst',
+        reason: '0.8s apart',
         photos: [
           { path: '/photo1.jpg', filename: 'photo1.jpg', aggregate: 8.5, aesthetic: 7.0, tech_sharpness: 6.0, is_blink: 0, is_burst_lead: 1, date_taken: '2024-01-01', burst_score: 9.0 },
           { path: '/photo2.jpg', filename: 'photo2.jpg', aggregate: 7.0, aesthetic: 6.5, tech_sharpness: 5.5, is_blink: 0, is_burst_lead: 0, date_taken: '2024-01-01', burst_score: 7.0 },
@@ -24,7 +26,9 @@ describe('BurstCullingComponent', () => {
         count: 3,
       },
       {
-        burst_id: 2,
+        group_id: 2,
+        type: 'similar',
+        reason: '85% similar',
         photos: [
           { path: '/photo4.jpg', filename: 'photo4.jpg', aggregate: 9.0, aesthetic: 8.5, tech_sharpness: 7.0, is_blink: 0, is_burst_lead: 1, date_taken: '2024-01-02', burst_score: 9.5 },
           { path: '/photo5.jpg', filename: 'photo5.jpg', aggregate: 6.0, aesthetic: 5.0, tech_sharpness: 5.0, is_blink: 0, is_burst_lead: 0, date_taken: '2024-01-02', burst_score: 5.5 },
@@ -41,7 +45,7 @@ describe('BurstCullingComponent', () => {
 
   beforeEach(() => {
     mockApi = {
-      get: jest.fn(() => of(mockBurstGroupsResponse)),
+      get: jest.fn(() => of(mockCullingGroupsResponse)),
       post: jest.fn(() => of({})),
     };
     mockSnackBar = { open: jest.fn() };
@@ -59,15 +63,8 @@ describe('BurstCullingComponent', () => {
   });
 
   describe('initial state', () => {
-    it('should start with loading true', () => {
-      // The constructor calls loadGroups which sets loading true initially
-      // After awaiting, loading becomes false. Since the mock resolves immediately,
-      // by the time we check, it may already be false.
+    it('should have loading as a signal function', () => {
       expect(typeof component['loading']).toBe('function');
-    });
-
-    it('should start with currentIndex 0', () => {
-      expect(component['currentIndex']()).toBe(0);
     });
 
     it('should start with confirming false', () => {
@@ -76,23 +73,17 @@ describe('BurstCullingComponent', () => {
   });
 
   describe('loadGroups', () => {
-    it('should load burst groups from API', async () => {
-      await component.loadGroups();
+    it('should load culling groups from API', async () => {
+      await (component as any).loadGroups();
 
-      expect(mockApi.get).toHaveBeenCalledWith('/burst-groups', { page: 1, per_page: 20 });
+      expect(mockApi.get).toHaveBeenCalledWith('/culling-groups', expect.objectContaining({ page: 1, per_page: 20 }));
       expect(component['groups']()).toHaveLength(2);
       expect(component['totalGroups']()).toBe(2);
       expect(component['loading']()).toBe(false);
     });
 
-    it('should set currentIndex to 0 after loading', async () => {
-      await component.loadGroups();
-
-      expect(component['currentIndex']()).toBe(0);
-    });
-
     it('should auto-select best photo in each group', async () => {
-      await component.loadGroups();
+      await (component as any).loadGroups();
 
       const selections = component['selectionsMap']();
       expect(selections.get(1)?.has('/photo1.jpg')).toBe(true);
@@ -101,11 +92,11 @@ describe('BurstCullingComponent', () => {
 
     it('should not create selection entry for groups without best_path', async () => {
       mockApi.get.mockReturnValue(of({
-        groups: [{ burst_id: 10, photos: [], best_path: '', count: 0 }],
+        groups: [{ group_id: 10, type: 'burst', reason: '', photos: [], best_path: '', count: 0 }],
         total_groups: 1, page: 1, per_page: 20, total_pages: 1,
       }));
 
-      await component.loadGroups();
+      await (component as any).loadGroups();
 
       const selections = component['selectionsMap']();
       expect(selections.has(10)).toBe(false);
@@ -114,64 +105,77 @@ describe('BurstCullingComponent', () => {
     it('should set loading false on error', async () => {
       mockApi.get.mockReturnValue(throwError(() => new Error('Network error')));
 
-      await component.loadGroups();
+      await (component as any).loadGroups();
 
       expect(component['loading']()).toBe(false);
     });
 
     it('should retain existing groups on error (no reset)', async () => {
       // First load succeeds
-      await component.loadGroups();
+      await (component as any).loadGroups();
       expect(component['groups']()).toHaveLength(2);
 
       // Second load fails — groups remain from the first load
       mockApi.get.mockReturnValue(throwError(() => new Error('Network error')));
-      await component.loadGroups();
+      await (component as any).loadGroups();
 
       expect(component['groups']()).toHaveLength(2);
     });
   });
 
-  describe('currentGroup', () => {
-    it('should return the group at currentIndex', async () => {
-      await component.loadGroups();
+  describe('loadMore', () => {
+    it('should append groups from the next page', async () => {
+      await (component as any).loadGroups();
+      component['totalPages'].set(2);
 
-      const group = component['currentGroup']();
-      expect(group.burst_id).toBe(1);
+      const page2Response = {
+        groups: [{ group_id: 3, type: 'burst', reason: '1s apart', photos: [], best_path: '', count: 0 }],
+        total_groups: 3, page: 2, per_page: 20, total_pages: 2,
+      };
+      mockApi.get.mockReturnValue(of(page2Response));
+
+      await (component as any).loadMore();
+
+      expect(component['groups']()).toHaveLength(3);
+      expect(component['currentPage']()).toBe(2);
     });
 
-    it('should update when currentIndex changes', async () => {
-      await component.loadGroups();
-      component['currentIndex'].set(1);
+    it('should not load if no more pages', async () => {
+      await (component as any).loadGroups();
+      mockApi.get.mockClear();
 
-      const group = component['currentGroup']();
-      expect(group.burst_id).toBe(2);
+      await (component as any).loadMore();
+
+      expect(mockApi.get).not.toHaveBeenCalled();
     });
   });
 
   describe('toggleSelection', () => {
     beforeEach(async () => {
-      await component.loadGroups();
+      await (component as any).loadGroups();
     });
 
     it('should add a photo to the selection when not already selected', () => {
-      component['toggleSelection']('/photo2.jpg');
+      const group = component['groups']()[0];
+      component['toggleSelection']('/photo2.jpg', group);
 
       const kept = component['selectionsMap']().get(1);
       expect(kept?.has('/photo2.jpg')).toBe(true);
     });
 
     it('should remove a photo from the selection when already selected', () => {
+      const group = component['groups']()[0];
       // photo1.jpg is auto-selected as best_path
-      component['toggleSelection']('/photo1.jpg');
+      component['toggleSelection']('/photo1.jpg', group);
 
       const kept = component['selectionsMap']().get(1);
       expect(kept?.has('/photo1.jpg')).toBe(false);
     });
 
     it('should allow multiple photos to be selected', () => {
-      component['toggleSelection']('/photo2.jpg');
-      component['toggleSelection']('/photo3.jpg');
+      const group = component['groups']()[0];
+      component['toggleSelection']('/photo2.jpg', group);
+      component['toggleSelection']('/photo3.jpg', group);
 
       const kept = component['selectionsMap']().get(1);
       expect(kept?.has('/photo1.jpg')).toBe(true); // auto-selected
@@ -181,7 +185,8 @@ describe('BurstCullingComponent', () => {
 
     it('should not mutate original map', () => {
       const originalMap = component['selectionsMap']();
-      component['toggleSelection']('/photo2.jpg');
+      const group = component['groups']()[0];
+      component['toggleSelection']('/photo2.jpg', group);
       const newMap = component['selectionsMap']();
 
       expect(newMap).not.toBe(originalMap);
@@ -190,23 +195,34 @@ describe('BurstCullingComponent', () => {
 
   describe('confirmGroup', () => {
     beforeEach(async () => {
-      await component.loadGroups();
+      await (component as any).loadGroups();
       mockApi.post.mockReturnValue(of({}));
     });
 
     it('should post selected paths to API', async () => {
-      await component['confirmGroup']();
+      const group = component['groups']()[0];
+      await component['confirmGroup'](group);
 
-      expect(mockApi.post).toHaveBeenCalledWith('/burst-groups/select', {
-        burst_id: 1,
+      expect(mockApi.post).toHaveBeenCalledWith('/culling-groups/confirm', {
+        group_id: 1,
+        type: 'burst',
+        paths: ['/photo1.jpg', '/photo2.jpg', '/photo3.jpg'],
         keep_paths: ['/photo1.jpg'],
       });
     });
 
     it('should show snackbar on success', async () => {
-      await component['confirmGroup']();
+      const group = component['groups']()[0];
+      await component['confirmGroup'](group);
 
       expect(mockSnackBar.open).toHaveBeenCalledWith('culling.confirmed', '', { duration: 2000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+    });
+
+    it('should add group to confirmedGroups on success', async () => {
+      const group = component['groups']()[0];
+      await component['confirmGroup'](group);
+
+      expect(component['confirmedGroups']().has('1_burst')).toBe(true);
     });
 
     it('should set confirming to true during request', async () => {
@@ -216,38 +232,34 @@ describe('BurstCullingComponent', () => {
         return of({});
       });
 
-      await component['confirmGroup']();
+      const group = component['groups']()[0];
+      await component['confirmGroup'](group);
 
       expect(confirmingDuringRequest).toBe(true);
     });
 
     it('should set confirming back to false after request', async () => {
-      await component['confirmGroup']();
+      const group = component['groups']()[0];
+      await component['confirmGroup'](group);
 
       expect(component['confirming']()).toBe(false);
-    });
-
-    it('should move to next group after confirming', async () => {
-      expect(component['currentIndex']()).toBe(0);
-
-      await component['confirmGroup']();
-
-      expect(component['currentIndex']()).toBe(1);
     });
 
     it('should not post if no photos are selected', async () => {
       // Clear the auto-selection
       component['selectionsMap'].set(new Map());
+      const group = component['groups']()[0];
 
-      await component['confirmGroup']();
+      await component['confirmGroup'](group);
 
       expect(mockApi.post).not.toHaveBeenCalled();
     });
 
     it('should set confirming false on API error', async () => {
       mockApi.post.mockReturnValue(throwError(() => new Error('Server error')));
+      const group = component['groups']()[0];
 
-      await component['confirmGroup']();
+      await component['confirmGroup'](group);
 
       expect(component['confirming']()).toBe(false);
     });
@@ -255,135 +267,79 @@ describe('BurstCullingComponent', () => {
 
   describe('skipGroup', () => {
     beforeEach(async () => {
-      await component.loadGroups();
+      await (component as any).loadGroups();
     });
 
-    it('should move to next group without posting', () => {
-      component['skipGroup']();
+    it('should add group to confirmedGroups without posting', () => {
+      const group = component['groups']()[0];
+      component['skipGroup'](group);
 
-      expect(component['currentIndex']()).toBe(1);
+      expect(component['confirmedGroups']().has('1_burst')).toBe(true);
       expect(mockApi.post).not.toHaveBeenCalled();
     });
   });
 
-  describe('autoSelectAll', () => {
+  describe('confirmAllRemaining', () => {
     beforeEach(async () => {
-      await component.loadGroups();
+      await (component as any).loadGroups();
       mockApi.post.mockReturnValue(of({}));
     });
 
     it('should post best_path for each remaining group', async () => {
-      await component['autoSelectAll']();
+      await component['confirmAllRemaining']();
 
-      expect(mockApi.post).toHaveBeenCalledWith('/burst-groups/select', {
-        burst_id: 1,
+      expect(mockApi.post).toHaveBeenCalledWith('/culling-groups/confirm', expect.objectContaining({
+        group_id: 1,
+        type: 'burst',
         keep_paths: ['/photo1.jpg'],
-      });
-      expect(mockApi.post).toHaveBeenCalledWith('/burst-groups/select', {
-        burst_id: 2,
+      }));
+      expect(mockApi.post).toHaveBeenCalledWith('/culling-groups/confirm', expect.objectContaining({
+        group_id: 2,
+        type: 'similar',
         keep_paths: ['/photo4.jpg'],
-      });
+      }));
     });
 
-    it('should show snackbar on success', async () => {
-      await component['autoSelectAll']();
+    it('should mark all groups as confirmed', async () => {
+      await component['confirmAllRemaining']();
 
-      expect(mockSnackBar.open).toHaveBeenCalledWith('culling.confirmed', '', { duration: 2000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+      expect(component['confirmedGroups']().has('1_burst')).toBe(true);
+      expect(component['confirmedGroups']().has('2_similar')).toBe(true);
     });
 
-    it('should move currentIndex to last group', async () => {
-      await component['autoSelectAll']();
+    it('should skip already confirmed groups', async () => {
+      const group = component['groups']()[0];
+      component['skipGroup'](group);
+      mockApi.post.mockClear();
 
-      expect(component['currentIndex']()).toBe(1);
+      await component['confirmAllRemaining']();
+
+      // Only group 2 should be posted (group 1 was already confirmed/skipped)
+      expect(mockApi.post).toHaveBeenCalledTimes(1);
+      expect(mockApi.post).toHaveBeenCalledWith('/culling-groups/confirm', expect.objectContaining({
+        group_id: 2,
+      }));
     });
 
     it('should set confirming false after completion', async () => {
-      await component['autoSelectAll']();
+      await component['confirmAllRemaining']();
 
       expect(component['confirming']()).toBe(false);
-    });
-
-    it('should only process groups from currentIndex onward', async () => {
-      component['currentIndex'].set(1);
-      mockApi.post.mockClear();
-
-      await component['autoSelectAll']();
-
-      // Only group at index 1 (burst_id: 2) should be posted
-      expect(mockApi.post).toHaveBeenCalledTimes(1);
-      expect(mockApi.post).toHaveBeenCalledWith('/burst-groups/select', {
-        burst_id: 2,
-        keep_paths: ['/photo4.jpg'],
-      });
-    });
-  });
-
-  describe('prev', () => {
-    beforeEach(async () => {
-      await component.loadGroups();
-    });
-
-    it('should decrement currentIndex', () => {
-      component['currentIndex'].set(1);
-      component['prev']();
-
-      expect(component['currentIndex']()).toBe(0);
-    });
-
-    it('should not go below 0', () => {
-      component['currentIndex'].set(0);
-      component['prev']();
-
-      expect(component['currentIndex']()).toBe(0);
-    });
-  });
-
-  describe('next', () => {
-    beforeEach(async () => {
-      await component.loadGroups();
-    });
-
-    it('should increment currentIndex', () => {
-      component['next']();
-
-      expect(component['currentIndex']()).toBe(1);
-    });
-
-    it('should not exceed groups length when no more pages', () => {
-      component['currentIndex'].set(1);
-      component['next']();
-
-      expect(component['currentIndex']()).toBe(1);
-    });
-
-    it('should load next page when at last group and more pages exist', async () => {
-      mockApi.get.mockReturnValue(of({
-        groups: [{ burst_id: 3, photos: [], best_path: '', count: 0 }],
-        total_groups: 3, page: 2, per_page: 20, total_pages: 2,
-      }));
-      // Simulate multi-page scenario
-      component['currentIndex'].set(1); // last group of page 1
-      (component as any)['totalPages'].set(2); // there is a second page
-
-      component['next']();
-
-      // Should have called the API for page 2
-      expect(mockApi.get).toHaveBeenCalledWith('/burst-groups', expect.objectContaining({ page: 2 }));
     });
   });
 
   describe('hasMore', () => {
     beforeEach(async () => {
-      await component.loadGroups();
+      await (component as any).loadGroups();
     });
 
-    it('should return true when not at last group', () => {
-      expect(component['hasMore']()).toBe(true);
-    });
-
-    it('should return false at last group with single page', () => {
-      component['currentIndex'].set(1);
+    it('should return false on single page', () => {
       expect(component['hasMore']()).toBe(false);
+    });
+
+    it('should return true when more pages exist', () => {
+      component['totalPages'].set(2);
+      expect(component['hasMore']()).toBe(true);
     });
   });
 });
@@ -440,5 +396,32 @@ describe('IsDecidedPipe', () => {
     map.set(1, new Set());
 
     expect(pipe.transform('/photo1.jpg', map, 1)).toBe(false);
+  });
+});
+
+describe('IsConfirmedPipe', () => {
+  const pipe = new IsConfirmedPipe();
+
+  it('should return true when group is confirmed', () => {
+    const group = { group_id: 1, type: 'burst' as const, reason: '', photos: [], best_path: '', count: 0 };
+    const confirmed = new Set(['1_burst']);
+
+    expect(pipe.transform(group as any, confirmed)).toBe(true);
+  });
+
+  it('should return false when group is not confirmed', () => {
+    const group = { group_id: 2, type: 'similar' as const, reason: '', photos: [], best_path: '', count: 0 };
+    const confirmed = new Set(['1_burst']);
+
+    expect(pipe.transform(group as any, confirmed)).toBe(false);
+  });
+
+  it('should distinguish between burst and similar types', () => {
+    const burstGroup = { group_id: 1, type: 'burst' as const, reason: '', photos: [], best_path: '', count: 0 };
+    const similarGroup = { group_id: 1, type: 'similar' as const, reason: '', photos: [], best_path: '', count: 0 };
+    const confirmed = new Set(['1_burst']);
+
+    expect(pipe.transform(burstGroup as any, confirmed)).toBe(true);
+    expect(pipe.transform(similarGroup as any, confirmed)).toBe(false);
   });
 });

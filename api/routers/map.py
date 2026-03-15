@@ -4,6 +4,7 @@ Map view router — GPS-based photo browsing with clustering at low zoom levels.
 """
 
 import logging
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from api.auth import CurrentUser, get_optional_user
 from api.database import get_db_connection
 from api.db_helpers import get_existing_columns, get_visibility_clause
+
+_DATE_RE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 
 router = APIRouter(tags=["map"])
 logger = logging.getLogger(__name__)
@@ -30,6 +33,8 @@ async def api_photos_map(
     bounds: str = Query(..., description="sw_lat,sw_lng,ne_lat,ne_lng"),
     zoom: int = Query(10, ge=0, le=22),
     limit: int = Query(500, ge=1, le=2000),
+    date_from: str = Query(None, description="Filter photos from this date (YYYY-MM-DD)"),
+    date_to: str = Query(None, description="Filter photos to this date (YYYY-MM-DD)"),
     user: Optional[CurrentUser] = Depends(get_optional_user),
 ):
     """Return photo locations within bounds, clustered at low zoom or individual at high zoom."""
@@ -66,34 +71,58 @@ async def api_photos_map(
         )
         base_params = [sw_lat, ne_lat, sw_lng, ne_lng] + vis_params
 
+        if date_from:
+            if not _DATE_RE.match(date_from):
+                raise HTTPException(status_code=400, detail='Invalid date_from format. Expected: YYYY-MM-DD')
+            base_where += " AND date_taken >= ?"
+            base_params.append(date_from)
+        if date_to:
+            if not _DATE_RE.match(date_to):
+                raise HTTPException(status_code=400, detail='Invalid date_to format. Expected: YYYY-MM-DD')
+            base_where += " AND date_taken <= ?"
+            base_params.append(date_to + " 23:59:59")
+
         if zoom < _get_cluster_zoom_threshold():
             # Cluster mode — group into grid cells (floor zoom at 2 to cap cell_size)
             effective_zoom = max(zoom, 2)
             cell_size = 180.0 / (2 ** effective_zoom)
+
+            # Build subquery filter for the representative photo (same bounds + dates + visibility)
+            p2_vis_sql, p2_vis_params = get_visibility_clause(user_id, table_alias='p2')
+            p2_where = f"p2.gps_latitude IS NOT NULL AND {p2_vis_sql}"
+            p2_params = list(p2_vis_params)
+            if date_from:
+                p2_where += " AND p2.date_taken >= ?"
+                p2_params.append(date_from)
+            if date_to:
+                p2_where += " AND p2.date_taken <= ?"
+                p2_params.append(date_to + " 23:59:59")
+
             rows = conn.execute(
                 f"SELECT "
-                f"  ROUND(gps_latitude / ?, 0) * ? AS grid_lat, "
-                f"  ROUND(gps_longitude / ?, 0) * ? AS grid_lng, "
+                f"  AVG(gps_latitude) AS avg_lat, "
+                f"  AVG(gps_longitude) AS avg_lng, "
                 f"  COUNT(*) AS count, "
                 f"  (SELECT p2.path FROM photos p2 "
-                f"   WHERE p2.gps_latitude IS NOT NULL "
+                f"   WHERE {p2_where} "
                 f"   AND ROUND(p2.gps_latitude / ?, 0) = ROUND(photos.gps_latitude / ?, 0) "
                 f"   AND ROUND(p2.gps_longitude / ?, 0) = ROUND(photos.gps_longitude / ?, 0) "
                 f"   ORDER BY p2.aggregate DESC LIMIT 1) AS representative_path "
                 f"FROM photos "
                 f"WHERE {base_where} "
-                f"GROUP BY grid_lat, grid_lng "
+                f"GROUP BY ROUND(gps_latitude / ?, 0), ROUND(gps_longitude / ?, 0) "
                 f"ORDER BY count DESC "
                 f"LIMIT ?",
-                [cell_size, cell_size, cell_size, cell_size,
-                 cell_size, cell_size, cell_size, cell_size]
-                + base_params + [limit],
+                p2_params
+                + [cell_size, cell_size, cell_size, cell_size]
+                + base_params
+                + [cell_size, cell_size, limit],
             ).fetchall()
 
             clusters = [
                 {
-                    'lat': row['grid_lat'],
-                    'lng': row['grid_lng'],
+                    'lat': row['avg_lat'],
+                    'lng': row['avg_lng'],
                     'count': row['count'],
                     'representative_path': row['representative_path'],
                 }
@@ -105,7 +134,7 @@ async def api_photos_map(
             # Individual mode
             rows = conn.execute(
                 f"SELECT path, gps_latitude AS lat, gps_longitude AS lng, "
-                f"  aggregate, filename "
+                f"  aggregate, filename, date_taken, category "
                 f"FROM photos "
                 f"WHERE {base_where} "
                 f"ORDER BY aggregate DESC "
@@ -120,6 +149,8 @@ async def api_photos_map(
                     'lng': row['lng'],
                     'aggregate': row['aggregate'],
                     'filename': row['filename'],
+                    'date_taken': row['date_taken'],
+                    'category': row['category'],
                 }
                 for row in rows
             ]

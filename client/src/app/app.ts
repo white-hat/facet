@@ -1,4 +1,4 @@
-import { Component, inject, computed, signal, OnInit } from '@angular/core';
+import { Component, inject, computed, signal, OnInit, WritableSignal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
@@ -29,6 +29,7 @@ import { TimelineFiltersService } from './features/timeline/timeline-filters.ser
 import { AlbumsFiltersService } from './features/albums/albums-filters.service';
 import { PersonsFiltersService } from './features/persons/persons-filters.service';
 import { CompareFiltersService } from './features/comparison/compare-filters.service';
+import { MapFiltersService } from './features/map/map-filters.service';
 import { TranslatePipe } from './shared/pipes/translate.pipe';
 import { PersonThumbnailUrlPipe, ThumbnailUrlPipe } from './shared/pipes/thumbnail-url.pipe';
 import { MemoriesDialogComponent } from './features/gallery/memories-dialog.component';
@@ -116,6 +117,7 @@ export class App implements OnInit {
   protected readonly albumsFilters = inject(AlbumsFiltersService);
   protected readonly personsFilters = inject(PersonsFiltersService);
   protected readonly compareFilters = inject(CompareFiltersService);
+  protected readonly mapFilters = inject(MapFiltersService);
   protected readonly mobileSearchOpen = signal(false);
   protected readonly mobileAlbumsSearchOpen = signal(false);
   protected readonly mobilePersonsSearchOpen = signal(false);
@@ -142,6 +144,7 @@ export class App implements OnInit {
   protected readonly isTimelineRoute = computed(() => this.url().split('?')[0] === '/timeline');
   protected readonly isAlbumsRoute = computed(() => this.url().split('?')[0] === '/albums');
   protected readonly isPersonsRoute = computed(() => this.url().split('?')[0] === '/persons');
+  protected readonly isMapRoute = computed(() => this.url().split('?')[0] === '/map');
 
   protected readonly sortGroups = computed(() => {
     const grouped = this.store.config()?.sort_options_grouped;
@@ -344,16 +347,10 @@ export class App implements OnInit {
     this.compareFilters.selectedCategory.set(cat);
   }
 
-  protected onStatsDateChange(field: 'from' | 'to', event: Event): void {
+  protected onDateFilterChange(service: { dateFrom: WritableSignal<string>; dateTo: WritableSignal<string> }, field: 'from' | 'to', event: Event): void {
     const value = (event.target as HTMLInputElement).value;
-    if (field === 'from') this.statsFilters.dateFrom.set(value);
-    else this.statsFilters.dateTo.set(value);
-  }
-
-  protected onTimelineDateChange(field: 'from' | 'to', event: Event): void {
-    const value = (event.target as HTMLInputElement).value;
-    if (field === 'from') this.timelineFilters.dateFrom.set(value);
-    else this.timelineFilters.dateTo.set(value);
+    if (field === 'from') service.dateFrom.set(value);
+    else service.dateTo.set(value);
   }
 
   protected onPersonChange(ids: string[]): void {

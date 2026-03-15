@@ -188,6 +188,7 @@
     "subject_prominence": "Prominencia",
     "subject_placement": "Ubicación",
     "bg_separation": "Separación fondo",
+    "caption": "Leyenda",
     "histogram_spread": "Histograma",
     "star_rating": "Valoración",
     "topiq_score": "TOPIQ"
@@ -985,7 +986,7 @@
     "sort_desc": "Descendente",
     "sort_asc": "Ascendente",
     "filters": "Filtros",
-    "search_placeholder": "Buscar fotos...",
+    "search_placeholder": "Buscar nombre, leyenda...",
     "semantic_search": "Busqueda semantica",
     "semantic_search_placeholder": "atardecer en la playa...",
     "photo_count": "{count} fotos",
@@ -1039,8 +1040,14 @@
       "technical": "Técnica",
       "exposure_range": "Exposición & Rango",
       "ratings": "Calificaciones",
-      "add_filter": "Agregar filtro..."
+      "add_filter": "Agregar filtro...",
+      "semantic_search": "Búsqueda semántica",
+      "location": "Ubicación"
     },
+    "semantic_search_info": "La búsqueda semántica carga los embeddings en la RAM en el primer uso. Esto puede tardar un momento para bibliotecas grandes.",
+    "select_on_map": "Seleccionar en el mapa",
+    "gps_radius": "Radio",
+    "gps_clear": "Borrar ubicación",
     "hide_rejected": "Ocultar rechazadas",
     "favorites_only": "Solo favoritas",
     "monochrome_only": "Solo monocromo",
@@ -1478,11 +1485,11 @@
     }
   },
   "culling": {
-    "title": "Selección de ráfagas",
-    "no_bursts": "No se encontraron grupos de ráfagas",
+    "title": "Selección",
+    "no_bursts": "No hay grupos para revisar",
     "group_progress": "Grupo {current} de {total}",
-    "auto_best": "MEJOR AUTO",
-    "confirm": "Confirmar selección",
+    "auto_best": "MEJOR",
+    "confirm": "Confirmar",
     "skip": "Saltar",
     "auto_select_all": "Selección automática completa",
     "confirm_tooltip": "Mantener las fotos seleccionadas, descartar el resto",
@@ -1499,7 +1506,15 @@
     "similarity_threshold": "Umbral de similitud",
     "burst_help": "Las fotos tomadas en ráfaga se agrupan juntas. Haz clic en las fotos para conservarlas (borde verde), las fotos no seleccionadas (borde rojo) se ocultarán. La mejor foto se selecciona automáticamente según la nitidez y la calidad.",
     "similar_help": "Las fotos visualmente similares de tu biblioteca se agrupan mediante embeddings de IA. Revisa cada grupo, conserva las mejores tomas y descarta los casi-duplicados. Ajusta el control deslizante del umbral para controlar cuán similares deben ser las fotos para formar un grupo.",
-    "help": "Ayuda"
+    "help": "Ayuda",
+    "help_text": "Revisa grupos de fotos similares o en ráfaga. Haz clic para seleccionar, doble clic para seleccionar exclusivamente. Los grupos confirmados ocultan las fotos rechazadas de la galería.",
+    "type_burst": "Ráfaga",
+    "type_similar": "Similar",
+    "confirm_all": "Confirmar todo",
+    "confirmed_badge": "Confirmado",
+    "photos": "fotos",
+    "threshold": "Similitud",
+    "load_more": "Cargar más"
   },
   "memories": {
     "title": "En este día",
@@ -1522,7 +1537,14 @@
     "photos_on_date": "{count} fotos",
     "empty": "No se encontraron fotos con fechas.",
     "more": "más",
-    "load_more": "Cargar más"
+    "load_more": "Cargar más",
+    "granularity": "Agrupar",
+    "granularity_day": "Día",
+    "granularity_week": "Semana",
+    "granularity_month": "Mes",
+    "sort_within": "Orden",
+    "sort_filename": "Nombre",
+    "photos_per_group": "Fotos"
   },
   "albums_sharing": {
     "share": "Compartir álbum",
@@ -1537,14 +1559,20 @@
     "auto_generate_confirm": "Se crearán álbumes basados en fecha y similitud visual. ¿Continuar?",
     "auto_generating": "Generando álbumes...",
     "auto_generated": "{count} álbumes creados",
-    "error_generating": "Error al generar álbumes automáticamente"
+    "error_generating": "Error al generar álbumes automáticamente",
+    "settings_title": "Configuración de generación automática",
+    "min_photos": "Fotos mínimas por álbum",
+    "time_gap": "Intervalo de tiempo entre eventos (horas)",
+    "embedding_threshold": "Umbral de similitud visual"
   },
   "map": {
     "title": "Mapa",
     "no_gps": "No se encontraron fotos con datos GPS",
     "photos_count": "{count} fotos con ubicación",
     "cluster_photos": "{count} fotos",
-    "score": "Puntuación: {score}"
+    "score": "Puntuación: {score}",
+    "date_from": "Desde",
+    "date_to": "Hasta"
   },
   "photo_detail": {
     "back": "Volver",
@@ -1560,6 +1588,11 @@
     "tags": "Etiquetas",
     "rating": "Valoración",
     "favorite": "Favorito",
-    "rejected": "Rechazado"
+    "rejected": "Rechazado",
+    "generate_caption": "Generar",
+    "edit_caption": "Editar",
+    "caption_edit_title": "Editar leyenda",
+    "caption_error": "Error al generar la leyenda",
+    "location": "Ubicación"
   }
 }

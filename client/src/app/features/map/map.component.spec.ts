@@ -18,6 +18,8 @@ const mockCircleMarker = {
 const mockMarker = {
   bindPopup: jest.fn().mockReturnThis(),
   addTo: jest.fn().mockReturnThis(),
+  on: jest.fn().mockReturnThis(),
+  getPopup: jest.fn(() => ({ getElement: jest.fn(() => null) })),
 };
 
 const mockMap = {

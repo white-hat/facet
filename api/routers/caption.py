@@ -9,8 +9,9 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
-from api.auth import CurrentUser, get_optional_user
+from api.auth import CurrentUser, get_optional_user, require_edition
 from api.config import VIEWER_CONFIG, _FULL_CONFIG
 from api.database import get_db_connection
 from api.db_helpers import get_existing_columns, get_visibility_clause
@@ -132,3 +133,40 @@ def _generate_caption(photo_path: str) -> Optional[str]:
     except Exception:
         logger.exception("VLM caption generation failed")
         return None
+
+
+class CaptionUpdate(BaseModel):
+    path: str
+    caption: str
+
+
+@router.put("/api/caption")
+async def api_update_caption(
+    body: CaptionUpdate,
+    user: CurrentUser = Depends(require_edition),
+):
+    """Update the caption for a photo (edition mode required)."""
+    conn = get_db_connection()
+    try:
+        existing_cols = get_existing_columns(conn)
+        if 'caption' not in existing_cols:
+            raise HTTPException(status_code=400, detail="Caption column not available")
+
+        user_id = user.user_id if user else None
+        vis_sql, vis_params = get_visibility_clause(user_id)
+
+        row = conn.execute(
+            f"SELECT path FROM photos WHERE path = ? AND {vis_sql}",
+            [body.path] + vis_params,
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Photo not found")
+
+        conn.execute(
+            f"UPDATE photos SET caption = ? WHERE path = ? AND {vis_sql}",
+            [body.caption or None, body.path] + vis_params,
+        )
+        conn.commit()
+        return {"caption": body.caption, "source": "manual"}
+    finally:
+        conn.close()

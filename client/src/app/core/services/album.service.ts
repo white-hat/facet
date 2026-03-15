@@ -73,7 +73,7 @@ export class AlbumService {
     return this.api.get(`/shared/album/${albumId}`, { token });
   }
 
-  autoGenerate(dryRun = false): Observable<{ albums_created: number; albums: { name: string; photo_count: number }[]; dry_run: boolean }> {
-    return this.api.post(`/albums/auto-generate?dry_run=${dryRun}`, {});
+  autoGenerate(dryRun = false, settings?: { min_photos_per_album?: number; time_gap_hours?: number; embedding_threshold?: number }): Observable<{ albums_created: number; albums: { name: string; photo_count: number }[]; dry_run: boolean }> {
+    return this.api.post(`/albums/auto-generate?dry_run=${dryRun}`, settings ?? {});
   }
 }

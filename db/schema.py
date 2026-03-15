@@ -48,6 +48,7 @@ PHOTOS_COLUMNS = [
     ('is_burst_lead', 'INTEGER DEFAULT 0 CHECK (is_burst_lead IN (0, 1))'),
     ('burst_group_id', 'INTEGER'),
     ('burst_reviewed', 'INTEGER NOT NULL DEFAULT 0 CHECK (burst_reviewed IN (0, 1))'),
+    ('similarity_reviewed', 'INTEGER NOT NULL DEFAULT 0 CHECK (similarity_reviewed IN (0, 1))'),
     ('is_monochrome', 'INTEGER DEFAULT 0 CHECK (is_monochrome IN (0, 1))'),
     ('is_silhouette', 'INTEGER'),
     ('is_group_portrait', 'INTEGER'),
@@ -172,6 +173,7 @@ INDEXES = [
     # Duplicate detection indexes
     ('idx_burst_group', 'photos', 'burst_group_id'),
     ('idx_burst_reviewed', 'photos', 'burst_reviewed, burst_group_id'),
+    ('idx_similarity_reviewed', 'photos', 'similarity_reviewed'),
     ('idx_duplicate_group', 'photos', 'duplicate_group_id'),
     ('idx_duplicate_lead', 'photos', 'is_duplicate_lead'),
     # User rating indexes

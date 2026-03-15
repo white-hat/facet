@@ -189,6 +189,10 @@ export interface GalleryFilters {
   semanticQuery: string;
   // Album filter
   album_id: string;
+  // GPS filter
+  gps_lat: string;
+  gps_lng: string;
+  gps_radius_km: string;
   // Display
   hide_details: boolean;
   hide_tooltip: boolean;
@@ -207,7 +211,34 @@ export const SMART_ALBUM_EXCLUDE_KEYS = new Set([
   'similarity_mode', 'min_similarity',
   'hide_details', 'hide_tooltip', 'hide_blinks', 'hide_bursts',
   'hide_duplicates', 'hide_rejected',
+  'gps_lat', 'gps_lng', 'gps_radius_km',
 ]);
+
+/** Common string-typed filter keys shared across URL sync, API params, and filter counting. */
+const RANGE_AND_SELECT_KEYS: (keyof GalleryFilters)[] = [
+  'type', 'camera', 'lens', 'tag', 'person_id', 'composition_pattern', 'search',
+  'min_score', 'max_score', 'min_aesthetic', 'max_aesthetic',
+  'min_quality_score', 'max_quality_score', 'min_topiq', 'max_topiq',
+  'min_face_quality', 'max_face_quality', 'min_composition', 'max_composition',
+  'min_sharpness', 'max_sharpness', 'min_exposure', 'max_exposure',
+  'min_color', 'max_color', 'min_contrast', 'max_contrast',
+  'min_noise', 'max_noise', 'min_dynamic_range', 'max_dynamic_range',
+  'min_saturation', 'max_saturation', 'min_luminance', 'max_luminance',
+  'min_histogram_spread', 'max_histogram_spread',
+  'min_power_point', 'max_power_point', 'min_leading_lines', 'max_leading_lines',
+  'min_isolation', 'max_isolation',
+  'min_aesthetic_iaa', 'max_aesthetic_iaa', 'min_face_quality_iqa', 'max_face_quality_iqa',
+  'min_liqe', 'max_liqe',
+  'min_subject_sharpness', 'max_subject_sharpness', 'min_subject_prominence', 'max_subject_prominence',
+  'min_subject_placement', 'max_subject_placement', 'min_bg_separation', 'max_bg_separation',
+  'min_face_count', 'max_face_count',
+  'min_eye_sharpness', 'max_eye_sharpness', 'min_face_sharpness', 'max_face_sharpness',
+  'min_face_ratio', 'max_face_ratio', 'min_face_confidence', 'max_face_confidence',
+  'min_star_rating', 'max_star_rating',
+  'min_iso', 'max_iso', 'min_aperture', 'max_aperture', 'min_focal_length', 'max_focal_length',
+  'date_from', 'date_to',
+  'gps_lat', 'gps_lng', 'gps_radius_km',
+];
 
 export const DEFAULT_FILTERS: GalleryFilters = {
   page: 1,
@@ -292,6 +323,9 @@ export const DEFAULT_FILTERS: GalleryFilters = {
   composition_pattern: '',
   semanticQuery: '',
   album_id: '',
+  gps_lat: '',
+  gps_lng: '',
+  gps_radius_km: '',
   similar_to: '',
   similarity_mode: 'visual',
   min_similarity: '70',
@@ -374,29 +408,7 @@ export class GalleryStore {
     const f = this.filters();
     let count = 0;
     // String filters — count each non-empty one
-    const stringKeys: (keyof GalleryFilters)[] = [
-      'type', 'camera', 'lens', 'tag', 'person_id', 'composition_pattern', 'search', 'similar_to', 'semanticQuery',
-      'min_score', 'max_score', 'min_aesthetic', 'max_aesthetic',
-      'min_quality_score', 'max_quality_score', 'min_topiq', 'max_topiq',
-      'min_face_quality', 'max_face_quality', 'min_composition', 'max_composition',
-      'min_sharpness', 'max_sharpness', 'min_exposure', 'max_exposure',
-      'min_color', 'max_color', 'min_contrast', 'max_contrast',
-      'min_noise', 'max_noise', 'min_dynamic_range', 'max_dynamic_range',
-      'min_saturation', 'max_saturation', 'min_luminance', 'max_luminance',
-      'min_histogram_spread', 'max_histogram_spread',
-      'min_power_point', 'max_power_point', 'min_leading_lines', 'max_leading_lines',
-      'min_isolation', 'max_isolation',
-      'min_aesthetic_iaa', 'max_aesthetic_iaa', 'min_face_quality_iqa', 'max_face_quality_iqa',
-      'min_liqe', 'max_liqe',
-      'min_subject_sharpness', 'max_subject_sharpness', 'min_subject_prominence', 'max_subject_prominence',
-      'min_subject_placement', 'max_subject_placement', 'min_bg_separation', 'max_bg_separation',
-      'min_face_count', 'max_face_count',
-      'min_eye_sharpness', 'max_eye_sharpness', 'min_face_sharpness', 'max_face_sharpness',
-      'min_face_ratio', 'max_face_ratio', 'min_face_confidence', 'max_face_confidence',
-      'min_star_rating', 'max_star_rating',
-      'min_iso', 'max_iso', 'min_aperture', 'max_aperture', 'min_focal_length', 'max_focal_length',
-      'date_from', 'date_to',
-    ];
+    const stringKeys: (keyof GalleryFilters)[] = [...RANGE_AND_SELECT_KEYS, 'similar_to', 'semanticQuery'];
     for (const key of stringKeys) {
       if (f[key]) count++;
     }
@@ -777,30 +789,7 @@ export class GalleryStore {
       params['sort_direction'] = f.sort_direction;
 
     // All string filters: include if non-empty
-    const stringKeys: (keyof GalleryFilters)[] = [
-      'type', 'camera', 'lens', 'tag', 'person_id', 'composition_pattern', 'search',
-      'similar_to', 'album_id', 'semanticQuery',
-      'min_score', 'max_score', 'min_aesthetic', 'max_aesthetic',
-      'min_quality_score', 'max_quality_score', 'min_topiq', 'max_topiq',
-      'min_face_quality', 'max_face_quality', 'min_composition', 'max_composition',
-      'min_sharpness', 'max_sharpness', 'min_exposure', 'max_exposure',
-      'min_color', 'max_color', 'min_contrast', 'max_contrast',
-      'min_noise', 'max_noise', 'min_dynamic_range', 'max_dynamic_range',
-      'min_saturation', 'max_saturation', 'min_luminance', 'max_luminance',
-      'min_histogram_spread', 'max_histogram_spread',
-      'min_power_point', 'max_power_point', 'min_leading_lines', 'max_leading_lines',
-      'min_isolation', 'max_isolation',
-      'min_aesthetic_iaa', 'max_aesthetic_iaa', 'min_face_quality_iqa', 'max_face_quality_iqa',
-      'min_liqe', 'max_liqe',
-      'min_subject_sharpness', 'max_subject_sharpness', 'min_subject_prominence', 'max_subject_prominence',
-      'min_subject_placement', 'max_subject_placement', 'min_bg_separation', 'max_bg_separation',
-      'min_face_count', 'max_face_count',
-      'min_eye_sharpness', 'max_eye_sharpness', 'min_face_sharpness', 'max_face_sharpness',
-      'min_face_ratio', 'max_face_ratio', 'min_face_confidence', 'max_face_confidence',
-      'min_star_rating', 'max_star_rating',
-      'min_iso', 'max_iso', 'min_aperture', 'max_aperture', 'min_focal_length', 'max_focal_length',
-      'date_from', 'date_to',
-    ];
+    const stringKeys: (keyof GalleryFilters)[] = [...RANGE_AND_SELECT_KEYS, 'similar_to', 'album_id', 'semanticQuery'];
     for (const key of stringKeys) {
       if (f[key]) params[key] = String(f[key]);
     }
@@ -836,28 +825,7 @@ export class GalleryStore {
 
     // String params
     const stringKeys: (keyof GalleryFilters)[] = [
-      'sort', 'sort_direction', 'type', 'camera', 'lens', 'tag', 'person_id',
-      'composition_pattern', 'search', 'similar_to', 'min_similarity', 'semanticQuery', 'album_id',
-      'min_score', 'max_score', 'min_aesthetic', 'max_aesthetic',
-      'min_quality_score', 'max_quality_score', 'min_topiq', 'max_topiq',
-      'min_face_quality', 'max_face_quality', 'min_composition', 'max_composition',
-      'min_sharpness', 'max_sharpness', 'min_exposure', 'max_exposure',
-      'min_color', 'max_color', 'min_contrast', 'max_contrast',
-      'min_noise', 'max_noise', 'min_dynamic_range', 'max_dynamic_range',
-      'min_saturation', 'max_saturation', 'min_luminance', 'max_luminance',
-      'min_histogram_spread', 'max_histogram_spread',
-      'min_power_point', 'max_power_point', 'min_leading_lines', 'max_leading_lines',
-      'min_isolation', 'max_isolation',
-      'min_aesthetic_iaa', 'max_aesthetic_iaa', 'min_face_quality_iqa', 'max_face_quality_iqa',
-      'min_liqe', 'max_liqe',
-      'min_subject_sharpness', 'max_subject_sharpness', 'min_subject_prominence', 'max_subject_prominence',
-      'min_subject_placement', 'max_subject_placement', 'min_bg_separation', 'max_bg_separation',
-      'min_face_count', 'max_face_count',
-      'min_eye_sharpness', 'max_eye_sharpness', 'min_face_sharpness', 'max_face_sharpness',
-      'min_face_ratio', 'max_face_ratio', 'min_face_confidence', 'max_face_confidence',
-      'min_star_rating', 'max_star_rating',
-      'min_iso', 'max_iso', 'min_aperture', 'max_aperture', 'min_focal_length', 'max_focal_length',
-      'date_from', 'date_to',
+      ...RANGE_AND_SELECT_KEYS, 'sort', 'sort_direction', 'similar_to', 'min_similarity', 'semanticQuery', 'album_id',
     ];
     for (const key of stringKeys) {
       if (params[key]) (result as Record<string, unknown>)[key] = params[key];
@@ -901,29 +869,7 @@ export class GalleryStore {
     };
 
     // All string filters: include if non-empty
-    const stringKeys: (keyof GalleryFilters)[] = [
-      'type', 'camera', 'lens', 'tag', 'person_id', 'composition_pattern', 'search', 'album_id',
-      'min_score', 'max_score', 'min_aesthetic', 'max_aesthetic',
-      'min_quality_score', 'max_quality_score', 'min_topiq', 'max_topiq',
-      'min_face_quality', 'max_face_quality', 'min_composition', 'max_composition',
-      'min_sharpness', 'max_sharpness', 'min_exposure', 'max_exposure',
-      'min_color', 'max_color', 'min_contrast', 'max_contrast',
-      'min_noise', 'max_noise', 'min_dynamic_range', 'max_dynamic_range',
-      'min_saturation', 'max_saturation', 'min_luminance', 'max_luminance',
-      'min_histogram_spread', 'max_histogram_spread',
-      'min_power_point', 'max_power_point', 'min_leading_lines', 'max_leading_lines',
-      'min_isolation', 'max_isolation',
-      'min_aesthetic_iaa', 'max_aesthetic_iaa', 'min_face_quality_iqa', 'max_face_quality_iqa',
-      'min_liqe', 'max_liqe',
-      'min_subject_sharpness', 'max_subject_sharpness', 'min_subject_prominence', 'max_subject_prominence',
-      'min_subject_placement', 'max_subject_placement', 'min_bg_separation', 'max_bg_separation',
-      'min_face_count', 'max_face_count',
-      'min_eye_sharpness', 'max_eye_sharpness', 'min_face_sharpness', 'max_face_sharpness',
-      'min_face_ratio', 'max_face_ratio', 'min_face_confidence', 'max_face_confidence',
-      'min_star_rating', 'max_star_rating',
-      'min_iso', 'max_iso', 'min_aperture', 'max_aperture', 'min_focal_length', 'max_focal_length',
-      'date_from', 'date_to',
-    ];
+    const stringKeys: (keyof GalleryFilters)[] = [...RANGE_AND_SELECT_KEYS, 'album_id'];
     for (const key of stringKeys) {
       if (f[key]) params[key] = String(f[key]);
     }

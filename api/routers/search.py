@@ -129,23 +129,6 @@ def _load_embedding_matrix(conn, vis_sql, vis_params, user_id):
     return matrix, paths
 
 
-def _search_captions(conn, query: str, from_clause: str, from_params: list,
-                     vis_sql: str, vis_params: list, limit: int) -> list[str]:
-    """Search photo captions for words matching the query. Returns matching paths."""
-    # Split query into words and require all words to appear (AND logic)
-    words = [w.strip() for w in query.split() if w.strip()]
-    if not words:
-        return []
-    where_parts = [f"photos.caption LIKE ? ESCAPE '\\'" for _ in words]
-    like_params = [f"%{w.replace('%', '\\%').replace('_', '\\_')}%" for w in words]
-    rows = conn.execute(
-        f"SELECT photos.path FROM {from_clause} "
-        f"WHERE photos.caption IS NOT NULL AND {' AND '.join(where_parts)} AND {vis_sql} "
-        f"LIMIT ?",
-        from_params + like_params + vis_params + [limit]
-    ).fetchall()
-    return [row['path'] for row in rows]
-
 
 @router.get("/api/search")
 async def api_search(
@@ -155,7 +138,7 @@ async def api_search(
     threshold: float = Query(0.15, ge=0.0, le=1.0),
     user: Optional[CurrentUser] = Depends(get_optional_user),
 ):
-    """Semantic text-to-image search using CLIP/SigLIP cosine similarity + caption text match."""
+    """Semantic text-to-image search using CLIP/SigLIP cosine similarity."""
     if not VIEWER_CONFIG.get('features', {}).get('show_semantic_search', True):
         return {'photos': [], 'total': 0, 'query': q, 'error': 'Semantic search is disabled'}
 
@@ -189,14 +172,6 @@ async def api_search(
                     top_indices = indices[np.argsort(-similarities[indices])[:limit]]
                     for i in top_indices:
                         sim_by_path[paths[i]] = float(similarities[i])
-
-        # --- Caption text search ---
-        if 'caption' in existing_cols:
-            caption_paths = _search_captions(conn, q, from_clause, from_params, vis_sql, vis_params, limit)
-            for path in caption_paths:
-                if path not in sim_by_path:
-                    # Caption-only matches score just above threshold so they rank after embedding hits
-                    sim_by_path[path] = threshold + 0.001
 
         if not sim_by_path:
             return {'photos': [], 'total': 0, 'query': q}

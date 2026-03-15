@@ -114,7 +114,6 @@ export class MergeTargetDialogComponent {
             (editStart)="startEdit($event)"
             (editSave)="onEditSave($event)"
             (editCancel)="cancelEdit()"
-            (share)="onShare($event)"
             (deleted)="onDelete($event)"
           />
         }
@@ -310,11 +309,6 @@ export class ManagePersonsComponent implements OnInit {
     if (person) void this.saveName(person, name);
   }
 
-  onShare(id: number): void {
-    const person = this.persons().find((p) => p.id === id);
-    if (person) void this.copyShareLink(person);
-  }
-
   onDelete(id: number): void {
     const person = this.persons().find((p) => p.id === id);
     if (person) void this.deletePerson(person);
@@ -336,21 +330,6 @@ export class ManagePersonsComponent implements OnInit {
 
   clearSelection(): void {
     this.selectedIds.set(new Set());
-  }
-
-  // --- Share link ---
-
-  async copyShareLink(person: Person): Promise<void> {
-    try {
-      const res = await firstValueFrom(
-        this.api.get<{ token: string }>(`/auth/person/${person.id}/share-token`),
-      );
-      const url = `${window.location.origin}/person/${person.id}?token=${res.token}`;
-      await navigator.clipboard.writeText(url);
-      this.snackBar.open(this.i18n.t('persons.link_copied'), '', { duration: 2000 });
-    } catch {
-      this.snackBar.open(this.i18n.t('persons.link_copy_error'), '', { duration: 3000 });
-    }
   }
 
   // --- Batch delete ---

@@ -5,14 +5,22 @@ import { ElementRef } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { TimelineFiltersService } from './timeline-filters.service';
-import { TimelineComponent, ToLocalDatePipe } from './timeline.component';
+import { TimelineComponent } from './timeline.component';
+import { TimelineDatePipe } from './timeline-date.pipe';
 
 describe('TimelineComponent', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
   let mockApi: { get: jest.Mock };
   let mockRouter: { navigate: jest.Mock };
-  let mockFilters: { dateFrom: ReturnType<typeof signal<string>>; dateTo: ReturnType<typeof signal<string>>; sortDirection: ReturnType<typeof signal<'older' | 'newer'>> };
+  let mockFilters: {
+    dateFrom: ReturnType<typeof signal<string>>;
+    dateTo: ReturnType<typeof signal<string>>;
+    sortDirection: ReturnType<typeof signal<'older' | 'newer'>>;
+    photosPerGroup: ReturnType<typeof signal<number>>;
+    sortBy: ReturnType<typeof signal<'aggregate' | 'date_taken' | 'filename'>>;
+    granularity: ReturnType<typeof signal<'day' | 'week' | 'month'>>;
+  };
 
   const timelineResponse = {
     groups: [
@@ -45,6 +53,9 @@ describe('TimelineComponent', () => {
       dateFrom: signal(''),
       dateTo: signal(''),
       sortDirection: signal<'older' | 'newer'>('older'),
+      photosPerGroup: signal(30),
+      sortBy: signal<'aggregate' | 'date_taken' | 'filename'>('aggregate'),
+      granularity: signal<'day' | 'week' | 'month'>('day'),
     };
 
     TestBed.configureTestingModule({
@@ -62,7 +73,13 @@ describe('TimelineComponent', () => {
     it('should fetch timeline data and populate groups', async () => {
       await component.loadInitial();
 
-      expect(mockApi.get).toHaveBeenCalledWith('/timeline', { limit: 30, direction: 'older' });
+      expect(mockApi.get).toHaveBeenCalledWith('/timeline', {
+        limit: 30,
+        direction: 'older',
+        photos_per_group: 30,
+        sort_by: 'aggregate',
+        granularity: 'day',
+      });
       expect(component.groups()).toHaveLength(2);
       expect(component.groups()[0].date).toBe('2024-06-15');
       expect(component.hasMore()).toBe(true);
@@ -88,6 +105,9 @@ describe('TimelineComponent', () => {
       expect(mockApi.get).toHaveBeenCalledWith('/timeline', {
         limit: 30,
         direction: 'older',
+        photos_per_group: 30,
+        sort_by: 'aggregate',
+        granularity: 'day',
         date_from: '2024-01-01',
         date_to: '2024-06-30',
       });
@@ -195,14 +215,27 @@ describe('TimelineComponent', () => {
     });
   });
 
-  describe('ToLocalDatePipe', () => {
-    it('should convert date string to Date at noon', () => {
-      const pipe = new ToLocalDatePipe();
+  describe('TimelineDatePipe', () => {
+    const pipe = new TimelineDatePipe();
+
+    it('should format day dates as full date', () => {
       const result = pipe.transform('2024-06-15');
-      expect(result).toBeInstanceOf(Date);
-      expect(result.getFullYear()).toBe(2024);
-      expect(result.getMonth()).toBe(5); // June = 5
-      expect(result.getDate()).toBe(15);
+      expect(result).toContain('2024');
+      expect(result).toContain('15');
+    });
+
+    it('should format week dates as "Week N, YYYY"', () => {
+      expect(pipe.transform('2025-W46')).toBe('Week 46, 2025');
+    });
+
+    it('should format month dates as "MMMM yyyy"', () => {
+      const result = pipe.transform('2025-11');
+      expect(result).toContain('November');
+      expect(result).toContain('2025');
+    });
+
+    it('should return empty string for empty input', () => {
+      expect(pipe.transform('')).toBe('');
     });
   });
 });

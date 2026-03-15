@@ -570,8 +570,15 @@ async def get_shared_album(
         conn.close()
 
 
+class AutoAlbumSettings(BaseModel):
+    min_photos_per_album: Optional[int] = Field(None, ge=1, le=100)
+    time_gap_hours: Optional[float] = Field(None, gt=0, le=72)
+    embedding_threshold: Optional[float] = Field(None, ge=0, le=1)
+
+
 @router.post("/api/albums/auto-generate")
 async def auto_generate_albums(
+    settings: AutoAlbumSettings = AutoAlbumSettings(),
     dry_run: bool = Query(False),
     user: CurrentUser = Depends(require_edition),
 ):
@@ -581,7 +588,12 @@ async def auto_generate_albums(
     try:
         from analyzers.auto_album import generate_auto_albums
         user_id = _get_user_id(user)
-        albums = generate_auto_albums(conn, config=_FULL_CONFIG, dry_run=dry_run, user_id=user_id)
+        # Shallow-copy only the auto_albums sub-dict to avoid deep-copying the entire config
+        config = dict(_FULL_CONFIG)
+        auto_cfg = dict(config.get('auto_albums', {}))
+        auto_cfg.update(settings.model_dump(exclude_none=True))
+        config['auto_albums'] = auto_cfg
+        albums = generate_auto_albums(conn, config=config, dry_run=dry_run, user_id=user_id)
         return {
             'albums_created': len(albums),
             'albums': [{'name': a['name'], 'photo_count': a['photo_count']} for a in albums],

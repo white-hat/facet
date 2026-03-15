@@ -1,9 +1,11 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { I18nService } from '../../../core/services/i18n.service';
@@ -16,10 +18,12 @@ interface SharedPhoto {
   path: string;
   filename: string;
   aggregate: number;
+  aesthetic?: number;
+  date_taken?: string;
 }
 
 interface SharedAlbumResponse {
-  album: { id: number; name: string; description: string };
+  album: { id: number; name: string; description: string; is_smart?: boolean; smart_filter_json?: string };
   photos: SharedPhoto[];
   total: number;
   page: number;
@@ -42,6 +46,7 @@ interface SharedPersonResponse {
   host: { class: 'block h-full' },
   imports: [
     MatIconModule, MatButtonModule, MatProgressSpinnerModule,
+    MatSelectModule, MatFormFieldModule,
     TranslatePipe, ThumbnailUrlPipe, PersonThumbnailUrlPipe,
   ],
   template: `
@@ -71,17 +76,36 @@ interface SharedPersonResponse {
             </div>
           </div>
         } @else {
-          <h1 class="text-xl font-semibold">{{ entityName() }}</h1>
-          @if (description()) {
-            <p class="text-sm opacity-70 mt-1">{{ description() }}</p>
-          }
-          <p class="text-xs opacity-50 mt-1">{{ 'albums.photos_count' | translate:{ count: total() } }}</p>
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-xl font-semibold">{{ entityName() }}</h1>
+              @if (description()) {
+                <p class="text-sm opacity-70 mt-1">{{ description() }}</p>
+              }
+              <p class="text-xs opacity-50 mt-1">{{ 'albums.photos_count' | translate:{ count: total() } }}</p>
+            </div>
+            @if (isSmart()) {
+              <div class="flex items-center gap-2">
+                <mat-form-field class="w-36" subscriptSizing="dynamic">
+                  <mat-label>{{ 'gallery.sort' | translate }}</mat-label>
+                  <mat-select [value]="sortBy()" (selectionChange)="sortBy.set($event.value)">
+                    <mat-option value="aggregate">{{ 'gallery.sort_aggregate' | translate }}</mat-option>
+                    <mat-option value="aesthetic">{{ 'gallery.sort_aesthetic' | translate }}</mat-option>
+                    <mat-option value="date_taken">{{ 'gallery.sort_date' | translate }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <button mat-icon-button (click)="toggleSortDirection()">
+                  <mat-icon>{{ sortDirection() === 'desc' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
+                </button>
+              </div>
+            }
+          </div>
         }
       </div>
 
       <div class="p-4">
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
-          @for (photo of photos(); track photo.path) {
+          @for (photo of sortedPhotos(); track photo.path) {
             <div class="relative rounded-lg overflow-hidden bg-[var(--mat-sys-surface-container)]">
               <img [src]="photo.path | thumbnailUrl:320"
                    [alt]="photo.filename"
@@ -118,6 +142,23 @@ export class SharedViewComponent implements OnInit {
   protected readonly photos = signal<SharedPhoto[]>([]);
   protected readonly total = signal(0);
   protected readonly hasMore = signal(false);
+  protected readonly isSmart = signal(false);
+  protected readonly sortBy = signal('aggregate');
+  protected readonly sortDirection = signal<'asc' | 'desc'>('desc');
+
+  protected readonly sortedPhotos = computed(() => {
+    const photos = [...this.photos()];
+    const sort = this.sortBy();
+    const dir = this.sortDirection() === 'desc' ? -1 : 1;
+    return photos.sort((a, b) => {
+      if (sort === 'date_taken') {
+        return ((a.date_taken ?? '') > (b.date_taken ?? '') ? 1 : -1) * dir;
+      }
+      const va = sort === 'aesthetic' ? (a.aesthetic ?? 0) : (a.aggregate ?? 0);
+      const vb = sort === 'aesthetic' ? (b.aesthetic ?? 0) : (b.aggregate ?? 0);
+      return (va - vb) * dir;
+    });
+  });
 
   protected entityType: EntityType = 'album';
   protected entityId = 0;
@@ -172,6 +213,10 @@ export class SharedViewComponent implements OnInit {
     }
   }
 
+  protected toggleSortDirection(): void {
+    this.sortDirection.update(d => d === 'desc' ? 'asc' : 'desc');
+  }
+
   private async loadAlbumPage(page: number, append: boolean): Promise<void> {
     const res = await firstValueFrom(
       this.api.get<SharedAlbumResponse>(
@@ -181,6 +226,7 @@ export class SharedViewComponent implements OnInit {
     );
     this.entityName.set(res.album.name);
     this.description.set(res.album.description);
+    this.isSmart.set(res.album.is_smart ?? false);
     this.total.set(res.total);
     this.hasMore.set(res.has_more);
     this.currentPage = res.page;

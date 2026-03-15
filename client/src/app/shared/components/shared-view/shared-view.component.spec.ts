@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
+import { ApiService } from '../../../core/services/api.service';
 import { I18nService } from '../../../core/services/i18n.service';
 import { SharedViewComponent } from './shared-view.component';
 
@@ -23,7 +24,7 @@ function buildMockRoute(
 describe('SharedViewComponent', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let component: any;
-  let mockHttp: { get: jest.Mock };
+  let mockApi: { get: jest.Mock };
   let mockI18n: { t: jest.Mock };
 
   const sharedAlbumResponse = {
@@ -59,7 +60,7 @@ describe('SharedViewComponent', () => {
     TestBed.configureTestingModule({
       providers: [
         SharedViewComponent,
-        { provide: HttpClient, useValue: mockHttp },
+        { provide: ApiService, useValue: mockApi },
         { provide: I18nService, useValue: mockI18n },
         { provide: ActivatedRoute, useValue: mockRoute },
       ],
@@ -68,7 +69,7 @@ describe('SharedViewComponent', () => {
   }
 
   beforeEach(() => {
-    mockHttp = {
+    mockApi = {
       get: jest.fn(() => of(sharedAlbumResponse)),
     };
     mockI18n = {
@@ -83,9 +84,7 @@ describe('SharedViewComponent', () => {
 
         await component.ngOnInit();
 
-        expect(mockHttp.get).toHaveBeenCalledWith('/api/shared/album/1', {
-          params: { token: 'abc123', page: '1' },
-        });
+        expect(mockApi.get).toHaveBeenCalledWith('/shared/album/1', { token: 'abc123', page: 1 });
         expect(component.entityName()).toBe('Shared Album');
         expect(component.description()).toBe('A shared album');
         expect(component.photos()).toHaveLength(2);
@@ -100,7 +99,7 @@ describe('SharedViewComponent', () => {
 
         expect(component.error()).toBe('albums.invalid_share_link');
         expect(component.loading()).toBe(false);
-        expect(mockHttp.get).not.toHaveBeenCalled();
+        expect(mockApi.get).not.toHaveBeenCalled();
       });
 
       it('should set error when token is missing', async () => {
@@ -110,7 +109,7 @@ describe('SharedViewComponent', () => {
 
         expect(component.error()).toBe('albums.invalid_share_link');
         expect(component.loading()).toBe(false);
-        expect(mockHttp.get).not.toHaveBeenCalled();
+        expect(mockApi.get).not.toHaveBeenCalled();
       });
 
       it('should set error when albumId is 0', async () => {
@@ -119,11 +118,11 @@ describe('SharedViewComponent', () => {
         await component.ngOnInit();
 
         expect(component.error()).toBe('albums.invalid_share_link');
-        expect(mockHttp.get).not.toHaveBeenCalled();
+        expect(mockApi.get).not.toHaveBeenCalled();
       });
 
       it('should set revoked error on 403 response', async () => {
-        mockHttp.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+        mockApi.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
         createComponent('album', '1', 'expired_token');
 
         await component.ngOnInit();
@@ -133,7 +132,7 @@ describe('SharedViewComponent', () => {
       });
 
       it('should set generic error on other HTTP errors', async () => {
-        mockHttp.get.mockReturnValue(throwError(() => ({ status: 500 })));
+        mockApi.get.mockReturnValue(throwError(() => ({ status: 500 })));
         createComponent('album', '1', 'token');
 
         await component.ngOnInit();
@@ -147,11 +146,11 @@ describe('SharedViewComponent', () => {
       beforeEach(async () => {
         createComponent('album', '1', 'token');
         await component.ngOnInit();
-        mockHttp.get.mockClear();
+        mockApi.get.mockClear();
       });
 
       it('should load next page and append photos', async () => {
-        mockHttp.get.mockReturnValue(of({
+        mockApi.get.mockReturnValue(of({
           album: { id: 1, name: 'Shared Album', description: 'A shared album' },
           photos: [{ path: '/p3.jpg', filename: 'p3.jpg', aggregate: 6.5 }],
           total: 10,
@@ -163,14 +162,12 @@ describe('SharedViewComponent', () => {
 
         await component.loadMore();
 
-        expect(mockHttp.get).toHaveBeenCalledWith('/api/shared/album/1', {
-          params: { token: 'token', page: '2' },
-        });
+        expect(mockApi.get).toHaveBeenCalledWith('/shared/album/1', { token: 'token', page: 2 });
         expect(component.photos()).toHaveLength(3);
       });
 
       it('should set loadingMore true then false', async () => {
-        mockHttp.get.mockReturnValue(of({
+        mockApi.get.mockReturnValue(of({
           ...sharedAlbumResponse,
           page: 2,
           has_more: false,
@@ -187,7 +184,7 @@ describe('SharedViewComponent', () => {
 
   describe('person mode', () => {
     beforeEach(() => {
-      mockHttp.get.mockReturnValue(of(sharedPersonResponse));
+      mockApi.get.mockReturnValue(of(sharedPersonResponse));
     });
 
     describe('ngOnInit', () => {
@@ -196,9 +193,7 @@ describe('SharedViewComponent', () => {
 
         await component.ngOnInit();
 
-        expect(mockHttp.get).toHaveBeenCalledWith('/api/persons/5/photos', {
-          params: { token: 'tok123', page: '1', per_page: '48' },
-        });
+        expect(mockApi.get).toHaveBeenCalledWith('/persons/5/photos', { token: 'tok123', page: 1, per_page: 48 });
         expect(component.entityName()).toBe('Alice');
         expect(component.photos()).toHaveLength(1);
         expect(component.total()).toBe(15);
@@ -213,11 +208,11 @@ describe('SharedViewComponent', () => {
 
         expect(component.error()).toBe('persons.invalid_share_link');
         expect(component.loading()).toBe(false);
-        expect(mockHttp.get).not.toHaveBeenCalled();
+        expect(mockApi.get).not.toHaveBeenCalled();
       });
 
       it('should set share_link_error on 403 response', async () => {
-        mockHttp.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
+        mockApi.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
         createComponent('person', '5', 'bad_token');
 
         await component.ngOnInit();
@@ -227,7 +222,7 @@ describe('SharedViewComponent', () => {
       });
 
       it('should set share_link_error on 401 response', async () => {
-        mockHttp.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
+        mockApi.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
         createComponent('person', '5', 'bad_token');
 
         await component.ngOnInit();
@@ -237,7 +232,7 @@ describe('SharedViewComponent', () => {
       });
 
       it('should set generic error on other HTTP errors', async () => {
-        mockHttp.get.mockReturnValue(throwError(() => ({ status: 500 })));
+        mockApi.get.mockReturnValue(throwError(() => ({ status: 500 })));
         createComponent('person', '5', 'token');
 
         await component.ngOnInit();
@@ -251,11 +246,11 @@ describe('SharedViewComponent', () => {
       beforeEach(async () => {
         createComponent('person', '5', 'token');
         await component.ngOnInit();
-        mockHttp.get.mockClear();
+        mockApi.get.mockClear();
       });
 
       it('should load next page and append photos', async () => {
-        mockHttp.get.mockReturnValue(of({
+        mockApi.get.mockReturnValue(of({
           ...sharedPersonResponse,
           photos: [{ path: '/a2.jpg', filename: 'a2.jpg', aggregate: 7.5 }],
           page: 2,
@@ -264,9 +259,7 @@ describe('SharedViewComponent', () => {
 
         await component.loadMore();
 
-        expect(mockHttp.get).toHaveBeenCalledWith('/api/persons/5/photos', {
-          params: { token: 'token', page: '2', per_page: '48' },
-        });
+        expect(mockApi.get).toHaveBeenCalledWith('/persons/5/photos', { token: 'token', page: 2, per_page: 48 });
         expect(component.photos()).toHaveLength(2);
       });
     });

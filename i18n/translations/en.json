@@ -190,7 +190,8 @@
     "subject_sharpness": "Subject Sharpness",
     "subject_prominence": "Prominence",
     "subject_placement": "Placement",
-    "bg_separation": "BG Separation"
+    "bg_separation": "BG Separation",
+    "caption": "Caption"
   },
   "notifications": {
     "copied": "Copied!",
@@ -985,7 +986,7 @@
     "sort_desc": "Descending",
     "sort_asc": "Ascending",
     "filters": "Filters",
-    "search_placeholder": "Search photos...",
+    "search_placeholder": "Search filename, caption...",
     "semantic_search": "Semantic Search",
     "semantic_search_placeholder": "sunset at the beach...",
     "photo_count": "{count} photos",
@@ -1039,8 +1040,14 @@
       "saliency": "Subject Saliency",
       "exposure_range": "Exposure & Range",
       "ratings": "User Ratings",
-      "add_filter": "Add Filter..."
+      "add_filter": "Add Filter...",
+      "semantic_search": "Semantic Search",
+      "location": "Location"
     },
+    "semantic_search_info": "Semantic search loads embeddings into RAM on first use. This may take a moment for large libraries.",
+    "select_on_map": "Select on map",
+    "gps_radius": "Radius",
+    "gps_clear": "Clear location",
     "hide_rejected": "Hide Rejected",
     "favorites_only": "Favorites Only",
     "monochrome_only": "Monochrome Only",
@@ -1478,11 +1485,11 @@
     }
   },
   "culling": {
-    "title": "Burst Culling",
-    "no_bursts": "No burst groups found",
+    "title": "Culling",
+    "no_bursts": "No groups to review",
     "group_progress": "Group {current} of {total}",
-    "auto_best": "AUTO BEST",
-    "confirm": "Confirm Selection",
+    "auto_best": "BEST",
+    "confirm": "Confirm",
     "skip": "Skip",
     "auto_select_all": "Auto-select All",
     "confirm_tooltip": "Keep selected photos, discard the rest",
@@ -1491,7 +1498,7 @@
     "confirmed": "Selection confirmed",
     "previous": "Previous",
     "next": "Next",
-    "error_loading": "Failed to load burst groups",
+    "error_loading": "Failed to load groups",
     "error_confirming": "Failed to confirm selection",
     "error_auto_select": "Failed to auto-select",
     "burst_groups": "Burst Groups",
@@ -1499,7 +1506,15 @@
     "similarity_threshold": "Similarity Threshold",
     "burst_help": "Photos taken in rapid succession are grouped together. Click photos to keep them (green border), unselected photos (red border) will be hidden. The best photo is auto-selected based on sharpness and quality.",
     "similar_help": "Visually similar photos across your library are grouped using AI embeddings. Review each group, keep the best shots, and discard near-duplicates. Adjust the threshold slider to control how similar photos must be to form a group.",
-    "help": "Help"
+    "help": "Help",
+    "help_text": "Review groups of similar or burst photos. Click to select, double-click to select exclusively. Confirmed groups hide rejected photos from the gallery.",
+    "type_burst": "Burst",
+    "type_similar": "Similar",
+    "confirm_all": "Confirm All",
+    "confirmed_badge": "Confirmed",
+    "photos": "photos",
+    "threshold": "Similarity",
+    "load_more": "Load more"
   },
   "memories": {
     "title": "On This Day",
@@ -1522,7 +1537,14 @@
     "photos_on_date": "{count} photos",
     "empty": "No photos with dates found.",
     "more": "more",
-    "load_more": "Load more"
+    "load_more": "Load more",
+    "granularity": "Group by",
+    "granularity_day": "Day",
+    "granularity_week": "Week",
+    "granularity_month": "Month",
+    "sort_within": "Sort",
+    "sort_filename": "Filename",
+    "photos_per_group": "Photos"
   },
   "albums_sharing": {
     "share": "Share Album",
@@ -1537,14 +1559,20 @@
     "auto_generate_confirm": "This will create albums based on date and visual similarity. Continue?",
     "auto_generating": "Generating albums...",
     "auto_generated": "{count} albums created",
-    "error_generating": "Failed to auto-generate albums"
+    "error_generating": "Failed to auto-generate albums",
+    "settings_title": "Auto-Generate Settings",
+    "min_photos": "Minimum photos per album",
+    "time_gap": "Time gap between events (hours)",
+    "embedding_threshold": "Visual similarity threshold"
   },
   "map": {
     "title": "Map",
     "no_gps": "No photos with GPS data found",
     "photos_count": "{count} photos with location",
     "cluster_photos": "{count} photos",
-    "score": "Score: {score}"
+    "score": "Score: {score}",
+    "date_from": "From",
+    "date_to": "To"
   },
   "photo_detail": {
     "back": "Back",
@@ -1560,6 +1588,11 @@
     "tags": "Tags",
     "rating": "Rating",
     "favorite": "Favorite",
-    "rejected": "Rejected"
+    "rejected": "Rejected",
+    "generate_caption": "Generate",
+    "edit_caption": "Edit",
+    "caption_edit_title": "Edit Caption",
+    "caption_error": "Failed to generate caption",
+    "location": "Location"
   }
 }

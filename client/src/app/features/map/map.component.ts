@@ -1,5 +1,5 @@
 import {
-  Component, OnInit, OnDestroy, inject, signal, viewChild, ElementRef,
+  Component, OnInit, OnDestroy, inject, signal, effect, viewChild, ElementRef,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,7 +8,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { I18nService } from '../../core/services/i18n.service';
+import { MapFiltersService } from './map-filters.service';
 import * as L from 'leaflet';
+import { createLeafletMap } from '../../shared/leaflet';
 
 interface MapCluster {
   lat: number;
@@ -23,6 +25,8 @@ interface MapPhoto {
   lng: number;
   aggregate: number;
   filename: string;
+  date_taken?: string;
+  category?: string;
 }
 
 interface MapResponse {
@@ -52,7 +56,8 @@ L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl });
     </div>
   `,
   // Leaflet requires ::ng-deep styles because its DOM is created outside Angular's
-  // view encapsulation. This is a necessary exception to the "no custom CSS" rule.
+  // view encapsulation — className is set via Leaflet JS API (bindTooltip),
+  // not Angular templates, so Tailwind utilities cannot be used here.
   styles: [`
     :host ::ng-deep .leaflet-container {
       height: 100%;
@@ -65,7 +70,7 @@ L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl });
       box-shadow: none !important;
       color: white;
       font-weight: bold;
-      font-size: 12px;
+      font-size: 0.75rem;
     }
   `],
   host: { class: 'block h-full' },
@@ -74,6 +79,7 @@ export class MapComponent implements OnInit, OnDestroy {
   private readonly api = inject(ApiService);
   private readonly i18n = inject(I18nService);
   private readonly router = inject(Router);
+  private readonly mapFilters = inject(MapFiltersService);
   private readonly mapContainer = viewChild.required<ElementRef<HTMLDivElement>>('mapContainer');
 
   /** Escape HTML special characters to prevent XSS in Leaflet popups. */
@@ -83,6 +89,13 @@ export class MapComponent implements OnInit, OnDestroy {
     return div.innerHTML;
   }
 
+  /** Translate a category key via i18n, falling back to title-cased name. */
+  private translateCategory(name: string): string {
+    const key = `category_names.${name}`;
+    const translated = this.i18n.t(key);
+    return translated === key ? name.replace(/_/g, ' ') : translated;
+  }
+
   protected readonly loading = signal(false);
 
   private map: L.Map | null = null;
@@ -90,6 +103,16 @@ export class MapComponent implements OnInit, OnDestroy {
   private moveEndHandler: (() => void) | null = null;
   private initTimeout: ReturnType<typeof setTimeout> | null = null;
   private moveEndDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  // Reload markers when date filters change
+  private dateFilterEffect = effect(() => {
+    this.mapFilters.dateFrom();
+    this.mapFilters.dateTo();
+    // Only reload if map is already initialized
+    if (this.map) {
+      this.loadMarkers();
+    }
+  });
 
   ngOnInit(): void {
     // Defer map init to next tick so the container has dimensions
@@ -117,12 +140,7 @@ export class MapComponent implements OnInit, OnDestroy {
 
   private initMap(): void {
     const container = this.mapContainer().nativeElement;
-    this.map = L.map(container).setView([48.8566, 2.3522], 5);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(this.map);
+    this.map = createLeafletMap(container).setView([48.8566, 2.3522], 5);
 
     this.markersLayer.addTo(this.map);
 
@@ -156,8 +174,14 @@ export class MapComponent implements OnInit, OnDestroy {
     this.loading.set(true);
 
     try {
+      const params: Record<string, string | number> = { bounds: boundsStr, zoom, limit: 500 };
+      const dateFrom = this.mapFilters.dateFrom();
+      const dateTo = this.mapFilters.dateTo();
+      if (dateFrom) params['date_from'] = dateFrom;
+      if (dateTo) params['date_to'] = dateTo;
+
       const data = await firstValueFrom(
-        this.api.get<MapResponse>('/photos/map', { bounds: boundsStr, zoom, limit: 500 }),
+        this.api.get<MapResponse>('/photos/map', params),
       );
 
       this.markersLayer.clearLayers();
@@ -208,7 +232,11 @@ export class MapComponent implements OnInit, OnDestroy {
             `<div style="text-align:center;cursor:pointer" data-photo-path="${this.escapeHtml(photo.path)}">` +
             `<img src="${thumbUrl}" style="max-width:150px;border-radius:6px;display:block;margin:0 auto" />` +
             `<div style="margin-top:4px;font-size:13px">${this.escapeHtml(photo.filename)}</div>` +
-            `<div style="font-size:11px;opacity:0.7">${scoreLabel}</div>` +
+            (photo.date_taken ? `<div style="font-size:11px;opacity:0.7">${this.escapeHtml(photo.date_taken)}</div>` : '') +
+            `<div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-top:2px;font-size:11px">` +
+            (photo.category ? `<span style="background:var(--mat-sys-primary-container,#e3e8ff);color:var(--mat-sys-on-primary-container,#1a1c2e);padding:1px 6px;border-radius:10px;font-size:10px">${this.escapeHtml(this.translateCategory(photo.category))}</span>` : '') +
+            `<span style="opacity:0.7">${scoreLabel}</span>` +
+            `</div>` +
             `</div>`,
             { maxWidth: 200, minWidth: 160 },
           );

@@ -67,20 +67,26 @@ def _build_gallery_where(params, conn=None, user_id=None):
 
     if params.get('search'):
         term = params['search']
+        escaped_term = term.replace('%', '\\%').replace('_', '\\_')
         search_clauses = [
-            "filename LIKE ?",
-            "camera_model LIKE ?",
-            "lens_model LIKE ?",
-            "category LIKE ?",
+            "filename LIKE ? ESCAPE '\\'",
+            "camera_model LIKE ? ESCAPE '\\'",
+            "lens_model LIKE ? ESCAPE '\\'",
+            "category LIKE ? ESCAPE '\\'",
         ]
-        search_params = [f"%{term}%"] * 4
+        search_params = [f"%{escaped_term}%"] * 4
 
         from api.db_helpers import is_photo_tags_available
         if is_photo_tags_available(conn):
-            search_clauses.append("EXISTS (SELECT 1 FROM photo_tags WHERE photo_path = photos.path AND tag LIKE ?)")
+            search_clauses.append("EXISTS (SELECT 1 FROM photo_tags WHERE photo_path = photos.path AND tag LIKE ? ESCAPE '\\')")
         else:
-            search_clauses.append("tags LIKE ?")
-        search_params.append(f"%{term}%")
+            search_clauses.append("tags LIKE ? ESCAPE '\\'")
+        search_params.append(f"%{escaped_term}%")
+
+        existing_cols = get_existing_columns(conn)
+        if 'caption' in existing_cols:
+            search_clauses.append("caption LIKE ? ESCAPE '\\'")
+            search_params.append(f"%{escaped_term}%")
 
         where_clauses.append(f"({' OR '.join(search_clauses)})")
         sql_params.extend(search_params)
@@ -213,6 +219,20 @@ def _build_gallery_where(params, conn=None, user_id=None):
             )
             sql_params.append(album_id)
         except ValueError:
+            pass
+
+    if params.get('gps_lat') and params.get('gps_lng') and params.get('gps_radius_km'):
+        try:
+            lat = float(params['gps_lat'])
+            lng = float(params['gps_lng'])
+            radius_km = float(params['gps_radius_km'])
+            lat_delta = radius_km / 111.0
+            lng_delta = radius_km / (111.0 * max(abs(math.cos(math.radians(lat))), 0.01))
+            where_clauses.append("gps_latitude BETWEEN ? AND ?")
+            sql_params.extend([lat - lat_delta, lat + lat_delta])
+            where_clauses.append("gps_longitude BETWEEN ? AND ?")
+            sql_params.extend([lng - lng_delta, lng + lng_delta])
+        except (ValueError, TypeError):
             pass
 
     return where_clauses, sql_params
@@ -378,6 +398,9 @@ async def api_photos(
         'max_topiq': qp.get('max_topiq', ''),
         'composition_pattern': qp.get('composition_pattern', ''),
         'album_id': qp.get('album_id', ''),
+        'gps_lat': qp.get('gps_lat', ''),
+        'gps_lng': qp.get('gps_lng', ''),
+        'gps_radius_km': qp.get('gps_radius_km', ''),
         'min_aesthetic_iaa': qp.get('min_aesthetic_iaa', ''),
         'max_aesthetic_iaa': qp.get('max_aesthetic_iaa', ''),
         'min_face_quality_iqa': qp.get('min_face_quality_iqa', ''),
