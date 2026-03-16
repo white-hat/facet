@@ -56,7 +56,7 @@ def _cached_image_response(image_bytes: bytes, request: Request) -> Response:
     )
 
 
-@lru_cache(maxsize=20)
+@lru_cache(maxsize=5)
 def _convert_raw_cached(file_path: str, mtime: float) -> bytes:
     """Convert a RAW file to JPEG bytes, cached by path+mtime."""
     import rawpy

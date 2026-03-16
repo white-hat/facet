@@ -641,8 +641,8 @@ def _generate_this_week(conn, capsule_config, min_aggregate, vis, user_id):
     rows = conn.execute(
         f"""SELECT path, date_taken, aggregate
            FROM photos
-           WHERE strftime('%m-%d', date_taken) IN ({placeholders})
-             AND CAST(strftime('%Y', date_taken) AS INTEGER) < ?
+           WHERE strftime('%m-%d', {_ISO_DATE}) IN ({placeholders})
+             AND CAST(strftime('%Y', {_ISO_DATE}) AS INTEGER) < ?
              AND aggregate >= ?
              AND date_taken IS NOT NULL
              AND {vis_sql}
@@ -964,24 +964,24 @@ def _generate_seeded(conn, capsule_config, min_aggregate, vis, user_id):
         # --- Same tags axis ---
         tag_list = _parse_tags(seed["tags"] or "")
         if tag_list:
-                top_tag = tag_list[0]
-                tag_rows = conn.execute(
-                    f"""SELECT DISTINCT pt.photo_path AS path, p.aggregate
-                       FROM photo_tags pt
-                       JOIN photos p ON p.path = pt.photo_path
-                       WHERE pt.tag = ? AND pt.photo_path != ?
-                         AND p.aggregate >= ? AND {vis_sql}
-                       ORDER BY p.aggregate DESC
-                       LIMIT ?""",
-                    [top_tag, seed_path, min_aggregate] + vis_params + [max_photos],
-                ).fetchall()
-                if tag_rows:
-                    avg_agg = sum(r["aggregate"] for r in tag_rows) / len(tag_rows)
-                    score = len(tag_rows) * avg_agg
-                    if score > best_score:
-                        best_score = score
-                        best_photos = tag_rows
-                        best_axis = ("tag", {"tag": top_tag.title()})
+            top_tag = tag_list[0]
+            tag_rows = conn.execute(
+                f"""SELECT DISTINCT pt.photo_path AS path, p.aggregate
+                   FROM photo_tags pt
+                   JOIN photos p ON p.path = pt.photo_path
+                   WHERE pt.tag = ? AND pt.photo_path != ?
+                     AND p.aggregate >= ? AND {vis_sql}
+                   ORDER BY p.aggregate DESC
+                   LIMIT ?""",
+                [top_tag, seed_path, min_aggregate] + vis_params + [max_photos],
+            ).fetchall()
+            if tag_rows:
+                avg_agg = sum(r["aggregate"] for r in tag_rows) / len(tag_rows)
+                score = len(tag_rows) * avg_agg
+                if score > best_score:
+                    best_score = score
+                    best_photos = tag_rows
+                    best_axis = ("tag", {"tag": top_tag.title()})
 
         # --- Same location axis ---
         seed_lat = seed["gps_latitude"]

@@ -176,7 +176,7 @@ async def get_capsule_photos(
 @router.post("/api/capsules/{capsule_id}/save-album")
 async def save_capsule_as_album(
     capsule_id: str,
-    user: Optional[CurrentUser] = Depends(get_optional_user),
+    user: CurrentUser = Depends(require_edition),
 ):
     """Save a capsule as a new album."""
     user_id = user.user_id if user else None

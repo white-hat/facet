@@ -66,6 +66,8 @@ class CurrentUser:
     def is_edition(self):
         if is_multi_user_enabled():
             return self.role in ('admin', 'superadmin')
+        if not VIEWER_CONFIG.get('edition_password', ''):
+            return True
         return self.edition_authenticated
 
     @property
