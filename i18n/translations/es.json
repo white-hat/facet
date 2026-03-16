@@ -1632,7 +1632,10 @@
     "seeded_mood_title": "Ambiente de color",
     "progress_title": "Tu fotografía está mejorando",
     "color_palette_title": "{mood} — {date}",
-    "rare_pair_title": "{name1} & {name2} — Momento raro"
+    "rare_pair_title": "{name1} & {name2} — Momento raro",
+    "date_from": "Desde",
+    "date_to": "Hasta",
+    "regenerate": "Regenerar cápsulas"
   },
   "map": {
     "title": "Mapa",

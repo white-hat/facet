@@ -1632,7 +1632,10 @@
     "seeded_mood_title": "Color Mood",
     "progress_title": "Your Photography is Improving",
     "color_palette_title": "{mood} — {date}",
-    "rare_pair_title": "{name1} & {name2} — Rare Moment"
+    "rare_pair_title": "{name1} & {name2} — Rare Moment",
+    "date_from": "From",
+    "date_to": "To",
+    "regenerate": "Regenerate capsules"
   },
   "map": {
     "title": "Map",

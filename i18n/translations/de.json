@@ -1632,7 +1632,10 @@
     "seeded_mood_title": "Farbstimmung",
     "progress_title": "Ihre Fotografie verbessert sich",
     "color_palette_title": "{mood} — {date}",
-    "rare_pair_title": "{name1} & {name2} — Seltener Moment"
+    "rare_pair_title": "{name1} & {name2} — Seltener Moment",
+    "date_from": "Von",
+    "date_to": "Bis",
+    "regenerate": "Kapseln neu generieren"
   },
   "map": {
     "title": "Karte",

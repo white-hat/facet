@@ -95,13 +95,15 @@ def _count_tags(photos):
     return tag_counts
 
 
-def generate_all_capsules(conn, config=None, user_id=None):
+def generate_all_capsules(conn, config=None, user_id=None, date_from=None, date_to=None):
     """Generate all capsule types and return a combined list.
 
     Args:
         conn: SQLite connection
         config: Full scoring_config dict
         user_id: Optional user ID for visibility filtering
+        date_from: Optional ISO date string (YYYY-MM-DD) for start of range
+        date_to: Optional ISO date string (YYYY-MM-DD) for end of range
 
     Returns:
         list[dict] with keys: type, id, title, subtitle, cover_photo_path,
@@ -112,8 +114,16 @@ def generate_all_capsules(conn, config=None, user_id=None):
     capsule_config = config.get("capsules", {})
     min_aggregate = capsule_config.get("min_aggregate", 6.0)
 
-    from api.db_helpers import get_visibility_clause
-    vis = get_visibility_clause(user_id)
+    from api.db_helpers import get_visibility_clause, to_exif_date
+    vis_sql, vis_params = get_visibility_clause(user_id)
+    vis_params = list(vis_params)
+    if date_from:
+        vis_sql += " AND date_taken >= ?"
+        vis_params.append(to_exif_date(date_from))
+    if date_to:
+        vis_sql += " AND date_taken <= ?"
+        vis_params.append(to_exif_date(date_to) + " 23:59:59")
+    vis = (vis_sql, tuple(vis_params))
 
     capsules = []
     seen_ids = set()

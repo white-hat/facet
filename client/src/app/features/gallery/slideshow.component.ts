@@ -398,14 +398,14 @@ export class SlideshowComponent implements OnDestroy {
       return;
     }
 
-    // Preload all images in the slide
+    // Preload all images in the slide (waits for full image to be browser-cached)
     const preloadPromises = slide.photos.map(
       (photo) =>
         new Promise<void>((resolve) => {
           const img = new Image();
           img.onload = () => resolve();
           img.onerror = () => {
-            // Fallback to thumbnail for RAW files that fail to convert
+            // Full image failed — preload thumbnail as fallback
             const thumb = new Image();
             thumb.onload = () => resolve();
             thumb.onerror = () => resolve();

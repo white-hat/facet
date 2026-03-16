@@ -1,6 +1,8 @@
 import { Component, inject, signal, OnDestroy, afterNextRender } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -40,7 +42,9 @@ interface CapsulesResponse {
   host: { class: 'block px-4 pt-2 pb-4' },
   imports: [
     MatButtonModule,
+    MatFormFieldModule,
     MatIconModule,
+    MatInputModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
     MatSnackBarModule,
@@ -63,6 +67,20 @@ interface CapsulesResponse {
         <p>{{ 'capsules.empty' | translate }}</p>
       </div>
     }
+
+    <div class="flex items-center gap-3 mb-3">
+      <mat-form-field class="w-40" subscriptSizing="dynamic">
+        <mat-label>{{ 'capsules.date_from' | translate }}</mat-label>
+        <input matInput type="date" [value]="dateFrom()" (change)="dateFrom.set($any($event.target).value)">
+      </mat-form-field>
+      <mat-form-field class="w-40" subscriptSizing="dynamic">
+        <mat-label>{{ 'capsules.date_to' | translate }}</mat-label>
+        <input matInput type="date" [value]="dateTo()" (change)="dateTo.set($any($event.target).value)">
+      </mat-form-field>
+      <button mat-icon-button [matTooltip]="'capsules.regenerate' | translate" (click)="regenerate()" [disabled]="loading()">
+        <mat-icon [class.animate-spin]="loading()">refresh</mat-icon>
+      </button>
+    </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
       @for (capsule of capsules(); track capsule.id) {
@@ -153,6 +171,8 @@ export class CapsulesComponent implements OnDestroy {
   protected readonly loading = signal(false);
   protected readonly hasMore = signal(false);
   protected readonly total = signal(0);
+  protected readonly dateFrom = signal('');
+  protected readonly dateTo = signal('');
 
   protected readonly savingAlbum = signal(false);
 
@@ -182,7 +202,7 @@ export class CapsulesComponent implements OnDestroy {
     this.clearTransitionTimer();
   }
 
-  private async loadCapsules(): Promise<void> {
+  private async loadCapsules(refresh = false): Promise<void> {
     if (this.loading()) return;
     this.loading.set(true);
     try {
@@ -190,6 +210,9 @@ export class CapsulesComponent implements OnDestroy {
         this.api.get<CapsulesResponse>('/capsules', {
           page: this.currentPage,
           per_page: this.perPage,
+          date_from: this.dateFrom(),
+          date_to: this.dateTo(),
+          ...(refresh ? { refresh: true } : {}),
         }),
       );
       const resolved = res.capsules.map(c => this.resolveParams(c));
@@ -211,6 +234,11 @@ export class CapsulesComponent implements OnDestroy {
     if (this.loading() || !this.hasMore()) return;
     this.currentPage++;
     this.loadCapsules();
+  }
+
+  protected regenerate(): void {
+    this.currentPage = 1;
+    this.loadCapsules(true);
   }
 
   protected async playCapsule(capsule: Capsule): Promise<void> {

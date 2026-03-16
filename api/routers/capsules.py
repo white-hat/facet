@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["capsules"])
 
-# Per-user cache for full capsule list (with paths), regenerated at most once per hour
-_capsule_cache: dict[str | None, dict] = {}
+# Per-(user, date_from, date_to) cache for full capsule list, regenerated at most once per hour
+_capsule_cache: dict[tuple, dict] = {}
 _CACHE_TTL = 3600  # 1 hour
 
 
@@ -42,10 +42,16 @@ def _capsule_summary(capsule: dict) -> dict:
     }
 
 
-def _get_cached_capsules(user_id, refresh=False):
+def _cache_key(user_id, date_from="", date_to=""):
+    """Build a cache key tuple from user_id and optional date range."""
+    return (user_id, date_from or "", date_to or "")
+
+
+def _get_cached_capsules(user_id, refresh=False, date_from="", date_to=""):
     """Return (full_capsules_list, from_cache). Generates if needed."""
     now = time.time()
-    entry = _capsule_cache.get(user_id)
+    key = _cache_key(user_id, date_from, date_to)
+    entry = _capsule_cache.get(key)
 
     if not refresh and entry and (now - entry["ts"]) < _CACHE_TTL:
         return entry["data"], True
@@ -53,20 +59,22 @@ def _get_cached_capsules(user_id, refresh=False):
     return None, False
 
 
-def _set_cached_capsules(user_id, capsules):
+def _set_cached_capsules(user_id, capsules, date_from="", date_to=""):
     """Store full capsule list in per-user cache."""
-    _capsule_cache[user_id] = {"data": capsules, "ts": time.time()}
+    key = _cache_key(user_id, date_from, date_to)
+    _capsule_cache[key] = {"data": capsules, "ts": time.time()}
 
 
-def _resolve_capsule(capsule_id: str, user_id) -> dict:
+def _resolve_capsule(capsule_id: str, user_id, date_from="", date_to="") -> dict:
     """Find a capsule by ID from cache (generating if needed). Raises 404."""
-    cached, hit = _get_cached_capsules(user_id)
+    cached, hit = _get_cached_capsules(user_id, date_from=date_from, date_to=date_to)
     if not hit:
         conn = get_db_connection()
         try:
             from analyzers.capsule_generator import generate_all_capsules
-            cached = generate_all_capsules(conn, config=_FULL_CONFIG, user_id=user_id)
-            _set_cached_capsules(user_id, cached)
+            cached = generate_all_capsules(conn, config=_FULL_CONFIG, user_id=user_id,
+                                           date_from=date_from, date_to=date_to)
+            _set_cached_capsules(user_id, cached, date_from=date_from, date_to=date_to)
         finally:
             conn.close()
 
@@ -82,18 +90,21 @@ async def get_capsules(
     refresh: bool = Query(False),
     page: int = Query(1, ge=1),
     per_page: int = Query(24, ge=1, le=200),
+    date_from: str = Query(""),
+    date_to: str = Query(""),
 ):
     """Return available capsules (cached 1h, paginated)."""
     user_id = user.user_id if user else None
 
-    cached, hit = _get_cached_capsules(user_id, refresh)
+    cached, hit = _get_cached_capsules(user_id, refresh, date_from=date_from, date_to=date_to)
     if not hit:
         conn = get_db_connection()
         try:
             from analyzers.capsule_generator import generate_all_capsules
 
-            cached = generate_all_capsules(conn, config=_FULL_CONFIG, user_id=user_id)
-            _set_cached_capsules(user_id, cached)
+            cached = generate_all_capsules(conn, config=_FULL_CONFIG, user_id=user_id,
+                                           date_from=date_from, date_to=date_to)
+            _set_cached_capsules(user_id, cached, date_from=date_from, date_to=date_to)
         except Exception:
             logger.exception("Failed to generate capsules")
             raise HTTPException(status_code=500, detail="Failed to generate capsules")
