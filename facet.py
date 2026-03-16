@@ -666,7 +666,7 @@ Configuration:
         from tqdm import tqdm
 
         config = ScoringConfig(args.config)
-        target_lang = config.raw_config.get('translation', {}).get('target_language', '')
+        target_lang = config.config.get('translation', {}).get('target_language', '')
         if not target_lang:
             logger.error("No target_language configured in scoring_config.json → translation section.")
             sys.exit(1)
@@ -721,7 +721,7 @@ Configuration:
         from analyzers.auto_album import generate_auto_albums
         config = ScoringConfig(args.config)
         with get_connection(args.db) as conn:
-            albums = generate_auto_albums(conn, config=config.raw_config)
+            albums = generate_auto_albums(conn, config=config.config)
             logger.info("Auto-generated %d albums.", len(albums))
             for a in albums:
                 logger.info("  %s (%d photos)", a['name'], a['photo_count'])
