@@ -1620,7 +1620,19 @@
     "cross_title": "{a} — {b}",
     "score_per_dim_title": "{score}: {dimension}",
     "person_pair_title": "{name1} & {name2}",
-    "best_face_quality_title": "Mejor calidad de rostro"
+    "best_face_quality_title": "Mejor calidad de rostro",
+    "save_as_album": "Guardar como álbum",
+    "saved_as_album": "Guardado como álbum",
+    "save_album_error": "Error al guardar el álbum",
+    "seeded_time_title": "Alrededor de {date}",
+    "seeded_similar_title": "Visualmente similares",
+    "seeded_person_title": "Más de {name}",
+    "seeded_tag_title": "Colección {tag}",
+    "seeded_location_title": "Lugares cercanos",
+    "seeded_mood_title": "Ambiente de color",
+    "progress_title": "Tu fotografía está mejorando",
+    "color_palette_title": "{mood} — {date}",
+    "rare_pair_title": "{name1} & {name2} — Momento raro"
   },
   "map": {
     "title": "Mapa",

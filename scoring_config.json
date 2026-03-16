@@ -1842,12 +1842,7 @@
     "max_photos": 10000,
     "max_group_size": 50
   },
-  "auto_albums": {
-    "min_photos_per_album": 5,
-    "time_gap_hours": 4,
-    "embedding_threshold": 0.6
-  },
-  "capsules": {
+"capsules": {
     "min_aggregate": 6.0,
     "max_photos_per_capsule": 40,
     "journey": {
@@ -1885,6 +1880,27 @@
     },
     "tag_collection": {
       "min_photos": 15
+    },
+    "seeded": {
+      "num_seeds": 20,
+      "min_photos": 8,
+      "seed_lifetime_minutes": 1440,
+      "time_window_days": 7,
+      "embedding_threshold": 0.7,
+      "location_radius_km": 30
+    },
+    "progress": {
+      "min_improvement_pct": 5,
+      "min_photos": 10,
+      "period_months": 3
+    },
+    "color_palette": {
+      "min_photos": 8
+    },
+    "rare_pair": {
+      "max_shared_photos": 5,
+      "min_score": 7.0,
+      "min_photos": 3
     }
   },
   "models": {

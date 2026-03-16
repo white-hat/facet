@@ -273,16 +273,6 @@ Save a combination of filters (camera, tag, person, date range, score thresholds
 
 Controlled by `viewer.features.show_albums` (default: `true`).
 
-### AI Auto-Albums
-
-Click "Auto-Generate" on the albums page to automatically create albums from photo clusters based on time proximity, GPS location, and content similarity. Albums are named using date ranges and detected themes.
-
-Also available via CLI:
-
-```bash
-python facet.py --auto-albums
-```
-
 ### Photo Sharing
 
 Share albums with external users via tokenized links. No authentication required to view shared albums.

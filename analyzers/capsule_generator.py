@@ -11,12 +11,18 @@ Generates capsule types:
 8. Year in Review — best photos of each year
 9. Camera Collection — best photos from each camera body
 10. Tag Collection — best photos for each popular tag
+11. Seeded Discovery — seed-based exploration via time, similarity, person, tag, location, mood
+12. Progress — "Your Photography is Improving" from quarterly score trends
+13. Color Palette — "Color of the Month" from saturation/monochrome profiles
+14. Rare Pairs — infrequent person pairs in high-scoring photos
 """
 
 import hashlib
 import json
 import logging
 import math
+import random
+import time
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -69,20 +75,23 @@ def _haversine_km(lat1, lon1, lat2, lon2):
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
+def _parse_tags(tags_str):
+    """Parse a tags string (JSON array or comma-separated) into a list of clean tag strings."""
+    if not tags_str:
+        return []
+    try:
+        tag_list = json.loads(tags_str) if tags_str.startswith("[") else tags_str.split(",")
+        return [t.strip().strip('"') for t in tag_list if t.strip().strip('"')]
+    except (json.JSONDecodeError, AttributeError):
+        return []
+
+
 def _count_tags(photos):
     """Count tag occurrences across a list of photo rows. Returns defaultdict[str, int]."""
     tag_counts = defaultdict(int)
     for photo in photos:
-        tags_str = photo["tags"] or ""
-        if tags_str:
-            try:
-                tag_list = json.loads(tags_str) if tags_str.startswith("[") else tags_str.split(",")
-                for tag in tag_list:
-                    tag = tag.strip().strip('"')
-                    if tag:
-                        tag_counts[tag] += 1
-            except (json.JSONDecodeError, AttributeError):
-                pass
+        for tag in _parse_tags(photo["tags"] or ""):
+            tag_counts[tag] += 1
     return tag_counts
 
 
@@ -119,6 +128,10 @@ def generate_all_capsules(conn, config=None, user_id=None):
         _generate_this_week,
         _generate_location,
         _generate_person_pairs,
+        _generate_seeded,
+        _generate_progress,
+        _generate_color_palette,
+        _generate_rare_pairs,
     ]
 
     for gen in generators:
@@ -143,7 +156,48 @@ def generate_all_capsules(conn, config=None, user_id=None):
     max_overlap = capsule_config.get("max_photo_overlap", 0.6)
     capsules = _deduplicate_capsules(capsules, max_overlap)
 
+    # Sort: interleave types, prioritize specialized generators over dimension combos
+    capsules = _sort_capsules(capsules)
+
     return capsules
+
+
+# Priority tiers for capsule type sorting (lower = shown first)
+_TYPE_PRIORITY = {
+    "journey": 0, "faces_of": 0, "golden": 0, "this_week": 0,
+    "seeded": 1, "person_pair": 1, "rare_pair": 1, "color_story": 1,
+    "progress": 1, "color_palette": 1, "location": 1,
+    "seasonal": 2, "year": 2, "month": 3, "camera": 3, "lens": 3,
+    "tag": 3, "day_of_week": 3, "week": 4,
+}
+
+
+def _sort_capsules(capsules):
+    """Sort capsules: interleave types so no long runs of the same type, prioritize interesting ones."""
+    # Assign priority (default 5 for cross-dimensional combos)
+    for c in capsules:
+        c["_priority"] = _TYPE_PRIORITY.get(c["type"], 5)
+
+    # Group by type
+    by_type = defaultdict(list)
+    for c in capsules:
+        by_type[c["type"]].append(c)
+
+    # Round-robin interleave: take one from each type in priority order, repeat
+    sorted_types = sorted(by_type.keys(), key=lambda t: _TYPE_PRIORITY.get(t, 5))
+    result = []
+    queues = {t: list(by_type[t]) for t in sorted_types}
+
+    while any(queues.values()):
+        for t in sorted_types:
+            if queues.get(t):
+                result.append(queues[t].pop(0))
+
+    # Clean up internal key
+    for c in result:
+        c.pop("_priority", None)
+
+    return result
 
 
 def _deduplicate_capsules(capsules, max_overlap=0.6):
@@ -710,16 +764,8 @@ def _generate_location(conn, capsule_config, min_aggregate, vis, user_id):
     return capsules
 
 
-def _generate_person_pairs(conn, capsule_config, min_aggregate, vis, user_id):
-    """Generate capsules for pairs of named persons appearing together."""
-    cfg = capsule_config.get("person_pairs", {})
-    min_photos = cfg.get("min_photos", 8)
-    max_photos = capsule_config.get("max_photos_per_capsule", 40)
-
-    from api.db_helpers import get_visibility_clause
-    vis_sql, vis_params = get_visibility_clause(user_id, table_alias='ph')
-
-    # Find photo paths where 2+ named persons co-appear
+def _fetch_person_pairs(conn, min_score, vis_sql, vis_params, max_photos):
+    """Query person pairs co-appearing in photos. Returns {(pid1,pid2): (name1, name2, [paths])}."""
     rows = conn.execute(
         f"""SELECT f1.photo_path, p1.id AS pid1, p1.name AS name1,
                p2.id AS pid2, p2.name AS name2, ph.aggregate
@@ -732,14 +778,11 @@ def _generate_person_pairs(conn, capsule_config, min_aggregate, vis, user_id):
              AND p2.name IS NOT NULL AND p2.name != ''
              AND ph.aggregate >= ?
              AND {vis_sql}
-           ORDER BY ph.aggregate DESC""",
-        [min_aggregate] + vis_params,
+           ORDER BY ph.aggregate DESC
+           LIMIT 10000""",
+        [min_score] + vis_params,
     ).fetchall()
 
-    if not rows:
-        return []
-
-    # Group by person pair
     groups = defaultdict(list)
     pair_names = {}
     for r in rows:
@@ -748,13 +791,26 @@ def _generate_person_pairs(conn, capsule_config, min_aggregate, vis, user_id):
         if len(groups[key]) < max_photos:
             groups[key].append(r["photo_path"])
 
+    return {k: (pair_names[k][0], pair_names[k][1], list(dict.fromkeys(v)))
+            for k, v in groups.items()}
+
+
+def _generate_person_pairs(conn, capsule_config, min_aggregate, vis, user_id):
+    """Generate capsules for pairs of named persons appearing together."""
+    cfg = capsule_config.get("person_pairs", {})
+    min_photos = cfg.get("min_photos", 8)
+    max_photos = capsule_config.get("max_photos_per_capsule", 40)
+
+    from api.db_helpers import get_visibility_clause
+    vis_sql, vis_params = get_visibility_clause(user_id, table_alias='ph')
+
+    pairs = _fetch_person_pairs(conn, min_aggregate, vis_sql, vis_params, max_photos)
+
     capsules = []
-    for (pid1, pid2), paths in groups.items():
-        unique_paths = list(dict.fromkeys(paths))
+    for (pid1, pid2), (name1, name2, unique_paths) in pairs.items():
         if len(unique_paths) < min_photos:
             continue
 
-        name1, name2 = pair_names[(pid1, pid2)]
         cid = _stable_id("pair", str(pid1), str(pid2))
         capsules.append({
             "type": "person_pair",
@@ -766,6 +822,440 @@ def _generate_person_pairs(conn, capsule_config, min_aggregate, vis, user_id):
             "cover_photo_path": unique_paths[0],
             "photo_count": len(unique_paths),
             "icon": "group",
+            "params": {"paths": unique_paths},
+        })
+
+    return capsules
+
+
+def _generate_seeded(conn, capsule_config, min_aggregate, vis, user_id):
+    """Generate seed-based discovery capsules — stable within a time window."""
+    cfg = capsule_config.get("seeded", {})
+    num_seeds = cfg.get("num_seeds", 20)
+    min_photos = cfg.get("min_photos", 8)
+    seed_lifetime_minutes = cfg.get("seed_lifetime_minutes", 1440)
+    time_window_days = cfg.get("time_window_days", 7)
+    embedding_threshold = cfg.get("embedding_threshold", 0.7)
+    location_radius_km = cfg.get("location_radius_km", 30)
+    max_photos = capsule_config.get("max_photos_per_capsule", 40)
+
+    vis_sql, vis_params = vis
+
+    # Local RNG with time-bucketed seed for stability (avoids mutating global state)
+    rng = random.Random(int(time.time() // (seed_lifetime_minutes * 60)))
+
+    # Fetch candidate high-scoring photos
+    rows = conn.execute(
+        f"""SELECT path, date_taken, aggregate, gps_latitude, gps_longitude,
+               mean_saturation, is_monochrome, clip_embedding, tags
+           FROM photos
+           WHERE aggregate >= ? AND {vis_sql}
+           ORDER BY aggregate DESC
+           LIMIT 2000""",
+        [min_aggregate] + vis_params,
+    ).fetchall()
+
+    if not rows:
+        return []
+
+    # Pre-decode embeddings once for vectorized similarity (avoids per-seed reload)
+    _emb_list = []
+    _emb_indices = []  # maps emb_matrix row → rows index
+    _emb_paths = []
+    for ri, r in enumerate(rows):
+        emb = bytes_to_normalized_embedding(r["clip_embedding"])
+        if emb is not None:
+            _emb_list.append(emb)
+            _emb_indices.append(ri)
+            _emb_paths.append(r["path"])
+    emb_matrix = np.stack(_emb_list) if _emb_list else None
+
+    # Pick seed indices deterministically
+    seed_indices = rng.sample(range(len(rows)), min(num_seeds, len(rows)))
+
+    capsules = []
+    for idx in seed_indices:
+        seed = rows[idx]
+        seed_path = seed["path"]
+        best_axis = None
+        best_photos = []
+        best_score = 0
+
+        # --- Time neighborhood axis ---
+        seed_dt = _parse_date(seed["date_taken"])
+        if seed_dt:
+            window_start = seed_dt - timedelta(days=time_window_days)
+            window_end = seed_dt + timedelta(days=time_window_days)
+            start_str = window_start.strftime("%Y:%m:%d %H:%M:%S")
+            end_str = window_end.strftime("%Y:%m:%d %H:%M:%S")
+            time_rows = conn.execute(
+                f"""SELECT path, aggregate
+                   FROM photos
+                   WHERE date_taken BETWEEN ? AND ?
+                     AND path != ? AND aggregate >= ? AND {vis_sql}
+                   ORDER BY aggregate DESC
+                   LIMIT ?""",
+                [start_str, end_str, seed_path, min_aggregate] + vis_params + [max_photos],
+            ).fetchall()
+            if time_rows:
+                avg_agg = sum(r["aggregate"] for r in time_rows) / len(time_rows)
+                score = len(time_rows) * avg_agg
+                if score > best_score:
+                    best_score = score
+                    best_photos = time_rows
+                    if seed_dt:
+                        title_date = seed_dt.strftime("%B %Y")
+                    best_axis = ("time", {"date": title_date})
+
+        # --- Visual similarity axis (vectorized, uses pre-loaded matrix) ---
+        seed_emb = bytes_to_normalized_embedding(seed["clip_embedding"])
+        if seed_emb is not None and emb_matrix is not None:
+            sims = emb_matrix @ seed_emb  # vectorized cosine similarity
+            mask = sims >= embedding_threshold
+            similar_idx = np.where(mask)[0]
+            if len(similar_idx) > 0:
+                # Sort by similarity desc, take top max_photos, exclude seed
+                order = np.argsort(-sims[similar_idx])[:max_photos + 1]
+                similar = []
+                for oi in order:
+                    ri = _emb_indices[similar_idx[oi]]
+                    r = rows[ri]
+                    if r["path"] != seed_path:
+                        similar.append(r)
+                        if len(similar) >= max_photos:
+                            break
+                if similar:
+                    avg_agg = sum(r["aggregate"] for r in similar) / len(similar)
+                    score = len(similar) * avg_agg
+                    if score > best_score:
+                        best_score = score
+                        best_photos = similar
+                        best_axis = ("similar", {})
+
+        # --- Same person axis ---
+        person_rows = conn.execute(
+            f"""SELECT DISTINCT f.photo_path AS path, p.aggregate
+               FROM faces f
+               JOIN photos p ON p.path = f.photo_path
+               WHERE f.person_id IN (SELECT person_id FROM faces WHERE photo_path = ?)
+                 AND f.photo_path != ?
+                 AND p.aggregate >= ? AND {vis_sql}
+               ORDER BY p.aggregate DESC
+               LIMIT ?""",
+            [seed_path, seed_path, min_aggregate] + vis_params + [max_photos],
+        ).fetchall()
+        if person_rows:
+            # Get person name for title
+            name_row = conn.execute(
+                """SELECT p.name FROM persons p
+                   JOIN faces f ON f.person_id = p.id
+                   WHERE f.photo_path = ? AND p.name IS NOT NULL AND p.name != ''
+                   LIMIT 1""",
+                [seed_path],
+            ).fetchone()
+            avg_agg = sum(r["aggregate"] for r in person_rows) / len(person_rows)
+            score = len(person_rows) * avg_agg
+            if score > best_score:
+                best_score = score
+                best_photos = person_rows
+                person_name = name_row["name"] if name_row else "Unknown"
+                best_axis = ("person", {"name": person_name})
+
+        # --- Same tags axis ---
+        tag_list = _parse_tags(seed["tags"] or "")
+        if tag_list:
+                top_tag = tag_list[0]
+                tag_rows = conn.execute(
+                    f"""SELECT DISTINCT pt.photo_path AS path, p.aggregate
+                       FROM photo_tags pt
+                       JOIN photos p ON p.path = pt.photo_path
+                       WHERE pt.tag = ? AND pt.photo_path != ?
+                         AND p.aggregate >= ? AND {vis_sql}
+                       ORDER BY p.aggregate DESC
+                       LIMIT ?""",
+                    [top_tag, seed_path, min_aggregate] + vis_params + [max_photos],
+                ).fetchall()
+                if tag_rows:
+                    avg_agg = sum(r["aggregate"] for r in tag_rows) / len(tag_rows)
+                    score = len(tag_rows) * avg_agg
+                    if score > best_score:
+                        best_score = score
+                        best_photos = tag_rows
+                        best_axis = ("tag", {"tag": top_tag.title()})
+
+        # --- Same location axis ---
+        seed_lat = seed["gps_latitude"]
+        seed_lon = seed["gps_longitude"]
+        if seed_lat is not None and seed_lon is not None:
+            # Rough bounding box
+            deg_delta = location_radius_km / 111.0
+            loc_rows = conn.execute(
+                f"""SELECT path, aggregate, gps_latitude, gps_longitude
+                   FROM photos
+                   WHERE gps_latitude BETWEEN ? AND ?
+                     AND gps_longitude BETWEEN ? AND ?
+                     AND path != ? AND aggregate >= ? AND {vis_sql}
+                   ORDER BY aggregate DESC
+                   LIMIT ?""",
+                [seed_lat - deg_delta, seed_lat + deg_delta,
+                 seed_lon - deg_delta, seed_lon + deg_delta,
+                 seed_path, min_aggregate] + vis_params + [max_photos * 2],
+            ).fetchall()
+            # Precise haversine filter
+            nearby = [r for r in loc_rows
+                      if _haversine_km(seed_lat, seed_lon, r["gps_latitude"], r["gps_longitude"]) <= location_radius_km]
+            nearby = nearby[:max_photos]
+            if nearby:
+                avg_agg = sum(r["aggregate"] for r in nearby) / len(nearby)
+                score = len(nearby) * avg_agg
+                if score > best_score:
+                    best_score = score
+                    best_photos = nearby
+                    best_axis = ("location", {})
+
+        # --- Color mood axis ---
+        seed_sat = seed["mean_saturation"]
+        seed_mono = seed["is_monochrome"]
+        if seed_sat is not None:
+            mood_rows = conn.execute(
+                f"""SELECT path, aggregate
+                   FROM photos
+                   WHERE mean_saturation BETWEEN ? AND ?
+                     AND is_monochrome = ?
+                     AND path != ? AND aggregate >= ? AND {vis_sql}
+                   ORDER BY aggregate DESC
+                   LIMIT ?""",
+                [seed_sat - 0.1, seed_sat + 0.1,
+                 seed_mono or 0, seed_path, min_aggregate] + vis_params + [max_photos],
+            ).fetchall()
+            if mood_rows:
+                avg_agg = sum(r["aggregate"] for r in mood_rows) / len(mood_rows)
+                score = len(mood_rows) * avg_agg
+                if score > best_score:
+                    best_score = score
+                    best_photos = mood_rows
+                    best_axis = ("mood", {})
+
+        # Build capsule from best axis
+        if best_axis is None or len(best_photos) < min_photos:
+            continue
+
+        axis_type, axis_params = best_axis
+        paths = [seed_path] + [r["path"] for r in best_photos if r["path"] != seed_path]
+        paths = list(dict.fromkeys(paths))[:max_photos]
+
+        title_key_map = {
+            "time": "capsules.seeded_time_title",
+            "similar": "capsules.seeded_similar_title",
+            "person": "capsules.seeded_person_title",
+            "tag": "capsules.seeded_tag_title",
+            "location": "capsules.seeded_location_title",
+            "mood": "capsules.seeded_mood_title",
+        }
+        title_map = {
+            "time": f"Around {axis_params.get('date', '')}",
+            "similar": "Visually Similar",
+            "person": f"More of {axis_params.get('name', '')}",
+            "tag": f"{axis_params.get('tag', '')} Collection",
+            "location": "Nearby Places",
+            "mood": "Color Mood",
+        }
+
+        cid = _stable_id("seeded", axis_type, seed_path)
+        capsules.append({
+            "type": "seeded",
+            "id": f"seeded_{cid}",
+            "title_key": title_key_map[axis_type],
+            "title_params": axis_params,
+            "title": title_map[axis_type],
+            "subtitle": f"{len(paths)} photos",
+            "cover_photo_path": seed_path,
+            "photo_count": len(paths),
+            "icon": "auto_awesome",
+            "params": {"paths": paths},
+        })
+
+    return capsules
+
+
+def _generate_progress(conn, capsule_config, min_aggregate, vis, user_id):
+    """Generate 'Your Photography is Improving' capsule from quarterly score trends."""
+    cfg = capsule_config.get("progress", {})
+    min_improvement_pct = cfg.get("min_improvement_pct", 5)
+    min_photos = cfg.get("min_photos", 10)
+    period_months = cfg.get("period_months", 3)
+    max_photos = capsule_config.get("max_photos_per_capsule", 40)
+
+    vis_sql, vis_params = vis
+
+    # Get average aggregate per quarter
+    rows = conn.execute(
+        f"""SELECT
+               CAST(strftime('%Y', {_ISO_DATE}) AS INTEGER) AS yr,
+               (CAST(strftime('%m', {_ISO_DATE}) AS INTEGER) - 1) / {period_months} AS qtr,
+               AVG(aggregate) AS avg_agg,
+               COUNT(*) AS cnt
+           FROM photos
+           WHERE aggregate IS NOT NULL AND date_taken IS NOT NULL AND {vis_sql}
+           GROUP BY yr, qtr
+           HAVING cnt >= ?
+           ORDER BY yr ASC, qtr ASC""",
+        vis_params + [min_photos],
+    ).fetchall()
+
+    if len(rows) < 2:
+        return []
+
+    # Check if most recent quarter improved over the previous
+    recent = rows[-1]
+    previous = rows[-2]
+    if previous["avg_agg"] <= 0:
+        return []
+
+    improvement = (recent["avg_agg"] - previous["avg_agg"]) / previous["avg_agg"] * 100
+    if improvement < min_improvement_pct:
+        return []
+
+    # Fetch best photos from the improving period
+    recent_yr = recent["yr"]
+    recent_qtr = recent["qtr"]
+    month_start = recent_qtr * period_months + 1
+    month_end = month_start + period_months
+
+    best_photos = conn.execute(
+        f"""SELECT path, aggregate
+           FROM photos
+           WHERE CAST(strftime('%Y', {_ISO_DATE}) AS INTEGER) = ?
+             AND CAST(strftime('%m', {_ISO_DATE}) AS INTEGER) >= ?
+             AND CAST(strftime('%m', {_ISO_DATE}) AS INTEGER) < ?
+             AND aggregate IS NOT NULL AND {vis_sql}
+           ORDER BY aggregate DESC
+           LIMIT ?""",
+        [recent_yr, month_start, month_end] + vis_params + [max_photos],
+    ).fetchall()
+
+    if len(best_photos) < min_photos:
+        return []
+
+    paths = [r["path"] for r in best_photos]
+    cid = _stable_id("progress", str(recent_yr), str(recent_qtr))
+
+    return [{
+        "type": "progress",
+        "id": f"progress_{cid}",
+        "title_key": "capsules.progress_title",
+        "title_params": {},
+        "title": "Your Photography is Improving",
+        "subtitle": f"{len(paths)} photos",
+        "cover_photo_path": paths[0],
+        "photo_count": len(paths),
+        "icon": "trending_up",
+        "params": {"paths": paths},
+    }]
+
+
+def _generate_color_palette(conn, capsule_config, min_aggregate, vis, user_id):
+    """Generate 'Color of the Month' capsules from saturation/monochrome profiles."""
+    cfg = capsule_config.get("color_palette", {})
+    min_photos = cfg.get("min_photos", 8)
+    max_photos = capsule_config.get("max_photos_per_capsule", 40)
+
+    vis_sql, vis_params = vis
+
+    # Get monthly color profiles
+    rows = conn.execute(
+        f"""SELECT
+               strftime('%Y-%m', {_ISO_DATE}) AS month_key,
+               AVG(mean_saturation) AS avg_sat,
+               AVG(CASE WHEN is_monochrome = 1 THEN 1.0 ELSE 0.0 END) AS mono_ratio,
+               COUNT(*) AS cnt
+           FROM photos
+           WHERE mean_saturation IS NOT NULL AND date_taken IS NOT NULL
+             AND aggregate >= ? AND {vis_sql}
+           GROUP BY month_key
+           HAVING cnt >= ?
+           ORDER BY month_key DESC""",
+        [min_aggregate] + vis_params + [min_photos],
+    ).fetchall()
+
+    capsules = []
+    for row in rows:
+        month_key = row["month_key"]
+        avg_sat = row["avg_sat"]
+        mono_ratio = row["mono_ratio"]
+
+        # Determine mood
+        if mono_ratio > 0.5:
+            mood = "Monochrome"
+        elif avg_sat > 0.5:
+            mood = "Vibrant"
+        elif avg_sat < 0.25:
+            mood = "Muted"
+        else:
+            continue  # No distinctive profile
+
+        # Fetch photos for this month
+        photos = conn.execute(
+            f"""SELECT path, aggregate
+               FROM photos
+               WHERE strftime('%Y-%m', {_ISO_DATE}) = ?
+                 AND aggregate >= ? AND {vis_sql}
+               ORDER BY aggregate DESC
+               LIMIT ?""",
+            [month_key, min_aggregate] + vis_params + [max_photos],
+        ).fetchall()
+
+        if len(photos) < min_photos:
+            continue
+
+        paths = [p["path"] for p in photos]
+        cid = _stable_id("color_palette", month_key, mood)
+
+        capsules.append({
+            "type": "color_palette",
+            "id": f"color_palette_{cid}",
+            "title_key": "capsules.color_palette_title",
+            "title_params": {"mood": mood, "date": month_key},
+            "title": f"{mood} \u2014 {month_key}",
+            "subtitle": f"{len(paths)} photos",
+            "cover_photo_path": paths[0],
+            "photo_count": len(paths),
+            "icon": "palette",
+            "params": {"paths": paths},
+        })
+
+    return capsules
+
+
+def _generate_rare_pairs(conn, capsule_config, min_aggregate, vis, user_id):
+    """Generate 'Unexpected Together' capsules for rare person pairs."""
+    cfg = capsule_config.get("rare_pair", {})
+    max_shared_photos = cfg.get("max_shared_photos", 5)
+    min_score = cfg.get("min_score", 7.0)
+    min_photos = cfg.get("min_photos", 3)
+    max_photos = capsule_config.get("max_photos_per_capsule", 40)
+
+    from api.db_helpers import get_visibility_clause
+    vis_sql, vis_params = get_visibility_clause(user_id, table_alias='ph')
+
+    pairs = _fetch_person_pairs(conn, min_score, vis_sql, vis_params, max_photos)
+
+    capsules = []
+    for (pid1, pid2), (name1, name2, unique_paths) in pairs.items():
+        if len(unique_paths) < min_photos or len(unique_paths) > max_shared_photos:
+            continue
+
+        cid = _stable_id("rare_pair", str(pid1), str(pid2))
+        capsules.append({
+            "type": "rare_pair",
+            "id": f"rare_pair_{cid}",
+            "title_key": "capsules.rare_pair_title",
+            "title_params": {"name1": name1, "name2": name2},
+            "title": f"{name1} & {name2} \u2014 Rare Moment",
+            "subtitle": f"{len(unique_paths)} photos",
+            "cover_photo_path": unique_paths[0],
+            "photo_count": len(unique_paths),
+            "icon": "people_outline",
             "params": {"paths": unique_paths},
         })
 

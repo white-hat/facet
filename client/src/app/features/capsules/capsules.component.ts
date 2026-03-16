@@ -1,10 +1,12 @@
-import { Component, inject, signal, computed, OnDestroy, afterNextRender } from '@angular/core';
+import { Component, inject, signal, OnDestroy, afterNextRender } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
@@ -41,6 +43,7 @@ interface CapsulesResponse {
     MatIconModule,
     MatProgressSpinnerModule,
     MatTooltipModule,
+    MatSnackBarModule,
     TranslatePipe,
     ThumbnailUrlPipe,
     InfiniteScrollDirective,
@@ -63,7 +66,7 @@ interface CapsulesResponse {
 
     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
       @for (capsule of capsules(); track capsule.id) {
-        <button
+        <div
           class="group flex flex-col rounded-xl overflow-hidden bg-[var(--mat-sys-surface-container)] hover:shadow-lg transition-shadow cursor-pointer text-left w-full"
           (click)="playCapsule(capsule)"
         >
@@ -73,11 +76,7 @@ interface CapsulesResponse {
                    [alt]="capsule.title"
                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
               <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-              <div class="absolute bottom-2 left-2 right-2 flex items-end justify-between">
-                <div class="flex items-center gap-1 text-white">
-                  <mat-icon class="!text-base !w-4 !h-4 !leading-4">{{ capsule.icon }}</mat-icon>
-                  <span class="text-xs opacity-80">{{ capsule.photo_count }}</span>
-                </div>
+              <div class="absolute bottom-2 right-2">
                 <mat-icon class="!text-white opacity-0 group-hover:opacity-80 transition-opacity">play_circle</mat-icon>
               </div>
             </div>
@@ -86,11 +85,27 @@ interface CapsulesResponse {
               <mat-icon class="!text-4xl !w-10 !h-10 opacity-30">{{ capsule.icon }}</mat-icon>
             </div>
           }
-          <div class="p-2">
-            <div class="font-medium text-sm truncate">{{ capsule.title_key | translate:capsule.title_params }}</div>
-            <div class="text-xs opacity-60 truncate">{{ 'capsules.photos_count' | translate:{ count: capsule.photo_count } }}</div>
+          <div class="p-2 flex items-start gap-1">
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm truncate">{{ capsule.title_key | translate:capsule.title_params }}</div>
+              <div class="flex items-center gap-1 text-xs opacity-60">
+                <mat-icon class="!text-xs !w-3 !h-3 !leading-3 inline-flex">{{ capsule.icon }}</mat-icon>
+                <span>{{ capsule.photo_count }}</span>
+              </div>
+            </div>
+            @if (auth.isEdition()) {
+              <button
+                mat-icon-button
+                class="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                [matTooltip]="'capsules.save_as_album' | translate"
+                [disabled]="savingAlbum()"
+                (click)="saveAsAlbumFromCard($event, capsule)"
+              >
+                <mat-icon class="opacity-60">playlist_add</mat-icon>
+              </button>
+            }
           </div>
-        </button>
+        </div>
       }
     </div>
 
@@ -130,12 +145,16 @@ interface CapsulesResponse {
 })
 export class CapsulesComponent implements OnDestroy {
   private readonly api = inject(ApiService);
+  protected readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
+  private readonly snackBar = inject(MatSnackBar);
 
   protected readonly capsules = signal<Capsule[]>([]);
   protected readonly loading = signal(false);
   protected readonly hasMore = signal(false);
   protected readonly total = signal(0);
+
+  protected readonly savingAlbum = signal(false);
 
   // Slideshow state
   protected readonly slideshowActive = signal(false);
@@ -220,6 +239,27 @@ export class CapsulesComponent implements OnDestroy {
       this.slideshowPhotos.set([]);
     } finally {
       this.slideshowLoading.set(false);
+    }
+  }
+
+  protected async saveAsAlbumFromCard(event: Event, capsule: Capsule): Promise<void> {
+    event.stopPropagation();
+    if (this.savingAlbum()) return;
+    this.savingAlbum.set(true);
+    try {
+      await firstValueFrom(
+        this.api.post<{ album_id: number; name: string }>(`/capsules/${capsule.id}/save-album`),
+      );
+      this.snackBar.open(
+        this.i18n.t('capsules.saved_as_album'),
+        '', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' },
+      );
+    } catch {
+      this.snackBar.open(
+        this.i18n.t('capsules.save_album_error'), '', { duration: 3000 },
+      );
+    } finally {
+      this.savingAlbum.set(false);
     }
   }
 

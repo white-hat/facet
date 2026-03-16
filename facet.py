@@ -242,8 +242,6 @@ Configuration:
                         help='Generate AI captions for photos without one (requires VLM)')
     ai_group.add_argument('--translate-captions', action='store_true',
                         help='Translate English captions to the configured target language (CPU, MarianMT)')
-    ai_group.add_argument('--auto-albums', action='store_true',
-                        help='Auto-generate albums from temporal and visual clustering')
     ai_group.add_argument('--extract-gps', action='store_true',
                         help='Backfill GPS coordinates from EXIF data for photos missing GPS')
     ai_group.add_argument('--rescan-gps', action='store_true',
@@ -714,17 +712,6 @@ Configuration:
                     conn.commit()
             translator.unload()
         logger.info("Caption translation complete.")
-        exit()
-
-    # Auto-generate albums
-    if args.auto_albums:
-        from analyzers.auto_album import generate_auto_albums
-        config = ScoringConfig(args.config)
-        with get_connection(args.db) as conn:
-            albums = generate_auto_albums(conn, config=config.config)
-            logger.info("Auto-generated %d albums.", len(albums))
-            for a in albums:
-                logger.info("  %s (%d photos)", a['name'], a['photo_count'])
         exit()
 
     # Backfill GPS coordinates from EXIF

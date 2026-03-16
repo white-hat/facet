@@ -17,7 +17,6 @@ import { EditAlbumDialogComponent } from './edit-album-dialog.component';
 import { AlbumsFiltersService } from './albums-filters.service';
 import { ShareDialogComponent, ShareDialogData } from '../../shared/components/share-dialog/share-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 
 @Component({
   selector: 'app-albums',
@@ -25,7 +24,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
   host: { class: 'block px-4 pt-2 pb-4' },
   imports: [
     RouterLink, MatButtonModule, MatIconModule, MatDialogModule, MatTooltipModule,
-    MatProgressSpinnerModule, MatSnackBarModule,
+    MatProgressSpinnerModule,
     TranslatePipe, ThumbnailUrlPipe, InfiniteScrollDirective,
   ],
   template: `
@@ -33,23 +32,11 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
       @if (auth.isEdition()) {
         <div class="flex gap-2">
           <!-- Small screen: icon-only buttons -->
-          <button mat-icon-button class="sm:!hidden" (click)="autoGenerateAlbums()" [disabled]="autoGenerating()"
-                  [matTooltip]="'auto_albums.auto_generate' | translate">
-            <mat-icon [class.animate-spin]="autoGenerating()">{{ autoGenerating() ? 'refresh' : 'auto_fix_high' }}</mat-icon>
-          </button>
           <button mat-icon-button class="sm:!hidden" (click)="openCreateDialog()"
                   [matTooltip]="'albums.create' | translate">
             <mat-icon>add</mat-icon>
           </button>
           <!-- Larger screens: full buttons with labels -->
-          <button mat-stroked-button class="!hidden sm:!inline-flex" (click)="autoGenerateAlbums()" [disabled]="autoGenerating()">
-            @if (autoGenerating()) {
-              <mat-icon class="animate-spin">refresh</mat-icon>
-            } @else {
-              <mat-icon>auto_fix_high</mat-icon>
-            }
-            {{ 'auto_albums.auto_generate' | translate }}
-          </button>
           <button mat-flat-button class="!hidden sm:!inline-flex" (click)="openCreateDialog()">
             <mat-icon>add</mat-icon>
             {{ 'albums.create' | translate }}
@@ -132,7 +119,6 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 export class AlbumsComponent {
   private readonly albumService = inject(AlbumService);
   private readonly dialog = inject(MatDialog);
-  private readonly snackBar = inject(MatSnackBar);
   private readonly i18n = inject(I18nService);
   protected readonly auth = inject(AuthService);
   private readonly albumsFilters = inject(AlbumsFiltersService);
@@ -140,8 +126,6 @@ export class AlbumsComponent {
   protected readonly albums = signal<Album[]>([]);
   protected readonly total = signal(0);
   protected readonly loading = signal(false);
-  protected readonly autoGenerating = signal(false);
-
   private page = 1;
   private readonly perPage = 48;
 
@@ -244,27 +228,4 @@ export class AlbumsComponent {
     this.loadAlbums(true);
   }
 
-  protected async autoGenerateAlbums(): Promise<void> {
-    const { AutoAlbumSettingsDialogComponent } = await import('./auto-album-settings-dialog.component');
-    const ref = this.dialog.open(AutoAlbumSettingsDialogComponent, {
-      width: '95vw',
-      maxWidth: '400px',
-    });
-    const settings = await firstValueFrom(ref.afterClosed());
-    if (!settings) return;
-
-    this.autoGenerating.set(true);
-    try {
-      const result = await firstValueFrom(this.albumService.autoGenerate(false, settings));
-      this.snackBar.open(
-        this.i18n.t('auto_albums.auto_generated', { count: result.albums_created }),
-        '', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' },
-      );
-      await this.loadAlbums(true);
-    } catch {
-      this.snackBar.open(this.i18n.t('auto_albums.error_generating'), '', { duration: 3000 });
-    } finally {
-      this.autoGenerating.set(false);
-    }
-  }
 }

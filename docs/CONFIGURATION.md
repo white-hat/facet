@@ -31,7 +31,6 @@ All settings are in `scoring_config.json`. After modifying, run `python facet.py
 - [Storage](#storage)
 - [Plugins](#plugins)
 - [Similarity Groups](#similarity-groups)
-- [Auto Albums](#auto-albums)
 
 ---
 
@@ -1378,26 +1377,6 @@ Settings for the AI similar-photo culling feature, which groups visually similar
 | `min_group_size` | `2` | Minimum number of photos required to form a similarity group |
 | `max_photos` | `10000` | Maximum photos to load for similarity computation (O(n²) cost). Increase for larger libraries at the expense of computation time. |
 | `max_group_size` | `50` | Maximum photos per similarity group. Larger groups are split to keep the UI usable. |
-
-## Auto Albums
-
-Settings for automatic album generation from temporal and visual clustering:
-
-```json
-{
-  "auto_albums": {
-    "min_photos_per_album": 5,
-    "time_gap_hours": 4,
-    "embedding_threshold": 0.6
-  }
-}
-```
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `min_photos_per_album` | `5` | Minimum photos required to create an auto-album |
-| `time_gap_hours` | `4` | Time gap (hours) between photos that starts a new temporal group |
-| `embedding_threshold` | `0.6` | Cosine similarity threshold for sub-clustering within temporal groups |
 
 ## Share Secret
 

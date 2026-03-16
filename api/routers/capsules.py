@@ -6,7 +6,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from api.auth import CurrentUser, get_optional_user
+from api.auth import CurrentUser, get_optional_user, require_edition
 from api.config import _FULL_CONFIG
 from api.database import get_db_connection
 from api.db_helpers import (
@@ -58,6 +58,24 @@ def _set_cached_capsules(user_id, capsules):
     _capsule_cache[user_id] = {"data": capsules, "ts": time.time()}
 
 
+def _resolve_capsule(capsule_id: str, user_id) -> dict:
+    """Find a capsule by ID from cache (generating if needed). Raises 404."""
+    cached, hit = _get_cached_capsules(user_id)
+    if not hit:
+        conn = get_db_connection()
+        try:
+            from analyzers.capsule_generator import generate_all_capsules
+            cached = generate_all_capsules(conn, config=_FULL_CONFIG, user_id=user_id)
+            _set_cached_capsules(user_id, cached)
+        finally:
+            conn.close()
+
+    for c in cached:
+        if c["id"] == capsule_id:
+            return c
+    raise HTTPException(status_code=404, detail="Capsule not found")
+
+
 @router.get("/api/capsules")
 async def get_capsules(
     user: Optional[CurrentUser] = Depends(get_optional_user),
@@ -103,28 +121,7 @@ async def get_capsule_photos(
 ):
     """Return the curated photo list for a specific capsule."""
     user_id = user.user_id if user else None
-
-    # Try cache first to avoid regenerating all capsules
-    cached, hit = _get_cached_capsules(user_id)
-    if not hit:
-        # Generate and cache
-        conn_gen = get_db_connection()
-        try:
-            from analyzers.capsule_generator import generate_all_capsules
-            cached = generate_all_capsules(conn_gen, config=_FULL_CONFIG, user_id=user_id)
-            _set_cached_capsules(user_id, cached)
-        finally:
-            conn_gen.close()
-
-    # Find the capsule by ID
-    capsule = None
-    for c in cached:
-        if c["id"] == capsule_id:
-            capsule = c
-            break
-
-    if not capsule:
-        raise HTTPException(status_code=404, detail="Capsule not found")
+    capsule = _resolve_capsule(capsule_id, user_id)
 
     paths = capsule["params"].get("paths", [])
     if not paths:
@@ -172,5 +169,43 @@ async def get_capsule_photos(
     except Exception:
         logger.exception("Failed to fetch capsule photos for %s", capsule_id)
         raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        conn.close()
+
+
+@router.post("/api/capsules/{capsule_id}/save-album")
+async def save_capsule_as_album(
+    capsule_id: str,
+    user: Optional[CurrentUser] = Depends(get_optional_user),
+):
+    """Save a capsule as a new album."""
+    user_id = user.user_id if user else None
+    capsule = _resolve_capsule(capsule_id, user_id)
+
+    paths = capsule["params"].get("paths", [])
+    if not paths:
+        raise HTTPException(status_code=400, detail="Capsule has no photos")
+
+    name = capsule["title"]
+    description = capsule.get("subtitle", "")
+    cover_path = capsule.get("cover_photo_path")
+
+    conn = get_db_connection()
+    try:
+        cursor = conn.execute(
+            """INSERT INTO albums (user_id, name, description, is_smart, cover_photo_path)
+               VALUES (?, ?, ?, 0, ?)""",
+            (user_id, name, description, cover_path),
+        )
+        album_id = cursor.lastrowid
+        conn.executemany(
+            "INSERT OR IGNORE INTO album_photos (album_id, photo_path, position) VALUES (?, ?, ?)",
+            [(album_id, path, i) for i, path in enumerate(paths)],
+        )
+        conn.commit()
+        return {"album_id": album_id, "name": name}
+    except Exception:
+        logger.exception("Failed to save capsule %s as album", capsule_id)
+        raise HTTPException(status_code=500, detail="Failed to save album")
     finally:
         conn.close()

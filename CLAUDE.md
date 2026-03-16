@@ -108,9 +108,8 @@ python facet.py --recompute-blinks               # Recompute blink detection for
 python facet.py --recompute-burst                # Recompute burst detection groups
 python facet.py --detect-duplicates              # Detect duplicate photos via pHash
 
-# AI captioning and auto-albums
+# AI captioning
 python facet.py --generate-captions          # Generate AI captions for uncaptioned photos (VLM, GPU)
-python facet.py --auto-albums                # Auto-generate albums from photo clusters
 python facet.py --extract-gps                # Extract GPS coordinates from EXIF into database
 
 # Saliency commands
@@ -352,8 +351,6 @@ See [docs/FACE_RECOGNITION.md](docs/FACE_RECOGNITION.md) for the complete workfl
 
 **AI Culling (Similar Groups):** `GET /api/similar-groups?threshold=&page=&per_page=` — groups of visually similar photos for culling, accessible via similarity tab in burst culling.
 
-**AI Auto-Albums:** `POST /api/albums/auto-generate` — auto-create albums from photo clusters. Also available via `--auto-albums` CLI.
-
 **Map View:** `GET /api/photos/map?bounds=&zoom=&limit=` and `GET /api/photos/map/count` — geotagged photo locations for Leaflet map. Angular route: `/map`.
 
 ### Key Implementation Details
@@ -411,8 +408,4 @@ For quick reference, here are the actual defaults from the config file:
 | `similarity_groups` | `min_group_size` | `2` |
 | `similarity_groups` | `max_photos` | `10000` |
 | `similarity_groups` | `max_group_size` | `50` |
-| `auto_albums` | `min_photos_per_album` | `5` |
-| `auto_albums` | `time_gap_hours` | `4` |
-| `auto_albums` | `embedding_threshold` | `0.6` |
-
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the complete reference.

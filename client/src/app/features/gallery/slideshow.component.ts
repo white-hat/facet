@@ -77,6 +77,7 @@ interface Slide {
                 [src]="photo.path | imageUrl"
                 [alt]="photo.filename"
                 class="flex-1 min-w-0 h-full object-cover"
+                (error)="onImageError($event, photo.path)"
               />
             }
           }
@@ -95,6 +96,7 @@ interface Slide {
                 [src]="photo.path | imageUrl"
                 [alt]="photo.filename"
                 class="flex-1 min-w-0 h-full object-cover"
+                (error)="onImageError($event, photo.path)"
               />
             }
           }
@@ -402,7 +404,13 @@ export class SlideshowComponent implements OnDestroy {
         new Promise<void>((resolve) => {
           const img = new Image();
           img.onload = () => resolve();
-          img.onerror = () => resolve();
+          img.onerror = () => {
+            // Fallback to thumbnail for RAW files that fail to convert
+            const thumb = new Image();
+            thumb.onload = () => resolve();
+            thumb.onerror = () => resolve();
+            thumb.src = `/thumbnail?${new URLSearchParams({ path: photo.path })}`;
+          };
           img.src = `/image?${new URLSearchParams({ path: photo.path })}`;
         }),
     );
@@ -509,6 +517,15 @@ export class SlideshowComponent implements OnDestroy {
     if (this.hideControlsTimer !== null) {
       clearTimeout(this.hideControlsTimer);
       this.hideControlsTimer = null;
+    }
+  }
+
+  /** Fallback to thumbnail when full image fails to load (e.g. RAW without rawpy). */
+  onImageError(event: Event, path: string): void {
+    const img = event.target as HTMLImageElement;
+    const thumbUrl = `/thumbnail?${new URLSearchParams({ path })}`;
+    if (!img.src.includes('/thumbnail?')) {
+      img.src = thumbUrl;
     }
   }
 
