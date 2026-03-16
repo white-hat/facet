@@ -278,14 +278,12 @@ export class CapsulesComponent implements OnDestroy {
   private async chainNextCapsule(): Promise<void> {
     this.currentCapsuleIndex++;
     if (this.currentCapsuleIndex >= this.shuffledOrder.length) {
-      this.currentCapsuleIndex = 0;
-    }
-
-    const next = this.shuffledOrder[this.currentCapsuleIndex];
-    if (!next) {
+      // All capsules played — stop instead of looping
       this.closeSlideshow();
       return;
     }
+
+    const next = this.shuffledOrder[this.currentCapsuleIndex];
 
     // Show transition card
     this.slideshowActive.set(false);
