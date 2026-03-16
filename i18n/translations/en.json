@@ -1617,7 +1617,10 @@
     "best_iaa_title": "Best IAA Aesthetic",
     "best_composition_title": "Best Composition",
     "best_sharpness_title": "Sharpest Photos",
-    "cross_title": "{a} — {b}"
+    "cross_title": "{a} — {b}",
+    "score_per_dim_title": "{score}: {dimension}",
+    "person_pair_title": "{name1} & {name2}",
+    "best_face_quality_title": "Best Face Quality"
   },
   "map": {
     "title": "Map",

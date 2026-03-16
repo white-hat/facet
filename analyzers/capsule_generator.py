@@ -118,6 +118,7 @@ def generate_all_capsules(conn, config=None, user_id=None):
         _generate_color_story,
         _generate_this_week,
         _generate_location,
+        _generate_person_pairs,
     ]
 
     for gen in generators:
@@ -674,6 +675,154 @@ def _generate_location(conn, capsule_config, min_aggregate, vis, user_id):
     return capsules
 
 
+def _generate_person_pairs(conn, capsule_config, min_aggregate, vis, user_id):
+    """Generate capsules for pairs of named persons appearing together."""
+    cfg = capsule_config.get("person_pairs", {})
+    min_photos = cfg.get("min_photos", 8)
+    max_photos = capsule_config.get("max_photos_per_capsule", 40)
+
+    from api.db_helpers import get_visibility_clause
+    vis_sql, vis_params = get_visibility_clause(user_id, table_alias='ph')
+
+    # Find photo paths where 2+ named persons co-appear
+    rows = conn.execute(
+        f"""SELECT f1.photo_path, p1.id AS pid1, p1.name AS name1,
+               p2.id AS pid2, p2.name AS name2, ph.aggregate
+           FROM faces f1
+           JOIN faces f2 ON f1.photo_path = f2.photo_path AND f1.person_id < f2.person_id
+           JOIN persons p1 ON p1.id = f1.person_id
+           JOIN persons p2 ON p2.id = f2.person_id
+           JOIN photos ph ON ph.path = f1.photo_path
+           WHERE p1.name IS NOT NULL AND p1.name != ''
+             AND p2.name IS NOT NULL AND p2.name != ''
+             AND ph.aggregate >= ?
+             AND {vis_sql}
+           ORDER BY ph.aggregate DESC""",
+        [min_aggregate] + vis_params,
+    ).fetchall()
+
+    if not rows:
+        return []
+
+    # Group by person pair
+    groups = defaultdict(list)
+    pair_names = {}
+    for r in rows:
+        key = (r["pid1"], r["pid2"])
+        pair_names[key] = (r["name1"], r["name2"])
+        if len(groups[key]) < max_photos:
+            groups[key].append(r["photo_path"])
+
+    capsules = []
+    for (pid1, pid2), paths in groups.items():
+        unique_paths = list(dict.fromkeys(paths))
+        if len(unique_paths) < min_photos:
+            continue
+
+        name1, name2 = pair_names[(pid1, pid2)]
+        cid = _stable_id("pair", str(pid1), str(pid2))
+        capsules.append({
+            "type": "person_pair",
+            "id": f"pair_{cid}",
+            "title_key": "capsules.person_pair_title",
+            "title_params": {"name1": name1, "name2": name2},
+            "title": f"{name1} & {name2}",
+            "subtitle": f"{len(unique_paths)} photos",
+            "cover_photo_path": unique_paths[0],
+            "photo_count": len(unique_paths),
+            "icon": "group",
+            "params": {"paths": unique_paths},
+        })
+
+    return capsules
+
+
+def _generate_score_per_dim(conn, capsules, capsule_config, min_aggregate,
+                            vis_sql, vis_params, max_photos, has_tags,
+                            dim_a_name, dim_b_name, score_dim, group_dim):
+    """Generate 'Best [Score] per [Dimension]' capsules."""
+    if group_dim.get("requires") == "photo_tags" and not has_tags:
+        return
+    if not group_dim.get("sql_expr"):
+        return
+
+    cfg_key = f"{dim_a_name}_{dim_b_name}"
+    cfg = capsule_config.get(cfg_key, {})
+    min_photos_score = cfg.get("min_photos", max(group_dim.get("min_photos", 10) // 2, 5))
+
+    join = group_dim.get("join", "")
+    expr = group_dim["sql_expr"]
+    label_expr = group_dim.get("label_expr", expr)
+    sort = score_dim["sort_override"]
+    score_label = score_dim.get("score_label", dim_a_name)
+
+    filters = []
+    if group_dim.get("filter"):
+        filters.append(group_dim["filter"])
+    if score_dim.get("filter"):
+        filters.append(score_dim["filter"])
+    extra_filter = ("AND " + " AND ".join(filters)) if filters else ""
+
+    junk_fn = group_dim.get("junk_filter")
+    value_map = group_dim.get("value_map")
+    transform = group_dim.get("title_transform")
+
+    try:
+        group_rows = conn.execute(
+            f"""SELECT {expr} AS dim_val, {label_expr} AS dim_label, COUNT(*) AS cnt
+               FROM photos {join}
+               WHERE aggregate >= ? {extra_filter} AND {vis_sql}
+               GROUP BY dim_val
+               HAVING cnt >= ?
+               ORDER BY cnt DESC
+               LIMIT 50""",
+            [min_aggregate] + vis_params + [min_photos_score],
+        ).fetchall()
+    except Exception:
+        logger.debug("Score-per-dim %s x %s query failed", dim_a_name, dim_b_name)
+        return
+
+    for gr in group_rows:
+        val = gr["dim_val"]
+        label = gr["dim_label"]
+        if val is None:
+            continue
+        if junk_fn and junk_fn(str(val)):
+            continue
+
+        display = value_map.get(val, label) if value_map else (str(label) if label else str(val))
+        if transform:
+            display = transform(display)
+
+        photos = conn.execute(
+            f"""SELECT path
+               FROM photos {join}
+               WHERE {expr} = ? AND aggregate >= ? {extra_filter} AND {vis_sql}
+               ORDER BY {sort}
+               LIMIT ?""",
+            [val, min_aggregate] + vis_params + [max_photos],
+        ).fetchall()
+
+        paths = list(dict.fromkeys(p["path"] for p in photos))
+        if len(paths) < min_photos_score:
+            continue
+
+        cid = _stable_id(cfg_key, str(val))
+        title = f"{score_label}: {display}"
+        capsules.append({
+            "type": cfg_key,
+            "id": f"{cfg_key}_{cid}",
+            "title_key": "capsules.score_per_dim_title",
+            "title_params": {"score": score_label, "dimension": display},
+            "title": title,
+            "subtitle": f"{len(paths)} photos",
+            "cover_photo_path": paths[0],
+            "photo_count": len(paths),
+            "icon": score_dim["icon"],
+            "params": {"paths": paths},
+        })
+
+
 # ============================================================
 # Generic Dimension-Based Capsule Engine
 # ============================================================
@@ -771,6 +920,8 @@ _DIMENSIONS = {
         "title_key": "capsules.best_aesthetic_title",
         "param_name": "metric",
         "single_only": True,
+        "is_score": True,
+        "score_label": "Aesthetic",
     },
     "score_iaa": {
         "sort_override": "aesthetic_iaa DESC",
@@ -781,6 +932,8 @@ _DIMENSIONS = {
         "title_key": "capsules.best_iaa_title",
         "param_name": "metric",
         "single_only": True,
+        "is_score": True,
+        "score_label": "IAA",
     },
     "score_composition": {
         "sort_override": "comp_score DESC",
@@ -791,6 +944,8 @@ _DIMENSIONS = {
         "title_key": "capsules.best_composition_title",
         "param_name": "metric",
         "single_only": True,
+        "is_score": True,
+        "score_label": "Composition",
     },
     "score_sharpness": {
         "sort_override": "tech_sharpness DESC",
@@ -801,20 +956,51 @@ _DIMENSIONS = {
         "title_key": "capsules.best_sharpness_title",
         "param_name": "metric",
         "single_only": True,
+        "is_score": True,
+        "score_label": "Sharpness",
+    },
+    "score_face_quality": {
+        "sort_override": "face_quality DESC",
+        "filter": "face_quality IS NOT NULL AND face_quality > 0",
+        "icon": "face_retouching_natural",
+        "min_photos": 20,
+        "title_tpl": "Best Face Quality",
+        "title_key": "capsules.best_face_quality_title",
+        "param_name": "metric",
+        "single_only": True,
+        "is_score": True,
+        "score_label": "Face Quality",
     },
 }
 
-# Cross-dimensional combinations to generate
+# Cross-dimensional combinations to generate.
+# When one dimension has is_score=True, it acts as a sort override
+# rather than a grouping dimension (e.g., "Best Aesthetic by Person").
 _CROSS_DIMENSIONS = [
+    # Grouping × Grouping
     ("camera", "year"),
     ("camera", "lens"),
+    ("camera", "month"),
     ("lens", "year"),
+    ("lens", "month"),
     ("tag", "year"),
+    ("tag", "month"),
     ("person", "year"),
+    ("person", "month"),
     ("person", "lens"),
     ("person", "camera"),
-    ("camera", "month"),
-    ("tag", "month"),
+    ("person", "tag"),
+    # Score × Grouping (best-of per dimension)
+    ("score_aesthetic", "person"),
+    ("score_aesthetic", "camera"),
+    ("score_aesthetic", "year"),
+    ("score_aesthetic", "lens"),
+    ("score_iaa", "person"),
+    ("score_composition", "person"),
+    ("score_composition", "camera"),
+    ("score_sharpness", "camera"),
+    ("score_sharpness", "lens"),
+    ("score_face_quality", "person"),
 ]
 
 
@@ -930,15 +1116,32 @@ def _generate_dimension_capsules(conn, capsule_config, min_aggregate, vis, user_
         dim_b = _DIMENSIONS.get(dim_b_name)
         if not dim_a or not dim_b:
             continue
-        if dim_a.get("single_only") or dim_b.get("single_only"):
-            continue
         if (dim_a.get("requires") == "photo_tags" or dim_b.get("requires") == "photo_tags") and not has_tags:
+            continue
+
+        # When one dimension is a score metric, use it as sort override
+        score_dim = dim_a if dim_a.get("is_score") else (dim_b if dim_b.get("is_score") else None)
+        group_dim = dim_b if dim_a.get("is_score") else (dim_a if dim_b.get("is_score") else None)
+
+        if score_dim and not group_dim:
+            continue  # Both are scores — skip
+
+        if score_dim:
+            # Score × Grouping: group by one dim, sort by score metric
+            _generate_score_per_dim(
+                conn, capsules, capsule_config, min_aggregate, vis_sql, vis_params,
+                max_photos, has_tags, dim_a_name, dim_b_name, score_dim, group_dim,
+            )
+            continue
+
+        # Both are regular grouping dimensions — skip if either is single_only
+        if dim_a.get("single_only") or dim_b.get("single_only"):
             continue
 
         cfg_key = f"{dim_a_name}_{dim_b_name}"
         cfg = capsule_config.get(cfg_key, {})
-        min_photos = cfg.get("min_photos", max(dim_a.get("min_photos", 10), dim_b.get("min_photos", 10)) // 2)
-        min_photos = max(min_photos, 5)
+        min_photos_cross = cfg.get("min_photos", max(dim_a.get("min_photos", 10), dim_b.get("min_photos", 10)) // 2)
+        min_photos_cross = max(min_photos_cross, 5)
 
         # Build combined query
         joins = set()
@@ -971,7 +1174,7 @@ def _generate_dimension_capsules(conn, capsule_config, min_aggregate, vis, user_
                    HAVING cnt >= ?
                    ORDER BY cnt DESC
                    LIMIT 100""",
-                [min_aggregate] + vis_params + [min_photos],
+                [min_aggregate] + vis_params + [min_photos_cross],
             ).fetchall()
         except Exception:
             logger.debug("Cross-dimension %s x %s query failed", dim_a_name, dim_b_name)
@@ -1011,11 +1214,11 @@ def _generate_dimension_capsules(conn, capsule_config, min_aggregate, vis, user_
                 [va, vb, min_aggregate] + vis_params + [max_photos],
             ).fetchall()
 
-            if len(photos) < min_photos:
+            if len(photos) < min_photos_cross:
                 continue
 
             paths = list(dict.fromkeys(p["path"] for p in photos))  # dedupe
-            if len(paths) < min_photos:
+            if len(paths) < min_photos_cross:
                 continue
 
             cid = _stable_id(cfg_key, str(va), str(vb))
@@ -1023,7 +1226,7 @@ def _generate_dimension_capsules(conn, capsule_config, min_aggregate, vis, user_
             capsules.append({
                 "type": cfg_key,
                 "id": f"{cfg_key}_{cid}",
-                "title_key": f"capsules.cross_title",
+                "title_key": "capsules.cross_title",
                 "title_params": {"a": disp_a, "b": disp_b},
                 "title": title,
                 "subtitle": f"{len(paths)} photos",

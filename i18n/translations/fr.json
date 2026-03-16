@@ -1617,7 +1617,10 @@
     "best_iaa_title": "Meilleure IAA",
     "best_composition_title": "Meilleure composition",
     "best_sharpness_title": "Photos les plus nettes",
-    "cross_title": "{a} — {b}"
+    "cross_title": "{a} — {b}",
+    "score_per_dim_title": "{score} : {dimension}",
+    "person_pair_title": "{name1} & {name2}",
+    "best_face_quality_title": "Meilleure qualité visage"
   },
   "map": {
     "title": "Carte",
