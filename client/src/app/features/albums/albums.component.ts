@@ -22,7 +22,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 @Component({
   selector: 'app-albums',
   standalone: true,
-  host: { class: 'block px-4 pt-2 pb-4 max-w-7xl mx-auto' },
+  host: { class: 'block px-4 pt-2 pb-4' },
   imports: [
     RouterLink, MatButtonModule, MatIconModule, MatDialogModule, MatTooltipModule,
     MatProgressSpinnerModule, MatSnackBarModule,
@@ -71,7 +71,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
       </div>
     }
 
-    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
       @for (album of albums(); track album.id) {
         <a [routerLink]="['/album', album.id]"
            class="group flex flex-col rounded-xl overflow-hidden bg-[var(--mat-sys-surface-container)] hover:shadow-lg transition-shadow cursor-pointer">

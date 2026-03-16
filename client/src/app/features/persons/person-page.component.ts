@@ -38,7 +38,7 @@ interface PersonPhotosResponse {
     InfiniteScrollDirective,
   ],
   template: `
-    <div class="p-4 md:p-6 max-w-screen-2xl mx-auto">
+    <div class="p-4 md:p-6">
       <!-- Header -->
       <div class="flex items-center gap-4 mb-6">
         <a mat-icon-button routerLink="/persons">

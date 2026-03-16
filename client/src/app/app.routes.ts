@@ -62,6 +62,12 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: 'capsules',
+    loadComponent: () =>
+      import('./features/capsules/capsules.component').then(m => m.CapsulesComponent),
+    canActivate: [authGuard],
+  },
+  {
     path: 'timeline',
     loadComponent: () =>
       import('./features/timeline/timeline.component').then(m => m.TimelineComponent),

@@ -1847,6 +1847,46 @@
     "time_gap_hours": 4,
     "embedding_threshold": 0.6
   },
+  "capsules": {
+    "min_aggregate": 6.0,
+    "max_photos_per_capsule": 40,
+    "journey": {
+      "min_distance_km": 50,
+      "min_photos": 8,
+      "time_gap_hours": 24
+    },
+    "faces_of": {
+      "min_photos": 10
+    },
+    "seasonal": {
+      "min_photos": 10
+    },
+    "golden": {
+      "percentile": 99,
+      "max_photos": 50
+    },
+    "color_story": {
+      "embedding_threshold": 0.75,
+      "min_group_size": 8,
+      "max_groups": 5
+    },
+    "this_week_years_ago": {
+      "min_photos_per_year": 3
+    },
+    "monthly": {
+      "min_photos": 8
+    },
+    "yearly": {
+      "min_photos": 20,
+      "max_photos": 60
+    },
+    "camera": {
+      "min_photos": 15
+    },
+    "tag_collection": {
+      "min_photos": 15
+    }
+  },
   "models": {
     "vram_profile": "auto",
     "keep_in_ram": "auto",
@@ -2008,9 +2048,9 @@
     }
   },
   "viewer": {
-    "password": "user",
+    "password": "",
     "default_category": "",
-    "edition_password": "admin",
+    "edition_password": "",
     "comparison_mode": {
       "min_comparisons_for_optimization": 50,
       "pair_selection_strategy": "uncertainty",
@@ -2224,7 +2264,8 @@
       "show_memories": true,
       "show_captions": true,
       "show_timeline": true,
-      "show_map": true
+      "show_map": true,
+      "show_capsules": true
     },
     "allowed_origins": [
       "http://localhost:4200",
@@ -2232,7 +2273,9 @@
     ],
     "cache_ttl_seconds": 60,
     "notification_duration_ms": 2000,
-    "path_mapping": {}
+    "path_mapping": {
+		"\\\\Sweet\\home\\Photos": "/nfs/temp-share/Photos"
+	}
   },
   "plugins": {
     "enabled": false,
@@ -2246,7 +2289,7 @@
     "filesystem_path": "./storage"
   },
   "translation": {
-    "target_language": ""
+    "target_language": "fr"
   },
   "performance": {
     "mmap_size_mb": 2048,

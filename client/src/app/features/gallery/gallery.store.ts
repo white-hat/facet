@@ -77,6 +77,7 @@ export interface ViewerConfig {
     show_captions: boolean;
     show_timeline: boolean;
     show_map: boolean;
+    show_capsules: boolean;
   };
   quality_thresholds: {
     good: number;

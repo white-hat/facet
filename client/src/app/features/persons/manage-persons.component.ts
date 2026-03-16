@@ -84,7 +84,7 @@ export class MergeTargetDialogComponent {
     InfiniteScrollDirective,
   ],
   template: `
-    <div class="px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6 max-w-screen-2xl mx-auto">
+    <div class="px-4 pt-2 pb-4 md:px-6 md:pt-3 md:pb-6">
       <!-- Header -->
       <div class="flex flex-wrap items-center justify-end gap-4 mb-3">
         @if (auth.isEdition()) {
@@ -103,7 +103,7 @@ export class MergeTargetDialogComponent {
       }
 
       <!-- Person grid -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
         @for (person of persons(); track person.id) {
           <app-person-card
             [person]="person"

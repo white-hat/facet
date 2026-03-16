@@ -4,8 +4,11 @@ import {
   OnDestroy,
   inject,
   input,
+  output,
   signal,
   computed,
+  effect,
+  untracked,
   afterNextRender,
   viewChild,
 } from '@angular/core';
@@ -170,6 +173,11 @@ export class SlideshowComponent implements OnDestroy {
   readonly hasMore = input<boolean>(false);
   readonly loading = input<boolean>(false);
 
+  /** Emitted when the slideshow requests closing. */
+  readonly closed = output<void>();
+  /** Emitted when the slideshow wraps around (all slides exhausted). */
+  readonly wrapped = output<void>();
+
   private readonly container = viewChild.required<ElementRef<HTMLElement>>('slideshowContainer');
 
   // Viewport dimensions for adaptive grouping
@@ -254,8 +262,18 @@ export class SlideshowComponent implements OnDestroy {
   private boundResizeHandler!: () => void;
 
   constructor() {
+    // Watch for slides to become available (handles async photo loading)
+    effect(() => {
+      const firstSlide = this.slides()[0];
+      if (firstSlide && !untracked(() => this.layerASlide()) && !untracked(() => this.layerBSlide())) {
+        this.layerASlide.set(firstSlide);
+        this.layerAOpacity.set(1);
+        this.frontLayer.set('a');
+      }
+    });
+
     afterNextRender(() => {
-      // Show first slide immediately in layer A
+      // Show first slide immediately in layer A (if already available)
       const firstSlide = this.slides()[0];
       if (firstSlide) {
         this.layerASlide.set(firstSlide);
@@ -335,6 +353,7 @@ export class SlideshowComponent implements OnDestroy {
   }
 
   close(): void {
+    this.closed.emit();
     this.store.slideshowActive.set(false);
   }
 
@@ -438,7 +457,12 @@ export class SlideshowComponent implements OnDestroy {
       if (newProgress >= 100) {
         this.progress.set(100);
         this.clearTimerInterval();
+        const prevIdx = this.currentSlideIndex();
         const nextIdx = this.nextSlideIndex();
+        // Emit wrapped only on auto-advance (not manual next/prev)
+        if (nextIdx === 0 && prevIdx > 0) {
+          this.wrapped.emit();
+        }
         if (nextIdx >= 0) {
           this.preloadAndAdvance(nextIdx);
         } else {

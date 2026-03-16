@@ -1,0 +1,296 @@
+import { Component, inject, signal, computed, OnDestroy, afterNextRender } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { firstValueFrom } from 'rxjs';
+import { ApiService } from '../../core/services/api.service';
+import { I18nService } from '../../core/services/i18n.service';
+import { TranslatePipe } from '../../shared/pipes/translate.pipe';
+import { ThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
+import { InfiniteScrollDirective } from '../../shared/directives/infinite-scroll.directive';
+import { Photo } from '../../shared/models/photo.model';
+import { SlideshowComponent } from '../gallery/slideshow.component';
+
+interface Capsule {
+  type: string;
+  id: string;
+  title: string;
+  title_key: string;
+  title_params: Record<string, string>;
+  subtitle: string;
+  cover_photo_path: string;
+  photo_count: number;
+  icon: string;
+}
+
+interface CapsulesResponse {
+  capsules: Capsule[];
+  total: number;
+  page: number;
+  per_page: number;
+  has_more: boolean;
+}
+
+@Component({
+  selector: 'app-capsules',
+  standalone: true,
+  host: { class: 'block px-4 pt-2 pb-4' },
+  imports: [
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    MatTooltipModule,
+    TranslatePipe,
+    ThumbnailUrlPipe,
+    InfiniteScrollDirective,
+    SlideshowComponent,
+  ],
+  template: `
+    @if (loading() && capsules().length === 0) {
+      <div class="flex flex-col items-center justify-center py-16 gap-3">
+        <mat-spinner diameter="48" />
+        <p class="text-sm opacity-60">{{ 'capsules.loading' | translate }}</p>
+      </div>
+    }
+
+    @if (capsules().length === 0 && !loading()) {
+      <div class="text-center py-16 opacity-60">
+        <mat-icon class="!text-5xl !w-12 !h-12 mb-4">auto_stories</mat-icon>
+        <p>{{ 'capsules.empty' | translate }}</p>
+      </div>
+    }
+
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+      @for (capsule of capsules(); track capsule.id) {
+        <button
+          class="group flex flex-col rounded-xl overflow-hidden bg-[var(--mat-sys-surface-container)] hover:shadow-lg transition-shadow cursor-pointer text-left w-full"
+          (click)="playCapsule(capsule)"
+        >
+          @if (capsule.cover_photo_path) {
+            <div class="relative w-full aspect-square overflow-hidden">
+              <img [src]="capsule.cover_photo_path | thumbnailUrl:320"
+                   [alt]="capsule.title"
+                   class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+              <div class="absolute bottom-2 left-2 right-2 flex items-end justify-between">
+                <div class="flex items-center gap-1 text-white">
+                  <mat-icon class="!text-base !w-4 !h-4 !leading-4">{{ capsule.icon }}</mat-icon>
+                  <span class="text-xs opacity-80">{{ capsule.photo_count }}</span>
+                </div>
+                <mat-icon class="!text-white opacity-0 group-hover:opacity-80 transition-opacity">play_circle</mat-icon>
+              </div>
+            </div>
+          } @else {
+            <div class="w-full aspect-square flex items-center justify-center bg-[var(--mat-sys-surface-container-high)]">
+              <mat-icon class="!text-4xl !w-10 !h-10 opacity-30">{{ capsule.icon }}</mat-icon>
+            </div>
+          }
+          <div class="p-2">
+            <div class="font-medium text-sm truncate">{{ capsule.title_key | translate:capsule.title_params }}</div>
+            <div class="text-xs opacity-60 truncate">{{ 'capsules.photos_count' | translate:{ count: capsule.photo_count } }}</div>
+          </div>
+        </button>
+      }
+    </div>
+
+    <!-- Infinite scroll sentinel -->
+    @if (hasMore()) {
+      <div appInfiniteScroll (scrollReached)="loadMore()" class="flex justify-center py-8">
+        @if (loading()) {
+          <mat-spinner diameter="32" />
+        }
+      </div>
+    }
+
+    <!-- Slideshow overlay -->
+    @if (slideshowActive()) {
+      <app-slideshow
+        [photos]="slideshowPhotos()"
+        [hasMore]="false"
+        [loading]="slideshowLoading()"
+        (closed)="closeSlideshow()"
+        (wrapped)="onSlideshowWrapped()"
+      />
+    }
+
+    <!-- Transition card between capsules -->
+    @if (transitionVisible()) {
+      <div class="fixed inset-0 z-[10000] bg-black flex items-center justify-center">
+        <div class="text-center text-white animate-pulse">
+          @if (nextCapsulePreview(); as next) {
+            <mat-icon class="!text-5xl !w-12 !h-12 mb-4 opacity-60">{{ next.icon }}</mat-icon>
+            <h2 class="text-2xl font-light mb-2">{{ next.title_key | translate:next.title_params }}</h2>
+            <p class="text-sm opacity-60">{{ 'capsules.photos_count' | translate:{ count: next.photo_count } }}</p>
+          }
+        </div>
+      </div>
+    }
+  `,
+})
+export class CapsulesComponent implements OnDestroy {
+  private readonly api = inject(ApiService);
+  private readonly i18n = inject(I18nService);
+
+  protected readonly capsules = signal<Capsule[]>([]);
+  protected readonly loading = signal(false);
+  protected readonly hasMore = signal(false);
+  protected readonly total = signal(0);
+
+  // Slideshow state
+  protected readonly slideshowActive = signal(false);
+  protected readonly slideshowPhotos = signal<Photo[]>([]);
+  protected readonly slideshowLoading = signal(false);
+  protected readonly transitionVisible = signal(false);
+  protected readonly nextCapsulePreview = signal<Capsule | null>(null);
+
+  private shuffledOrder: Capsule[] = [];
+  private currentCapsuleIndex = 0;
+  private currentPage = 1;
+  private readonly perPage = 24;
+  private transitionTimer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
+
+  constructor() {
+    afterNextRender(() => {
+      this.loadCapsules();
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.slideshowActive.set(false);
+    this.clearTransitionTimer();
+  }
+
+  private async loadCapsules(): Promise<void> {
+    if (this.loading()) return;
+    this.loading.set(true);
+    try {
+      const res = await firstValueFrom(
+        this.api.get<CapsulesResponse>('/capsules', {
+          page: this.currentPage,
+          per_page: this.perPage,
+        }),
+      );
+      const resolved = res.capsules.map(c => this.resolveParams(c));
+      if (this.currentPage === 1) {
+        this.capsules.set(resolved);
+      } else {
+        this.capsules.update(prev => [...prev, ...resolved]);
+      }
+      this.hasMore.set(res.has_more);
+      this.total.set(res.total);
+    } catch {
+      if (this.currentPage === 1) this.capsules.set([]);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  protected loadMore(): void {
+    if (this.loading() || !this.hasMore()) return;
+    this.currentPage++;
+    this.loadCapsules();
+  }
+
+  protected async playCapsule(capsule: Capsule): Promise<void> {
+    // Shuffle capsule order for auto-chaining, starting with the selected one
+    const all = [...this.capsules()];
+    const idx = all.findIndex(c => c.id === capsule.id);
+    const rest = [...all.slice(0, idx), ...all.slice(idx + 1)];
+    this.shuffleArray(rest);
+    this.shuffledOrder = [capsule, ...rest];
+    this.currentCapsuleIndex = 0;
+
+    await this.loadAndStartCapsule(capsule);
+  }
+
+  private async loadAndStartCapsule(capsule: Capsule): Promise<void> {
+    this.slideshowLoading.set(true);
+    this.slideshowActive.set(true);
+
+    try {
+      const res = await firstValueFrom(
+        this.api.get<{ photos: Photo[]; capsule: Capsule }>(`/capsules/${capsule.id}/photos`),
+      );
+      if (this.destroyed) return;
+      this.slideshowPhotos.set(res.photos);
+    } catch {
+      this.slideshowPhotos.set([]);
+    } finally {
+      this.slideshowLoading.set(false);
+    }
+  }
+
+  protected closeSlideshow(): void {
+    this.slideshowActive.set(false);
+    this.slideshowPhotos.set([]);
+    this.transitionVisible.set(false);
+    this.clearTransitionTimer();
+  }
+
+  protected onSlideshowWrapped(): void {
+    if (this.transitionVisible()) return;
+    this.chainNextCapsule();
+  }
+
+  private async chainNextCapsule(): Promise<void> {
+    this.currentCapsuleIndex++;
+    if (this.currentCapsuleIndex >= this.shuffledOrder.length) {
+      this.currentCapsuleIndex = 0;
+    }
+
+    const next = this.shuffledOrder[this.currentCapsuleIndex];
+    if (!next) {
+      this.closeSlideshow();
+      return;
+    }
+
+    // Show transition card
+    this.slideshowActive.set(false);
+    this.nextCapsulePreview.set(next);
+    this.transitionVisible.set(true);
+
+    await new Promise<void>(resolve => {
+      this.transitionTimer = setTimeout(resolve, 2000);
+    });
+
+    if (this.destroyed) return;
+
+    this.transitionVisible.set(false);
+    this.nextCapsulePreview.set(null);
+
+    // Load next capsule
+    await this.loadAndStartCapsule(next);
+  }
+
+  private clearTransitionTimer(): void {
+    if (this.transitionTimer !== null) {
+      clearTimeout(this.transitionTimer);
+      this.transitionTimer = null;
+    }
+  }
+
+  /** Resolve i18n-dependent title params (e.g. translate season names). */
+  private resolveParams(capsule: Capsule): Capsule {
+    if (capsule.type === 'seasonal' && capsule.title_params['season']) {
+      const seasonKey = 'capsules.season_' + capsule.title_params['season'];
+      return {
+        ...capsule,
+        title_params: {
+          ...capsule.title_params,
+          season: this.i18n.t(seasonKey),
+        },
+      };
+    }
+    return capsule;
+  }
+
+  private shuffleArray<T>(arr: T[]): void {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+}

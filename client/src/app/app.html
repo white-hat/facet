@@ -13,6 +13,11 @@
               <mat-icon>photo_album</mat-icon>
             </a>
           }
+          @if (store.config()?.features?.show_capsules) {
+            <a mat-icon-button class="lg:!hidden" routerLink="/capsules" routerLinkActive #rlCapsulesM="routerLinkActive" [style.color]="rlCapsulesM.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.capsules' | translate">
+              <mat-icon>auto_stories</mat-icon>
+            </a>
+          }
           @if (store.config()?.features?.show_timeline) {
             <a mat-icon-button class="lg:!hidden" routerLink="/timeline" routerLinkActive #rlTimelineM="routerLinkActive" [style.color]="rlTimelineM.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.timeline' | translate">
               <mat-icon>view_timeline</mat-icon>
@@ -50,6 +55,11 @@
           @if (store.config()?.features?.show_albums) {
             <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/albums" routerLinkActive #rlAlbums="routerLinkActive" [style.color]="rlAlbums.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.albums' | translate">
               <mat-icon>photo_album</mat-icon>
+            </a>
+          }
+          @if (store.config()?.features?.show_capsules) {
+            <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/capsules" routerLinkActive #rlCapsules="routerLinkActive" [style.color]="rlCapsules.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.capsules' | translate">
+              <mat-icon>auto_stories</mat-icon>
             </a>
           }
           @if (store.config()?.features?.show_timeline) {

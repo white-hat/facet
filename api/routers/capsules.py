@@ -1,0 +1,176 @@
+"""Capsules router — curated photo diaporamas grouped by theme."""
+
+import logging
+import time
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from api.auth import CurrentUser, get_optional_user
+from api.config import _FULL_CONFIG
+from api.database import get_db_connection
+from api.db_helpers import (
+    build_photo_select_columns,
+    sanitize_float_values,
+    get_visibility_clause,
+    split_photo_tags,
+    attach_person_data,
+    format_date,
+)
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["capsules"])
+
+# Per-user cache for full capsule list (with paths), regenerated at most once per hour
+_capsule_cache: dict[str | None, dict] = {}
+_CACHE_TTL = 3600  # 1 hour
+
+
+def _capsule_summary(capsule: dict) -> dict:
+    """Return capsule metadata without paths."""
+    return {
+        "type": capsule["type"],
+        "id": capsule["id"],
+        "title": capsule["title"],
+        "title_key": capsule.get("title_key", ""),
+        "title_params": capsule.get("title_params", {}),
+        "subtitle": capsule["subtitle"],
+        "cover_photo_path": capsule["cover_photo_path"],
+        "photo_count": capsule["photo_count"],
+        "icon": capsule["icon"],
+    }
+
+
+def _get_cached_capsules(user_id, refresh=False):
+    """Return (full_capsules_list, from_cache). Generates if needed."""
+    now = time.time()
+    entry = _capsule_cache.get(user_id)
+
+    if not refresh and entry and (now - entry["ts"]) < _CACHE_TTL:
+        return entry["data"], True
+
+    return None, False
+
+
+def _set_cached_capsules(user_id, capsules):
+    """Store full capsule list in per-user cache."""
+    _capsule_cache[user_id] = {"data": capsules, "ts": time.time()}
+
+
+@router.get("/api/capsules")
+async def get_capsules(
+    user: Optional[CurrentUser] = Depends(get_optional_user),
+    refresh: bool = Query(False),
+    page: int = Query(1, ge=1),
+    per_page: int = Query(24, ge=1, le=200),
+):
+    """Return available capsules (cached 1h, paginated)."""
+    user_id = user.user_id if user else None
+
+    cached, hit = _get_cached_capsules(user_id, refresh)
+    if not hit:
+        conn = get_db_connection()
+        try:
+            from analyzers.capsule_generator import generate_all_capsules
+
+            cached = generate_all_capsules(conn, config=_FULL_CONFIG, user_id=user_id)
+            _set_cached_capsules(user_id, cached)
+        except Exception:
+            logger.exception("Failed to generate capsules")
+            raise HTTPException(status_code=500, detail="Failed to generate capsules")
+        finally:
+            conn.close()
+
+    total = len(cached)
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_capsules = cached[start:end]
+
+    return {
+        "capsules": [_capsule_summary(c) for c in page_capsules],
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "has_more": end < total,
+    }
+
+
+@router.get("/api/capsules/{capsule_id}/photos")
+async def get_capsule_photos(
+    capsule_id: str,
+    user: Optional[CurrentUser] = Depends(get_optional_user),
+):
+    """Return the curated photo list for a specific capsule."""
+    user_id = user.user_id if user else None
+
+    # Try cache first to avoid regenerating all capsules
+    cached, hit = _get_cached_capsules(user_id)
+    if not hit:
+        # Generate and cache
+        conn_gen = get_db_connection()
+        try:
+            from analyzers.capsule_generator import generate_all_capsules
+            cached = generate_all_capsules(conn_gen, config=_FULL_CONFIG, user_id=user_id)
+            _set_cached_capsules(user_id, cached)
+        finally:
+            conn_gen.close()
+
+    # Find the capsule by ID
+    capsule = None
+    for c in cached:
+        if c["id"] == capsule_id:
+            capsule = c
+            break
+
+    if not capsule:
+        raise HTTPException(status_code=404, detail="Capsule not found")
+
+    paths = capsule["params"].get("paths", [])
+    if not paths:
+        return {"photos": [], "capsule": _capsule_summary(capsule)}
+
+    conn = get_db_connection()
+    try:
+        # Fetch full photo data for these paths
+        select_cols = build_photo_select_columns(conn, user_id)
+        inner_cols = ", ".join(select_cols)
+
+        vis_sql, vis_params = get_visibility_clause(user_id)
+
+        placeholders = ",".join(["?"] * len(paths))
+        query = f"""
+            SELECT {inner_cols}
+            FROM photos
+            WHERE path IN ({placeholders})
+              AND {vis_sql}
+        """
+        rows = conn.execute(query, paths + vis_params).fetchall()
+
+        from api.config import VIEWER_CONFIG
+
+        tags_limit = VIEWER_CONFIG.get("display", {}).get("tags_per_photo", 10)
+        photos = split_photo_tags(rows, tags_limit)
+
+        for photo in photos:
+            photo["date_formatted"] = format_date(photo.get("date_taken"))
+
+        attach_person_data(photos, conn)
+        sanitize_float_values(photos)
+
+        # Preserve the original path ordering
+        path_order = {p: i for i, p in enumerate(paths)}
+        photos.sort(key=lambda p: path_order.get(p.get("path"), 999999))
+
+        return {
+            "photos": photos,
+            "capsule": _capsule_summary(capsule),
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to fetch capsule photos for %s", capsule_id)
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        conn.close()

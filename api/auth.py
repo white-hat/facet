@@ -204,13 +204,21 @@ def verify_person_share_token(person_id: int, token: str) -> bool:
 
 def is_edition_enabled() -> bool:
     """Check if edition mode is available."""
-    if is_multi_user_enabled():
-        return True
-    return bool(VIEWER_CONFIG.get('edition_password', ''))
+    return True
 
 
 def is_edition_authenticated(user: Optional[CurrentUser]) -> bool:
-    """Check if user has edition-level access."""
+    """Check if user has edition-level access.
+
+    When no edition password is configured (single-user, no lock),
+    authenticated users get edition access automatically.
+    Share-token visitors are excluded.
+    """
     if user is None:
         return False
+    # Share-token users never get edition access
+    if user.shared_person_id is not None:
+        return False
+    if not is_multi_user_enabled() and not VIEWER_CONFIG.get('edition_password', ''):
+        return True
     return user.is_edition
