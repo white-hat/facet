@@ -1,6 +1,7 @@
 """Capsules router — curated photo diaporamas grouped by theme."""
 
 import logging
+import re
 import time
 from typing import Optional
 
@@ -25,6 +26,7 @@ router = APIRouter(tags=["capsules"])
 # Per-(user, date_from, date_to) cache for full capsule list, regenerated at most once per hour
 _capsule_cache: dict[tuple, dict] = {}
 _CACHE_TTL = 3600  # 1 hour
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _capsule_summary(capsule: dict) -> dict:
@@ -60,9 +62,21 @@ def _get_cached_capsules(user_id, refresh=False, date_from="", date_to=""):
 
 
 def _set_cached_capsules(user_id, capsules, date_from="", date_to=""):
-    """Store full capsule list in per-user cache."""
+    """Store full capsule list in per-user cache, evicting expired entries."""
+    now = time.time()
+    # Evict expired entries to prevent unbounded growth
+    expired = [k for k, v in _capsule_cache.items() if (now - v["ts"]) >= _CACHE_TTL]
+    for k in expired:
+        del _capsule_cache[k]
     key = _cache_key(user_id, date_from, date_to)
-    _capsule_cache[key] = {"data": capsules, "ts": time.time()}
+    _capsule_cache[key] = {"data": capsules, "ts": now}
+
+
+def _validate_date(value: str) -> str:
+    """Return validated date string or empty string if invalid."""
+    if value and _DATE_RE.match(value):
+        return value
+    return ""
 
 
 def _resolve_capsule(capsule_id: str, user_id, date_from="", date_to="") -> dict:
@@ -95,6 +109,8 @@ async def get_capsules(
 ):
     """Return available capsules (cached 1h, paginated)."""
     user_id = user.user_id if user else None
+    date_from = _validate_date(date_from)
+    date_to = _validate_date(date_to)
 
     cached, hit = _get_cached_capsules(user_id, refresh, date_from=date_from, date_to=date_to)
     if not hit:
