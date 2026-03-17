@@ -38,11 +38,18 @@ interface Slide {
   template: `
     <div
       #slideshowContainer
-      class="fixed inset-0 z-[9999] bg-black flex flex-col select-none"
+      class="fixed inset-0 z-[9999] bg-black overflow-hidden select-none"
       [class.cursor-none]="!controlsVisible()"
       (mousemove)="showControls()"
       (click)="showControls()"
     >
+      <div
+        [class]="autoRotate() ? 'flex flex-col absolute top-1/2 left-1/2' : 'flex flex-col w-full h-full'"
+        [style.width]="autoRotate() ? '100vh' : '100%'"
+        [style.height]="autoRotate() ? '100vw' : '100%'"
+        [style.transform]="autoRotate() ? 'translate(-50%, -50%) rotate(90deg)' : 'none'"
+        [style.transition]="'transform 300ms ease, width 300ms ease, height 300ms ease'"
+      >
       <!-- Top bar -->
       <div
         class="absolute top-0 left-0 right-0 flex items-center justify-between py-2 px-3 z-30 bg-gradient-to-b from-black/70 to-transparent transition-opacity duration-300"
@@ -67,9 +74,10 @@ interface Slide {
         <!-- Layer A -->
         <div
           class="absolute inset-0 flex gap-0.5 overflow-hidden"
-          [style.transition]="layerTransitionStyle()"
+          [style.transition]="layerATransition()"
           [style.opacity]="layerAOpacity()"
           [style.transform]="layerATransform()"
+          [style.filter]="layerAFilter()"
           [style.z-index]="frontLayer() === 'a' ? 1 : 0"
         >
           @if (layerASlide(); as slide) {
@@ -77,7 +85,9 @@ interface Slide {
               <img
                 [src]="photo.path | imageUrl"
                 [alt]="photo.filename"
-                class="flex-1 min-w-0 h-full object-cover"
+                class="flex-1 min-w-0 h-full"
+                [class.object-contain]="slide.photos.length === 1"
+                [class.object-cover]="slide.photos.length > 1"
                 (error)="onImageError($event, photo.path)"
               />
             }
@@ -87,9 +97,10 @@ interface Slide {
         <!-- Layer B -->
         <div
           class="absolute inset-0 flex gap-0.5 overflow-hidden"
-          [style.transition]="layerTransitionStyle()"
+          [style.transition]="layerBTransition()"
           [style.opacity]="layerBOpacity()"
           [style.transform]="layerBTransform()"
+          [style.filter]="layerBFilter()"
           [style.z-index]="frontLayer() === 'b' ? 1 : 0"
         >
           @if (layerBSlide(); as slide) {
@@ -97,7 +108,9 @@ interface Slide {
               <img
                 [src]="photo.path | imageUrl"
                 [alt]="photo.filename"
-                class="flex-1 min-w-0 h-full object-cover"
+                class="flex-1 min-w-0 h-full"
+                [class.object-contain]="slide.photos.length === 1"
+                [class.object-cover]="slide.photos.length > 1"
                 (error)="onImageError($event, photo.path)"
               />
             }
@@ -167,6 +180,7 @@ interface Slide {
           </button>
         </div>
       </div>
+      </div>
     </div>
   `,
 })
@@ -177,7 +191,7 @@ export class SlideshowComponent implements OnDestroy {
   readonly hasMore = input<boolean>(false);
   readonly loading = input<boolean>(false);
   readonly initialSlideIndex = input<number>(0);
-  readonly transitionType = input<'crossfade' | 'slide' | 'zoom' | 'kenburns'>('crossfade');
+  readonly transitionType = input<string>('crossfade');
 
   /** Emitted when the slideshow requests closing. */
   readonly closed = output<void>();
@@ -230,6 +244,17 @@ export class SlideshowComponent implements OnDestroy {
   readonly currentSlideIndex = signal(0);
   readonly currentSlide = computed(() => this.slides()[this.currentSlideIndex()] ?? null);
 
+  /** Rotate the entire slideshow UI when a landscape photo is shown on a portrait viewport. */
+  readonly autoRotate = computed(() => {
+    const slide = this.currentSlide();
+    if (!slide || slide.photos.length !== 1) return false;
+    const photo = slide.photos[0];
+    if (!photo.image_width || !photo.image_height) return false;
+    const isPhotoLandscape = photo.image_width > photo.image_height;
+    const isViewportPortrait = this.viewportHeight() > this.viewportWidth();
+    return isPhotoLandscape && isViewportPortrait;
+  });
+
   /** Photo range for the current slide (1-based). */
   readonly photoCounter = computed(() => {
     const slides = this.slides();
@@ -249,17 +274,35 @@ export class SlideshowComponent implements OnDestroy {
   readonly layerBOpacity = signal(0);
   readonly layerATransform = signal('none');
   readonly layerBTransform = signal('none');
+  readonly layerATransition = signal('opacity 300ms ease');
+  readonly layerBTransition = signal('opacity 300ms ease');
+  readonly layerAFilter = signal('none');
+  readonly layerBFilter = signal('none');
   readonly frontLayer = signal<'a' | 'b'>('a');
 
-  /** CSS transition string for layers, derived from transitionType. */
-  readonly layerTransitionStyle = computed(() => {
+  /** Compute the animated transition CSS for the current transitionType. */
+  private getAnimateTransition(): string {
     const t = this.transitionType();
     const dur = this.slideDuration();
-    if (t === 'slide') return 'transform 500ms ease, opacity 300ms ease';
-    if (t === 'zoom') return 'transform 500ms ease, opacity 400ms ease';
-    if (t === 'kenburns') return `transform ${dur}s ease-out, opacity 300ms ease`;
-    return 'opacity 300ms ease';
-  });
+    switch (t) {
+      case 'slide': return 'transform 500ms ease, opacity 300ms ease';
+      case 'zoom': return 'transform 500ms ease, opacity 400ms ease';
+      case 'kenburns': return `transform ${dur}s ease-out, opacity 300ms ease`;
+      case 'fade_black': return 'opacity 400ms ease';
+      case 'blur': return 'filter 400ms ease, opacity 400ms ease';
+      case 'flip': return 'transform 500ms ease, opacity 250ms ease';
+      default: return 'opacity 300ms ease';
+    }
+  }
+
+  /** Duration in ms for the active part of the transition. */
+  private getTransitionDuration(): number {
+    switch (this.transitionType()) {
+      case 'slide': case 'flip': return 500;
+      case 'zoom': case 'fade_black': case 'blur': return 400;
+      default: return 300;
+    }
+  }
 
   // Playback state
   readonly isPlaying = signal(true);
@@ -280,6 +323,10 @@ export class SlideshowComponent implements OnDestroy {
   private boundKeyHandler!: (e: KeyboardEvent) => void;
   private boundFullscreenHandler!: () => void;
   private boundResizeHandler!: () => void;
+  private boundOrientationHandler!: () => void;
+
+  /** Track the previous maxPortraitsPerSlide to detect regrouping. */
+  private prevMaxPortraits = 0;
 
   constructor() {
     // Watch for slides to become available (handles async photo loading)
@@ -294,6 +341,43 @@ export class SlideshowComponent implements OnDestroy {
         this.layerAOpacity.set(1);
         this.frontLayer.set('a');
       }
+    });
+
+    // Re-sync displayed slide when orientation/resize causes regrouping
+    effect(() => {
+      const max = this.maxPortraitsPerSlide();
+      const slides = this.slides();
+      const prev = this.prevMaxPortraits;
+      this.prevMaxPortraits = max;
+
+      // Skip initial run (prev === 0) or if grouping didn't change
+      if (prev === 0 || prev === max || slides.length === 0) return;
+
+      untracked(() => {
+        // Find which photo was at the start of the current slide
+        const frontLayer = this.frontLayer();
+        const currentSlide = frontLayer === 'a' ? this.layerASlide() : this.layerBSlide();
+        if (!currentSlide?.photos.length) return;
+
+        const firstPath = currentSlide.photos[0].path;
+
+        // Find the new slide containing that photo
+        let newIdx = 0;
+        for (let i = 0; i < slides.length; i++) {
+          if (slides[i].photos.some(p => p.path === firstPath)) {
+            newIdx = i;
+            break;
+          }
+        }
+
+        const newSlide = slides[newIdx];
+        if (!newSlide) return;
+
+        // Update instantly (no transition)
+        this.currentSlideIndex.set(newIdx);
+        const activeSlide = frontLayer === 'a' ? this.layerASlide : this.layerBSlide;
+        activeSlide.set(newSlide);
+      });
     });
 
     afterNextRender(() => {
@@ -315,11 +399,19 @@ export class SlideshowComponent implements OnDestroy {
       this.boundFullscreenHandler = () => this.isFullscreen.set(!!document.fullscreenElement);
       document.addEventListener('fullscreenchange', this.boundFullscreenHandler);
 
-      this.boundResizeHandler = () => {
-        this.viewportWidth.set(window.innerWidth);
-        this.viewportHeight.set(window.innerHeight);
-      };
+      // Read fresh dimensions now that DOM is ready
+      this.updateViewportDimensions();
+
+      this.boundResizeHandler = () => this.updateViewportDimensions();
       window.addEventListener('resize', this.boundResizeHandler);
+
+      // orientationchange fires on mobile when device is rotated
+      // (resize may not fire, or may fire with stale innerWidth/Height)
+      this.boundOrientationHandler = () => {
+        // Delay read — dimensions aren't updated until after the event
+        setTimeout(() => this.updateViewportDimensions(), 100);
+      };
+      screen.orientation?.addEventListener('change', this.boundOrientationHandler);
 
       this.startInterval();
       this.scheduleHideControls();
@@ -347,6 +439,14 @@ export class SlideshowComponent implements OnDestroy {
     if (this.boundResizeHandler) {
       window.removeEventListener('resize', this.boundResizeHandler);
     }
+    if (this.boundOrientationHandler) {
+      screen.orientation?.removeEventListener('change', this.boundOrientationHandler);
+    }
+  }
+
+  private updateViewportDimensions(): void {
+    this.viewportWidth.set(window.innerWidth);
+    this.viewportHeight.set(window.innerHeight);
   }
 
   showControls(): void {
@@ -392,7 +492,10 @@ export class SlideshowComponent implements OnDestroy {
     if (document.fullscreenElement) {
       document.exitFullscreen();
     } else {
-      this.container().nativeElement.requestFullscreen();
+      this.container().nativeElement.requestFullscreen().then(() => {
+        // Unlock orientation so device rotation works in fullscreen
+        screen.orientation?.unlock?.();
+      }).catch(() => {});
     }
   }
 
@@ -454,7 +557,7 @@ export class SlideshowComponent implements OnDestroy {
   }
 
   private crossfadeTo(slide: Slide): Promise<void> {
-    // Cancel any in-progress crossfade
+    // Cancel any in-progress crossfade and reset to clean state
     if (this.crossfadeTimer) {
       clearTimeout(this.crossfadeTimer);
       this.crossfadeTimer = null;
@@ -469,59 +572,88 @@ export class SlideshowComponent implements OnDestroy {
       const standbySlide = isAFront ? this.layerBSlide : this.layerASlide;
       const standbyOpacity = isAFront ? this.layerBOpacity : this.layerAOpacity;
       const standbyTransform = isAFront ? this.layerBTransform : this.layerATransform;
+      const standbyTransition = isAFront ? this.layerBTransition : this.layerATransition;
+      const standbyFilter = isAFront ? this.layerBFilter : this.layerAFilter;
       const activeOpacity = isAFront ? this.layerAOpacity : this.layerBOpacity;
       const activeTransform = isAFront ? this.layerATransform : this.layerBTransform;
+      const activeTransition = isAFront ? this.layerATransition : this.layerBTransition;
+      const activeFilter = isAFront ? this.layerAFilter : this.layerBFilter;
       const newFront: 'a' | 'b' = isAFront ? 'b' : 'a';
 
       const transition = this.transitionType();
+      const animateCSS = this.getAnimateTransition();
+      const duration = this.getTransitionDuration();
 
-      // Position standby layer off-screen / scaled before showing
-      if (transition === 'slide') {
-        standbyTransform.set('translateX(100%)');
-      } else if (transition === 'zoom') {
-        standbyTransform.set('scale(1.05)');
-      } else if (transition === 'kenburns') {
-        standbyTransform.set('scale(1.0)');
-      } else {
-        standbyTransform.set('none');
+      // 1. Disable transition on standby so positioning is instant (no flash)
+      standbyTransition.set('none');
+      standbyOpacity.set(0);
+      standbyFilter.set('none');
+
+      // Position standby layer for entry
+      switch (transition) {
+        case 'slide':   standbyTransform.set('translateX(100%)'); break;
+        case 'zoom':    standbyTransform.set('scale(1.05)'); break;
+        case 'kenburns': standbyTransform.set('scale(1.0)'); break;
+        case 'flip':    standbyTransform.set('perspective(1200px) rotateY(-90deg)'); break;
+        default:        standbyTransform.set('none'); break;
       }
 
-      // Load slide into standby layer (invisible)
+      // Load slide into standby layer (still invisible, still behind)
       standbySlide.set(slide);
-      standbyOpacity.set(0);
-      this.frontLayer.set(newFront);
 
-      const transitionDuration = transition === 'slide' ? 500 : transition === 'zoom' ? 400 : 300;
-
-      // Wait for DOM paint, then animate in
+      // 2. Wait one frame for DOM to paint the new content, then animate
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          standbyOpacity.set(1);
+          // Now bring standby to front and enable transitions
+          this.frontLayer.set(newFront);
+          standbyTransition.set(animateCSS);
+          activeTransition.set(animateCSS);
 
-          if (transition === 'slide') {
-            standbyTransform.set('translateX(0)');
-            activeTransform.set('translateX(-100%)');
-          } else if (transition === 'zoom') {
-            standbyTransform.set('scale(1.0)');
-          } else if (transition === 'kenburns') {
-            standbyTransform.set('scale(1.0)');
+          // Animate standby in
+          standbyOpacity.set(1);
+          standbyFilter.set('none');
+
+          switch (transition) {
+            case 'slide':
+              standbyTransform.set('translateX(0)');
+              activeTransform.set('translateX(-100%)');
+              break;
+            case 'zoom':
+              standbyTransform.set('scale(1.0)');
+              break;
+            case 'flip':
+              standbyTransform.set('perspective(1200px) rotateY(0deg)');
+              activeTransform.set('perspective(1200px) rotateY(90deg)');
+              break;
+            case 'fade_black':
+              // Active fades out first, then standby fades in
+              activeOpacity.set(0);
+              break;
+            case 'blur':
+              activeFilter.set('blur(12px)');
+              activeOpacity.set(0);
+              break;
           }
 
           this.crossfadeTimer = setTimeout(() => {
+            // Clean up active layer
             activeOpacity.set(0);
-            // Reset active layer transform for next use
+            activeTransition.set('none');
             activeTransform.set('none');
+            activeFilter.set('none');
             this.crossfadeTimer = null;
 
             // Start Ken Burns slow zoom on the new front layer
             if (transition === 'kenburns') {
+              // Re-apply slow transition for the zoom
+              standbyTransition.set(`transform ${this.slideDuration()}s ease-out`);
               this.kenburnsTimer = setTimeout(() => {
                 standbyTransform.set('scale(1.08)');
               }, 50);
             }
 
             resolve();
-          }, transitionDuration);
+          }, duration);
         });
       });
     });

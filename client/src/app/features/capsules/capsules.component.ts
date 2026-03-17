@@ -169,18 +169,22 @@ export class CapsulesComponent implements OnDestroy {
   protected readonly transitionVisible = signal(false);
   protected readonly nextCapsulePreview = signal<Capsule | null>(null);
   protected readonly slideshowStartIndex = signal(0);
-  protected readonly currentTransition = signal<'crossfade' | 'slide' | 'zoom' | 'kenburns'>('crossfade');
+  protected readonly currentTransition = signal<string>('crossfade');
 
-  private readonly typeTransitions: Record<string, 'crossfade' | 'slide' | 'zoom' | 'kenburns'> = {
+  private readonly typeTransitions: Record<string, string> = {
     journey: 'slide',
     location: 'slide',
     faces_of: 'zoom',
     golden: 'kenburns',
     seasonal: 'kenburns',
-    color_story: 'zoom',
-    this_week: 'slide',
+    color_story: 'blur',
+    color_palette: 'blur',
+    this_week: 'fade_black',
+    progress: 'kenburns',
     star_rating: 'kenburns',
     favorites: 'kenburns',
+    person_pair: 'zoom',
+    rare_pair: 'flip',
   };
 
   // Per-capsule shuffle + resume state
@@ -265,7 +269,7 @@ export class CapsulesComponent implements OnDestroy {
 
   private async loadAndStartCapsule(capsule: Capsule): Promise<void> {
     this.currentPlayingCapsuleId = capsule.id;
-    this.currentTransition.set(this.typeTransitions[capsule.type] ?? 'crossfade');
+    this.currentTransition.set(this.typeTransitions[capsule.type] || 'crossfade');
     this.slideshowLoading.set(true);
     this.slideshowActive.set(true);
 
