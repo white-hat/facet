@@ -13,6 +13,7 @@ import { Photo } from '../../shared/models/photo.model';
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { I18nService } from '../../core/services/i18n.service';
+import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
 import { ShutterSpeedPipe } from '../../shared/pipes/shutter-speed.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -383,6 +384,7 @@ export class PhotoDetailComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly i18n = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly photoActions = inject(PhotoActionsService);
 
   protected readonly photo = signal<Photo | null>(null);
   protected readonly fullImageLoaded = signal(false);
@@ -597,41 +599,12 @@ export class PhotoDetailComponent implements OnInit {
   }
 
   protected openCritique(photo: Photo): void {
-    import('../gallery/photo-critique-dialog.component').then(m => {
-      const vlmAvailable = this.store.config()?.features?.show_vlm_critique ?? false;
-      this.dialog.open(m.PhotoCritiqueDialogComponent, {
-        data: { photoPath: photo.path, vlmAvailable },
-        width: '95vw',
-        maxWidth: '600px',
-      });
-    });
+    this.photoActions.openCritique(photo);
   }
 
   protected openAddPerson(photo: Photo): void {
-    import('../gallery/face-selector-dialog.component').then(m => {
-      const faceRef = this.dialog.open(m.FaceSelectorDialogComponent, {
-        data: { photoPath: photo.path },
-        width: '95vw',
-        maxWidth: '400px',
-      });
-      faceRef.afterClosed().subscribe(face => {
-        if (!face) return;
-        import('../gallery/person-selector-dialog.component').then(m2 => {
-          const persons = this.store.persons().filter(p => p.name);
-          const personRef = this.dialog.open(m2.PersonSelectorDialogComponent, {
-            data: persons,
-            width: '95vw',
-            maxWidth: '400px',
-          });
-          personRef.afterClosed().subscribe(async selected => {
-            if (selected) {
-              await this.store.assignFace(face.id, selected.id, photo.path, selected.name);
-              this.snackBar.open(this.i18n.t('notifications.faces_assigned'), '', { duration: 2000 });
-              this.photo.update(p => p ? { ...p, unassigned_faces: Math.max(0, p.unassigned_faces - 1) } : p);
-            }
-          });
-        });
-      });
+    this.photoActions.openAddPerson(photo, () => {
+      this.photo.update(p => p ? { ...p, unassigned_faces: Math.max(0, p.unassigned_faces - 1) } : p);
     });
   }
 }

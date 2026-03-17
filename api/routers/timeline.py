@@ -30,6 +30,26 @@ def _get_photos_per_group():
         return 30
 
 
+def _fetch_grouped_summaries(conn, from_clause, where_clauses, sql_params, group_expr, order='ASC'):
+    """Return (group_key, count, hero_photo_path) rows in one query (no N+1)."""
+    where_str = " WHERE " + " AND ".join(where_clauses)
+    query = (
+        f"SELECT group_key, cnt, path as hero_photo_path FROM ("
+        f"  SELECT "
+        f"    {group_expr} as group_key, "
+        f"    COUNT(*) OVER (PARTITION BY {group_expr}) as cnt, "
+        f"    path, "
+        f"    ROW_NUMBER() OVER ("
+        f"      PARTITION BY {group_expr} "
+        f"      ORDER BY COALESCE(aggregate, 0) DESC"
+        f"    ) as rn "
+        f"  FROM {from_clause}{where_str}"
+        f") WHERE rn = 1 "
+        f"ORDER BY group_key {order}"
+    )
+    return conn.execute(query, sql_params).fetchall()
+
+
 
 @router.get("/api/timeline")
 async def api_timeline(
@@ -228,35 +248,13 @@ async def api_timeline_dates(
             where_clauses.append("SUBSTR(date_taken,1,4) = ?")
             sql_params.append(year_prefix)
 
-        where_str = " WHERE " + " AND ".join(where_clauses)
+        date_expr = "DATE(REPLACE(SUBSTR(date_taken,1,10),':','-'))"
+        rows = _fetch_grouped_summaries(conn, from_clause, where_clauses, sql_params, date_expr, 'ASC')
 
-        query = (
-            f"SELECT DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) as photo_date, COUNT(*) as cnt "
-            f"FROM {from_clause}{where_str} "
-            f"GROUP BY photo_date "
-            f"ORDER BY photo_date ASC"
-        )
-        rows = conn.execute(query, sql_params).fetchall()
-
-        dates = []
-        for row in rows:
-            date_val = row['photo_date']
-            # Find hero photo for this date
-            hero_where = list(where_clauses) + [
-                "DATE(REPLACE(SUBSTR(date_taken,1,10),':','-')) = ?"
-            ]
-            hero_params = list(sql_params) + [date_val]
-            hero_where_str = " WHERE " + " AND ".join(hero_where)
-            hero_query = (
-                f"SELECT path FROM {from_clause}{hero_where_str} "
-                f"ORDER BY COALESCE(aggregate, 0) DESC LIMIT 1"
-            )
-            hero_row = conn.execute(hero_query, hero_params).fetchone()
-            dates.append({
-                'date': date_val,
-                'count': row['cnt'],
-                'hero_photo_path': hero_row['path'] if hero_row else None,
-            })
+        dates = [
+            {'date': row['group_key'], 'count': row['cnt'], 'hero_photo_path': row['hero_photo_path']}
+            for row in rows
+        ]
 
     except HTTPException:
         raise
@@ -288,36 +286,13 @@ async def api_timeline_years(
 
         where_clauses.extend(build_hide_clauses(hide_blinks, hide_bursts, hide_duplicates))
 
-        where_str = " WHERE " + " AND ".join(where_clauses)
+        year_expr = "SUBSTR(REPLACE(SUBSTR(date_taken,1,10),':','-'),1,4)"
+        rows = _fetch_grouped_summaries(conn, from_clause, where_clauses, sql_params, year_expr, 'DESC')
 
-        query = (
-            f"SELECT SUBSTR(REPLACE(SUBSTR(date_taken,1,10),':','-'),1,4) as year, "
-            f"COUNT(*) as count "
-            f"FROM {from_clause}{where_str} "
-            f"GROUP BY year ORDER BY year DESC"
-        )
-        rows = conn.execute(query, sql_params).fetchall()
-
-        years = []
-        for row in rows:
-            year_val = row['year']
-            # Find hero photo (highest aggregate) for this year
-            hero_where = list(where_clauses) + [
-                "SUBSTR(REPLACE(SUBSTR(date_taken,1,10),':','-'),1,4) = ?"
-            ]
-            hero_params = list(from_params) + list(vis_params)
-            hero_params.append(year_val)
-            hero_where_str = " WHERE " + " AND ".join(hero_where)
-            hero_query = (
-                f"SELECT path FROM {from_clause}{hero_where_str} "
-                f"ORDER BY COALESCE(aggregate, 0) DESC LIMIT 1"
-            )
-            hero_row = conn.execute(hero_query, hero_params).fetchone()
-            years.append({
-                'year': year_val,
-                'count': row['count'],
-                'hero_photo_path': hero_row['path'] if hero_row else None,
-            })
+        years = [
+            {'year': row['group_key'], 'count': row['cnt'], 'hero_photo_path': row['hero_photo_path']}
+            for row in rows
+        ]
 
     except HTTPException:
         raise
@@ -351,36 +326,13 @@ async def api_timeline_months(
 
         where_clauses.extend(build_hide_clauses(hide_blinks, hide_bursts, hide_duplicates))
 
-        where_str = " WHERE " + " AND ".join(where_clauses)
+        month_expr = "SUBSTR(REPLACE(SUBSTR(date_taken,1,7),':','-'),1,7)"
+        rows = _fetch_grouped_summaries(conn, from_clause, where_clauses, sql_params, month_expr, 'ASC')
 
-        query = (
-            f"SELECT SUBSTR(REPLACE(SUBSTR(date_taken,1,7),':','-'),1,7) as month, "
-            f"COUNT(*) as count "
-            f"FROM {from_clause}{where_str} "
-            f"GROUP BY month ORDER BY month ASC"
-        )
-        rows = conn.execute(query, sql_params).fetchall()
-
-        months = []
-        for row in rows:
-            month_val = row['month']
-            # Find hero photo for this month
-            hero_where = list(where_clauses) + [
-                "SUBSTR(REPLACE(SUBSTR(date_taken,1,7),':','-'),1,7) = ?"
-            ]
-            hero_params = list(from_params) + list(vis_params) + [str(year)]
-            hero_params.append(month_val)
-            hero_where_str = " WHERE " + " AND ".join(hero_where)
-            hero_query = (
-                f"SELECT path FROM {from_clause}{hero_where_str} "
-                f"ORDER BY COALESCE(aggregate, 0) DESC LIMIT 1"
-            )
-            hero_row = conn.execute(hero_query, hero_params).fetchone()
-            months.append({
-                'month': month_val,
-                'count': row['count'],
-                'hero_photo_path': hero_row['path'] if hero_row else None,
-            })
+        months = [
+            {'month': row['group_key'], 'count': row['cnt'], 'hero_photo_path': row['hero_photo_path']}
+            for row in rows
+        ]
 
     except HTTPException:
         raise

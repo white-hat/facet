@@ -31,30 +31,30 @@ interface CalendarCell {
 
     @if (!loading()) {
       <!-- Day-of-week headers -->
-      <div class="grid grid-cols-7 gap-1 mb-1 max-w-3xl mx-auto">
+      <div class="grid grid-cols-7 gap-2 mb-2">
         @for (d of weekDays; track d) {
-          <div class="text-center text-xs font-medium opacity-50 py-1">{{ d }}</div>
+          <div class="text-center text-sm font-medium opacity-50 py-1">{{ d }}</div>
         }
       </div>
 
       <!-- Calendar grid -->
-      <div class="grid grid-cols-7 gap-1 max-w-3xl mx-auto">
+      <div class="grid grid-cols-7 gap-2">
         @for (cell of calendarCells(); track $index) {
           @if (cell.date) {
             <button
-              class="relative rounded-lg overflow-hidden transition-shadow cursor-pointer aspect-square"
+              class="relative rounded-xl overflow-hidden transition-shadow cursor-pointer aspect-square"
               [class]="cell.count > 0 ? 'hover:shadow-lg bg-[var(--mat-sys-surface-container)]' : 'opacity-40 bg-[var(--mat-sys-surface-container)] cursor-default'"
               (click)="cell.count > 0 && daySelected.emit(cell.date)">
               @if (cell.hero_photo_path) {
-                <img [src]="cell.hero_photo_path | thumbnailUrl:160"
+                <img [src]="cell.hero_photo_path | thumbnailUrl:320"
                      class="absolute inset-0 w-full h-full object-cover" loading="lazy" />
                 <div class="absolute inset-0 bg-black/30"></div>
               }
               <div class="relative z-10 flex flex-col items-center justify-center h-full p-1"
                    [class.text-white]="!!cell.hero_photo_path">
-                <span class="text-sm font-semibold">{{ cell.day }}</span>
+                <span class="text-base font-semibold">{{ cell.day }}</span>
                 @if (cell.count > 0) {
-                  <span class="text-[10px] opacity-70">{{ cell.count }}</span>
+                  <span class="text-xs opacity-70">{{ cell.count }}</span>
                 }
               </div>
             </button>
@@ -77,7 +77,12 @@ export class TimelineDaysComponent {
   protected readonly calendarCells = signal<CalendarCell[]>([]);
   protected readonly loading = signal(false);
 
-  protected readonly weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  // Generate Mon–Sun abbreviations from the browser locale (Monday-first)
+  protected readonly weekDays = (() => {
+    const fmt = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
+    // Jan 5 2026 is a Monday; generate 7 consecutive days
+    return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2026, 0, 5 + i)));
+  })();
 
   constructor() {
     effect(() => {

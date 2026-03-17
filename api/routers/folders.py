@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Query
 
 from api.auth import CurrentUser, get_optional_user
 from api.database import get_db_connection
-from api.db_helpers import get_visibility_clause, build_hide_clauses
+from api.db_helpers import get_visibility_clause, build_hide_clauses, get_photos_from_clause
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +37,11 @@ async def api_folders(
     user_id = user.user_id if user else None
     conn = get_db_connection()
     try:
+        from_clause, from_params = get_photos_from_clause(user_id)
         vis_sql, vis_params = get_visibility_clause(user_id)
 
         where_clauses = [vis_sql]
-        sql_params = list(vis_params)
+        sql_params = list(from_params) + list(vis_params)
 
         where_clauses.extend(build_hide_clauses(hide_blinks, hide_bursts, hide_duplicates))
 
@@ -56,7 +57,7 @@ async def api_folders(
         where_str = " WHERE " + " AND ".join(where_clauses)
 
         # Fetch path + aggregate for matching photos
-        query = f"SELECT path, COALESCE(aggregate, 0) as aggregate FROM photos{where_str}"
+        query = f"SELECT path, COALESCE(aggregate, 0) as aggregate FROM {from_clause}{where_str}"
         rows = conn.execute(query, sql_params).fetchall()
 
         # Group by immediate child directory

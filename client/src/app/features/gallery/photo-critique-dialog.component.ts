@@ -109,25 +109,6 @@ export class CategoryReasonPipe implements PipeTransform {
           <p class="text-sm">{{ e }}</p>
         </div>
       } @else if (critique(); as c) {
-        <!-- Caption -->
-        @if (c.caption || captionLoading()) {
-          <div class="text-sm mb-4 p-3 rounded-lg bg-[var(--mat-sys-surface-container)]">
-            <div class="text-xs uppercase tracking-wider opacity-50 mb-1">{{ 'caption.title' | translate }}</div>
-            @if (captionLoading()) {
-              <span class="opacity-60">{{ 'caption.generating' | translate }}</span>
-            } @else {
-              <p>{{ c.caption }}</p>
-            }
-          </div>
-        } @else if (captionAvailable()) {
-          <div class="mb-4">
-            <button mat-stroked-button (click)="generateCaption()">
-              <mat-icon>auto_awesome</mat-icon>
-              {{ 'caption.generate' | translate }}
-            </button>
-          </div>
-        }
-
         <!-- Category reason -->
         <div class="text-sm mb-4 p-3 rounded-lg bg-[var(--mat-sys-surface-container)]">
           <div class="text-xs uppercase tracking-wider opacity-50 mb-1">{{ 'critique.category_reason' | translate }}</div>
@@ -226,9 +207,6 @@ export class PhotoCritiqueDialogComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly critique = signal<CritiqueResponse | null>(null);
   protected readonly error = signal<string | null>(null);
-  protected readonly captionLoading = signal(false);
-  protected readonly captionAvailable = signal(false);
-
   protected readonly hasPenalties = computed(() => {
     const c = this.critique();
     return !!(c && Object.keys(c.penalties).length > 0);
@@ -237,40 +215,15 @@ export class PhotoCritiqueDialogComponent implements OnInit {
   async ngOnInit(): Promise<void> {
     try {
       const mode = this.data.vlmAvailable ? 'vlm' : 'rule';
-      const [res, captionRes] = await Promise.all([
-        firstValueFrom(
-          this.api.get<CritiqueResponse>('/critique', { path: this.data.photoPath, mode }),
-        ),
-        firstValueFrom(
-          this.api.get<{ caption?: string; source?: string }>('/caption', { path: this.data.photoPath }),
-        ).catch(() => null),
-      ]);
-      if (captionRes?.caption) {
-        res.caption = captionRes.caption;
-      } else {
-        this.captionAvailable.set(this.data.vlmAvailable);
-      }
+      const res = await firstValueFrom(
+        this.api.get<CritiqueResponse>('/critique', { path: this.data.photoPath, mode }),
+      );
       this.critique.set(res);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : this.i18n.t('critique.error_fallback');
       this.error.set(message);
     } finally {
       this.loading.set(false);
-    }
-  }
-
-  protected async generateCaption(): Promise<void> {
-    this.captionLoading.set(true);
-    try {
-      const res = await firstValueFrom(
-        this.api.get<{ caption: string }>('/caption', { path: this.data.photoPath, generate: '1' }),
-      );
-      this.critique.update(c => c ? { ...c, caption: res.caption } : c);
-      this.captionAvailable.set(false);
-    } catch {
-      // ignore
-    } finally {
-      this.captionLoading.set(false);
     }
   }
 }

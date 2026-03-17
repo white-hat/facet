@@ -1,11 +1,12 @@
 import { Component, inject, signal, input, effect, output } from '@angular/core';
-import { DatePipe, DecimalPipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { ThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
+import { TimelineDatePipe } from './timeline-date.pipe';
 
 interface MonthSummary {
   month: string;
@@ -16,7 +17,7 @@ interface MonthSummary {
 @Component({
   selector: 'app-timeline-months',
   standalone: true,
-  imports: [DecimalPipe, MatIconModule, MatProgressSpinnerModule, TranslatePipe, ThumbnailUrlPipe],
+  imports: [DecimalPipe, MatIconModule, MatProgressSpinnerModule, TranslatePipe, ThumbnailUrlPipe, TimelineDatePipe],
   template: `
     @if (loading() && months().length === 0) {
       <div class="flex justify-center py-16">
@@ -46,7 +47,7 @@ interface MonthSummary {
             </div>
           }
           <div class="p-3">
-            <div class="text-lg font-semibold">{{ formatMonth(m.month) }}</div>
+            <div class="text-lg font-semibold">{{ m.month | timelineDate }}</div>
             <div class="text-sm opacity-60">{{ m.count | number }} {{ 'timeline.photos_count' | translate }}</div>
           </div>
         </button>
@@ -56,7 +57,6 @@ interface MonthSummary {
 })
 export class TimelineMonthsComponent {
   private readonly api = inject(ApiService);
-  private readonly datePipe = new DatePipe('en-US');
 
   readonly year = input.required<string>();
   readonly monthSelected = output<string>();
@@ -83,8 +83,4 @@ export class TimelineMonthsComponent {
     }
   }
 
-  protected formatMonth(monthStr: string): string {
-    // monthStr is "2025-03" format
-    return this.datePipe.transform(new Date(monthStr + '-15T12:00:00'), 'MMMM') ?? monthStr;
-  }
 }

@@ -143,12 +143,10 @@ export class App implements OnInit {
   protected readonly isStatsRoute = computed(() => this.url().split('?')[0] === '/stats');
 
   protected readonly isCompareRoute = computed(() => this.url().split('?')[0] === '/compare');
-  protected readonly isTimelineRoute = computed(() => this.url().split('?')[0] === '/timeline');
   protected readonly isAlbumsRoute = computed(() => this.url().split('?')[0] === '/albums');
   protected readonly isPersonsRoute = computed(() => this.url().split('?')[0] === '/persons');
   protected readonly isMapRoute = computed(() => this.url().split('?')[0] === '/map');
   protected readonly isCapsuleRoute = computed(() => this.url().split('?')[0] === '/capsules');
-  protected readonly isFoldersRoute = computed(() => this.url().split('?')[0] === '/folders');
 
   protected readonly sortGroups = computed(() => {
     const grouped = this.store.config()?.sort_options_grouped;

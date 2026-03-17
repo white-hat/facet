@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -70,19 +70,23 @@ import { TimelineDatePipe } from './timeline-date.pipe';
     </div>
   `,
 })
-export class TimelineComponent {
+export class TimelineComponent implements OnInit {
   private readonly router = inject(Router);
   protected readonly filters = inject(TimelineFiltersService);
 
   protected readonly level = signal<'years' | 'months' | 'days'>('years');
 
-  protected selectedMonthNumber(): string {
-    // Extract month number from "2025-03" → "3"
+  ngOnInit(): void {
+    this.filters.selectedYear.set('');
+    this.filters.selectedMonth.set('');
+  }
+
+  protected readonly selectedMonthNumber = computed(() => {
     const m = this.filters.selectedMonth();
     if (!m) return '';
     const parts = m.split('-');
     return parts.length > 1 ? String(+parts[1]) : '';
-  }
+  });
 
   protected goToYears(): void {
     this.level.set('years');

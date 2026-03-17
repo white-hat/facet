@@ -1,4 +1,5 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
@@ -75,6 +76,7 @@ interface FoldersResponse {
           @if (folder.cover_photo_path) {
             <img [src]="folder.cover_photo_path | thumbnailUrl:320"
                  [alt]="folder.name"
+                 loading="lazy"
                  class="w-full aspect-square object-cover" />
           } @else {
             <div class="w-full aspect-square flex items-center justify-center bg-[var(--mat-sys-surface-container-high)]">
@@ -94,6 +96,7 @@ export class FoldersComponent implements OnInit {
   private readonly api = inject(ApiService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly folders = signal<FolderItem[]>([]);
   protected readonly loading = signal(false);
@@ -114,7 +117,7 @@ export class FoldersComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
       this.currentPrefix.set(params['prefix'] || '');
       this.loadFolders();
     });

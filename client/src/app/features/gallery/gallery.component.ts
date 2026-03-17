@@ -26,15 +26,13 @@ import { AuthService } from '../../core/services/auth.service';
 import { I18nService } from '../../core/services/i18n.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { PhotoTooltipComponent } from './photo-tooltip.component';
-import { FaceSelectorDialogComponent } from './face-selector-dialog.component';
-import { PersonSelectorDialogComponent } from './person-selector-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { PhotoActionsService } from '../../core/services/photo-actions.service';
 import { SlideshowComponent } from './slideshow.component';
 import { GalleryFilterSidebarComponent } from './gallery-filter-sidebar.component';
 import { PhotoCardComponent } from '../../shared/components/photo-card/photo-card.component';
 import { AlbumService, Album } from '../../core/services/album.service';
 import { CreateAlbumDialogComponent } from '../albums/create-album-dialog.component';
-import { PhotoCritiqueDialogComponent } from './photo-critique-dialog.component';
 import { InfiniteScrollDirective } from '../../shared/directives/infinite-scroll.directive';
 
 @Component({
@@ -235,6 +233,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   private readonly i18n = inject(I18nService);
   private readonly dialog = inject(MatDialog);
   private readonly albumService = inject(AlbumService);
+  private readonly photoActions = inject(PhotoActionsService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
@@ -529,12 +528,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   }
 
   openCritique(photo: Photo): void {
-    const vlmAvailable = this.store.config()?.features?.show_vlm_critique ?? false;
-    this.dialog.open(PhotoCritiqueDialogComponent, {
-      data: { photoPath: photo.path, vlmAvailable },
-      width: '95vw',
-      maxWidth: '600px',
-    });
+    this.photoActions.openCritique(photo);
   }
 
   showTooltip(event: MouseEvent, photo: Photo): void {
@@ -614,26 +608,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
   }
 
   openAddPerson(photo: Photo): void {
-    const faceRef = this.dialog.open(FaceSelectorDialogComponent, {
-      data: { photoPath: photo.path },
-      width: '95vw',
-      maxWidth: '400px',
-    });
-    faceRef.afterClosed().subscribe(face => {
-      if (!face) return;
-      const persons = this.store.persons().filter(p => p.name);
-      const personRef = this.dialog.open(PersonSelectorDialogComponent, {
-        data: persons,
-        width: '95vw',
-        maxWidth: '400px',
-      });
-      personRef.afterClosed().subscribe(async selected => {
-        if (selected) {
-          await this.store.assignFace(face.id, selected.id, photo.path, selected.name);
-          this.snackBar.open(this.i18n.t('notifications.faces_assigned'), '', { duration: 2000 });
-        }
-      });
-    });
+    this.photoActions.openAddPerson(photo);
   }
 
   removePerson(photo: Photo, personId: number): void {
