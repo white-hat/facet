@@ -226,6 +226,13 @@ export class App implements OnInit {
       }
     }
 
+    // GPS location filter
+    if (f.gps_lat && f.gps_lng) {
+      const locationName = this.store.gpsLocationName() || `${(+f.gps_lat).toFixed(2)}, ${(+f.gps_lng).toFixed(2)}`;
+      const radius = f.gps_radius_km ? ` — ${f.gps_radius_km} km` : '';
+      chips.push({ id: 'gps', labelKey: 'gallery.sidebar.location', value: locationName + radius, clearKeys: ['gps_lat', 'gps_lng', 'gps_radius_km'] });
+    }
+
     // Boolean filters
     if (f.favorites_only) chips.push({ id: 'favorites_only', labelKey: 'gallery.favorites_only', value: '', clearKeys: ['favorites_only'] });
     if (f.is_monochrome) chips.push({ id: 'is_monochrome', labelKey: 'gallery.monochrome_only', value: '', clearKeys: ['is_monochrome'] });

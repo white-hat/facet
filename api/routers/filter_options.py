@@ -237,3 +237,16 @@ async def categories(user: Optional[CurrentUser] = Depends(get_optional_user)):
         except Exception:
             return []
     return _cached_filter_query('categories', 'categories', query)
+
+
+@router.get("/location_name")
+async def location_name(lat: float, lng: float):
+    """Reverse geocode coordinates to a place name, using location_names cache."""
+    from analyzers.capsule_generator import _geocode_grid
+
+    conn = get_db_connection()
+    try:
+        name = _geocode_grid(conn, lat, lng)
+        return {"display_name": name}
+    finally:
+        conn.close()

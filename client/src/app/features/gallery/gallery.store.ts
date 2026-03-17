@@ -404,6 +404,26 @@ export class GalleryStore {
   readonly persons = signal<PersonOption[]>([]);
   readonly patterns = signal<FilterOption[]>([]);
 
+  /** Reverse-geocoded place name for the active GPS filter. */
+  readonly gpsLocationName = signal('');
+
+  private readonly gpsCoords = computed(() => {
+    const f = this.filters();
+    return f.gps_lat && f.gps_lng ? `${f.gps_lat},${f.gps_lng}` : '';
+  });
+
+  private gpsLocationEffect = effect(() => {
+    const coords = this.gpsCoords();
+    if (!coords) {
+      this.gpsLocationName.set('');
+      return;
+    }
+    const [lat, lng] = coords.split(',');
+    firstValueFrom(this.api.get<{ display_name: string }>('/filter_options/location_name', { lat, lng }))
+      .then(res => this.gpsLocationName.set(res.display_name || `${(+lat).toFixed(2)}, ${(+lng).toFixed(2)}`))
+      .catch(() => this.gpsLocationName.set(`${(+lat).toFixed(2)}, ${(+lng).toFixed(2)}`));
+  });
+
   // --- Computed ---
   readonly activeFilterCount = computed(() => {
     const f = this.filters();

@@ -543,7 +543,7 @@
   }
 
   <!-- Main content -->
-  <main class="flex-1 overflow-auto lg:pb-0" [class.pb-14]="isGalleryRoute() || isAlbumsRoute() || isPersonsRoute() || isTimelineRoute() || isMapRoute()">
+  <main class="flex-1 overflow-auto lg:pb-0" [class.pb-14]="isGalleryRoute() || isAlbumsRoute() || isPersonsRoute() || isTimelineRoute() || isMapRoute() || isCapsuleRoute()">
     <router-outlet />
   </main>
 
@@ -757,6 +757,24 @@
         <mat-label>{{ 'ui.labels.to' | translate }}</mat-label>
         <input matInput type="date" [value]="mapFilters.dateTo()" (change)="onDateFilterChange(mapFilters, 'to', $event)" />
       </mat-form-field>
+    </div>
+  }
+
+  <!-- Mobile capsules bottom bar -->
+  @if (auth.isAuthenticated() && isCapsuleRoute()) {
+    <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center gap-1 px-2 py-1 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] safe-area-pb">
+      <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
+        <mat-label>{{ 'capsules.date_from' | translate }}</mat-label>
+        <input matInput type="date" [value]="capsuleFilters.dateFrom()" (change)="onDateFilterChange(capsuleFilters, 'from', $event)" />
+      </mat-form-field>
+      <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
+        <mat-label>{{ 'capsules.date_to' | translate }}</mat-label>
+        <input matInput type="date" [value]="capsuleFilters.dateTo()" (change)="onDateFilterChange(capsuleFilters, 'to', $event)" />
+      </mat-form-field>
+      <button mat-icon-button class="!w-10 !h-10 shrink-0" [matTooltip]="'capsules.regenerate' | translate"
+        (click)="capsuleFilters.regenerate.set(capsuleFilters.regenerate() + 1)">
+        <mat-icon>refresh</mat-icon>
+      </button>
     </div>
   }
 </div>

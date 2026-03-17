@@ -48,7 +48,7 @@ interface Slide {
         [style.width]="autoRotate() ? '100vh' : '100%'"
         [style.height]="autoRotate() ? '100vw' : '100%'"
         [style.transform]="autoRotate() ? 'translate(-50%, -50%) rotate(90deg)' : 'none'"
-        [style.transition]="'transform 300ms ease, width 300ms ease, height 300ms ease'"
+        style="transition: transform 300ms ease, width 300ms ease, height 300ms ease"
       >
       <!-- Top bar -->
       <div

@@ -286,6 +286,9 @@ import { createLeafletMap } from '../../shared/leaflet';
           @if (p.gps_latitude != null && p.gps_longitude != null) {
             <div class="border-t border-[var(--mat-sys-outline-variant)] pt-3">
               <div class="text-[0.625rem] uppercase tracking-wider text-[var(--mat-sys-on-surface-variant)] mb-2">{{ 'photo_detail.location' | translate }}</div>
+              @if (locationName()) {
+                <div class="text-sm font-medium mb-1">{{ locationName() }}</div>
+              }
               <div class="text-xs text-[var(--mat-sys-on-surface-variant)] mb-2">{{ p.gps_latitude | fixed:6 }}, {{ p.gps_longitude | fixed:6 }}</div>
               <div #locationMapContainer class="w-full h-40 rounded-lg overflow-hidden"></div>
             </div>
@@ -352,7 +355,21 @@ export class PhotoDetailComponent implements OnInit {
   protected readonly displayCaption = computed(() => this.translatedCaption() ?? this.photo()?.caption ?? null);
   protected readonly stars: readonly number[] = [1, 2, 3, 4, 5];
 
-  // Location map
+  // Location
+  protected readonly locationName = signal('');
+  private locationNameEffect = effect(() => {
+    const p = this.photo();
+    if (!p || p.gps_latitude == null || p.gps_longitude == null) {
+      this.locationName.set('');
+      return;
+    }
+    firstValueFrom(this.api.get<{ display_name: string }>('/filter_options/location_name', {
+      lat: String(p.gps_latitude), lng: String(p.gps_longitude),
+    }))
+      .then(res => this.locationName.set(res.display_name || ''))
+      .catch(() => this.locationName.set(''));
+  });
+
   private readonly locationMapContainer = viewChild<ElementRef<HTMLDivElement>>('locationMapContainer');
   private locationMap: L.Map | null = null;
   private locationMapTimeout: ReturnType<typeof setTimeout> | null = null;

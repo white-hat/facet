@@ -357,8 +357,12 @@ function saveSectionStates(states: Record<string, boolean>): void {
           <div class="flex flex-col gap-2 pb-2">
             @if (store.filters().gps_lat) {
               <div class="text-xs opacity-60 px-1">
-                {{ +store.filters().gps_lat | number:'1.4-4' }}, {{ +store.filters().gps_lng | number:'1.4-4' }}
-                — {{ store.filters().gps_radius_km }} km
+                @if (store.gpsLocationName()) {
+                  {{ store.gpsLocationName() }} — {{ store.filters().gps_radius_km }} km
+                } @else {
+                  {{ +store.filters().gps_lat | number:'1.4-4' }}, {{ +store.filters().gps_lng | number:'1.4-4' }}
+                  — {{ store.filters().gps_radius_km }} km
+                }
               </div>
               <button mat-stroked-button class="w-full" (click)="clearGpsFilter()">
                 <mat-icon>close</mat-icon>
