@@ -192,8 +192,8 @@ class TestTimelineDates:
     def test_returns_date_counts(self, client):
         mock_conn = mock.MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = [
-            {"photo_date": "2025-03-10", "cnt": 15},
-            {"photo_date": "2025-03-11", "cnt": 8},
+            {"group_key": "2025-03-10", "cnt": 15, "hero_photo_path": "/photos/a.jpg"},
+            {"group_key": "2025-03-11", "cnt": 8, "hero_photo_path": "/photos/b.jpg"},
         ]
 
         with (
@@ -213,7 +213,7 @@ class TestTimelineDates:
     def test_year_and_month_filter(self, client):
         mock_conn = mock.MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = [
-            {"photo_date": "2025-06-15", "cnt": 3},
+            {"group_key": "2025-06-15", "cnt": 3, "hero_photo_path": "/photos/c.jpg"},
         ]
 
         with (

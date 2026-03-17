@@ -51,8 +51,9 @@ async def api_folders(
         # If prefix is given, filter to paths under that directory
         # Use REPLACE to normalize backslashes in SQL for LIKE matching
         if norm_prefix:
-            where_clauses.append("REPLACE(photos.path, '\\', '/') LIKE ?")
-            sql_params.append(norm_prefix + '%')
+            escaped = norm_prefix.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+            where_clauses.append("REPLACE(photos.path, '\\', '/') LIKE ? ESCAPE '\\'")
+            sql_params.append(escaped + '%')
 
         where_str = " WHERE " + " AND ".join(where_clauses)
 

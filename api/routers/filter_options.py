@@ -3,6 +3,7 @@ Filter options router — lazy-loaded dropdown options.
 
 """
 
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends
 
@@ -12,6 +13,7 @@ from api.database import get_db_connection
 from api.db_helpers import is_photo_tags_available, get_visibility_clause
 
 router = APIRouter(prefix="/api/filter_options", tags=["filter_options"])
+logger = logging.getLogger(__name__)
 
 
 def _vis_where(user: Optional[CurrentUser]):
@@ -96,7 +98,7 @@ async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
                 """, vp + [max_tags]).fetchall()
                 return {'tags': [(r[0], r[1]) for r in rows], 'cached': False}
             except Exception:
-                pass
+                logger.debug("photo_tags query failed, falling back to split", exc_info=True)
 
         tag_query = f"""
             WITH RECURSIVE split_tags(tag, rest) AS (
@@ -117,6 +119,7 @@ async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
             rows = conn.execute(tag_query, vp + [max_tags]).fetchall()
             return {'tags': [(r[0], r[1]) for r in rows], 'cached': False}
         except Exception:
+            logger.exception("Failed to query tags")
             return {'tags': [], 'cached': False}
     finally:
         conn.close()
@@ -156,6 +159,7 @@ async def persons(ids: Optional[str] = None, user: Optional[CurrentUser] = Depen
                     result = [(r[0], r[1], r[2]) for r in extra] + result
             return result
         except Exception:
+            logger.exception("Failed to query persons")
             return []
 
     if forced_ids:
@@ -182,6 +186,7 @@ async def patterns(user: Optional[CurrentUser] = Depends(get_optional_user)):
             """, vp).fetchall()
             return [(r[0], r[1]) for r in rows]
         except Exception:
+            logger.exception("Failed to query composition patterns")
             return []
     return _cached_filter_query('composition_patterns', 'patterns', query)
 
@@ -200,6 +205,7 @@ async def apertures(user: Optional[CurrentUser] = Depends(get_optional_user)):
             """, vp).fetchall()
             return [(r[0], r[1]) for r in rows]
         except Exception:
+            logger.exception("Failed to query apertures")
             return []
     return _cached_filter_query('apertures', 'apertures', query)
 
@@ -218,6 +224,7 @@ async def focal_lengths(user: Optional[CurrentUser] = Depends(get_optional_user)
             """, vp).fetchall()
             return [(r[0], r[1]) for r in rows]
         except Exception:
+            logger.exception("Failed to query focal lengths")
             return []
     return _cached_filter_query('focal_lengths', 'focal_lengths', query)
 
@@ -235,6 +242,7 @@ async def categories(user: Optional[CurrentUser] = Depends(get_optional_user)):
             """, vp).fetchall()
             return [(r[0], r[1]) for r in rows]
         except Exception:
+            logger.exception("Failed to query categories")
             return []
     return _cached_filter_query('categories', 'categories', query)
 
@@ -242,11 +250,11 @@ async def categories(user: Optional[CurrentUser] = Depends(get_optional_user)):
 @router.get("/location_name")
 async def location_name(lat: float, lng: float):
     """Reverse geocode coordinates to a place name, using location_names cache."""
-    from analyzers.capsule_generator import _geocode_grid
+    from analyzers.capsule_generator import geocode_grid
 
     conn = get_db_connection()
     try:
-        name = _geocode_grid(conn, lat, lng)
+        name = geocode_grid(conn, lat, lng)
         return {"display_name": name}
     finally:
         conn.close()

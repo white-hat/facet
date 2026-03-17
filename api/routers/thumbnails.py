@@ -194,6 +194,7 @@ def _get_face_thumbnail_data(face_id: int):
         face_crop.save(buf, format="JPEG", quality=VIEWER_CONFIG['face_thumbnails']['jpeg_quality'])
         return buf.getvalue(), etag
     except Exception:
+        logger.debug("Failed to generate face thumbnail on-the-fly", exc_info=True)
         return None, None
 
 

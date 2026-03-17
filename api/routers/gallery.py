@@ -240,8 +240,9 @@ def _build_gallery_where(params, conn=None, user_id=None):
 
     if params.get('path_prefix'):
         norm_prefix = params['path_prefix'].replace('\\', '/').rstrip('/') + '/'
-        where_clauses.append("REPLACE(photos.path, '\\', '/') LIKE ?")
-        sql_params.append(norm_prefix + '%')
+        escaped = norm_prefix.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+        where_clauses.append("REPLACE(photos.path, '\\', '/') LIKE ? ESCAPE '\\'")
+        sql_params.append(escaped + '%')
 
     return where_clauses, sql_params
 

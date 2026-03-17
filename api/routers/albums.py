@@ -5,6 +5,7 @@ Albums router — user-curated photo collections and smart albums.
 
 import hmac
 import json
+import logging
 import math
 import secrets
 from typing import Optional
@@ -22,6 +23,7 @@ from api.db_helpers import (
 )
 
 router = APIRouter(tags=["albums"])
+logger = logging.getLogger(__name__)
 
 
 # --- Request models ---
@@ -176,6 +178,7 @@ def _get_first_photo_path(conn, album_row, user_id=None):
             ).fetchone()
             return row['path'] if row else None
         except Exception:
+            logger.debug("Failed to resolve smart album cover photo", exc_info=True)
             return None
     # Manual album: get first photo from album_photos
     row = conn.execute(
@@ -403,7 +406,7 @@ async def add_photos_to_album(
                 row = conn.execute("SELECT changes()").fetchone()
                 added += row[0] if row else 0
             except Exception:
-                pass
+                logger.debug("Failed to add photo %s to album %s", path, album_id, exc_info=True)
 
         # Auto-set cover if not set
         album = conn.execute("SELECT cover_photo_path FROM albums WHERE id = ?", (album_id,)).fetchone()

@@ -61,8 +61,8 @@ class TestPhotosMap:
         """At zoom < 10, returns clusters grouped by grid cells."""
         mock_conn = mock.MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = [
-            {"grid_lat": 40.5, "grid_lng": -73.5, "count": 15, "representative_path": "/photos/a.jpg"},
-            {"grid_lat": 41.0, "grid_lng": -73.0, "count": 8, "representative_path": "/photos/b.jpg"},
+            {"avg_lat": 40.5, "avg_lng": -73.5, "count": 15, "representative_path": "/photos/a.jpg"},
+            {"avg_lat": 41.0, "avg_lng": -73.0, "count": 8, "representative_path": "/photos/b.jpg"},
         ]
 
         with (
@@ -87,8 +87,8 @@ class TestPhotosMap:
         """At zoom >= 10, returns individual photo points."""
         mock_conn = mock.MagicMock()
         mock_conn.execute.return_value.fetchall.return_value = [
-            {"path": "/photos/a.jpg", "lat": 40.7128, "lng": -74.0060, "aggregate": 8.5, "filename": "a.jpg"},
-            {"path": "/photos/b.jpg", "lat": 40.7130, "lng": -74.0058, "aggregate": 7.2, "filename": "b.jpg"},
+            {"path": "/photos/a.jpg", "lat": 40.7128, "lng": -74.0060, "aggregate": 8.5, "filename": "a.jpg", "date_taken": "2024-01-15", "category": "landscape"},
+            {"path": "/photos/b.jpg", "lat": 40.7130, "lng": -74.0058, "aggregate": 7.2, "filename": "b.jpg", "date_taken": "2024-02-20", "category": "portrait"},
         ]
 
         with (

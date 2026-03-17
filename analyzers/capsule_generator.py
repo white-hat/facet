@@ -118,7 +118,7 @@ def _init_geocode_cache(conn):
     )""")
 
 
-def _geocode_grid(conn, lat, lon, grid_resolution=0.1):
+def geocode_grid(conn, lat, lon, grid_resolution=0.1):
     """Look up or compute a place name for a grid cell. Caches in location_names table.
 
     Args:
@@ -174,7 +174,7 @@ def _geocode_centroid(conn, photos):
     lons = [p["gps_longitude"] for p in photos if p["gps_longitude"] is not None]
     if not lats:
         return ""
-    return _geocode_grid(conn, sum(lats) / len(lats), sum(lons) / len(lons))
+    return geocode_grid(conn, sum(lats) / len(lats), sum(lons) / len(lons))
 
 
 def _mmr_select(conn, paths, max_photos, lambda_weight=0.5):
@@ -982,7 +982,7 @@ def _generate_location(conn, capsule_config, min_aggregate, vis, user_id):
         paths = [p["path"] for p in photos]
         # Reverse geocode grid cell center, fallback to coordinates
         geo_enabled = capsule_config.get("reverse_geocoding", True)
-        place_name = _geocode_grid(conn, lat, lon) if geo_enabled else ""
+        place_name = geocode_grid(conn, lat, lon) if geo_enabled else ""
         title = place_name or f"{abs(lat):.1f}°{'N' if lat >= 0 else 'S'}, {abs(lon):.1f}°{'E' if lon >= 0 else 'W'}"
         cid = _stable_id("loc", f"{lat:.2f}", f"{lon:.2f}")
         full_id = f"loc_{cid}"
@@ -1260,7 +1260,7 @@ def _generate_seeded(conn, capsule_config, min_aggregate, vis, user_id):
                     best_photos = nearby
                     # Reverse geocode seed location for title
                     geo_enabled = capsule_config.get("reverse_geocoding", True)
-                    place = _geocode_grid(conn, seed_lat, seed_lon) if geo_enabled else ""
+                    place = geocode_grid(conn, seed_lat, seed_lon) if geo_enabled else ""
                     best_axis = ("location", {"place": place} if place else {})
 
         # --- Color mood axis ---
