@@ -51,7 +51,8 @@ python viewer.py
 ## Supported File Types
 
 - **JPEG** (.jpg, .jpeg)
-- **RAW files** (.cr2, .cr3, .nef, .arw, .raf, .rw2, .dng, .orf, .srw, .pef) - skipped if matching JPEG exists
+- **HEIF/HEIC** (.heic, .heif) — requires `pillow-heif`
+- **RAW files** (.cr2, .cr3, .nef, .arw, .raf, .rw2, .dng, .orf, .srw, .pef) - skipped if matching JPEG/HEIC exists
 
 ## Troubleshooting
 

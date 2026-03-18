@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse
 from api.auth import CurrentUser, get_optional_user
 from api.config import VIEWER_CONFIG, is_multi_user_enabled, get_user_directories, get_all_scan_directories
 from api.database import get_db_connection
-from utils.image_loading import RAW_EXTENSIONS
+from utils.image_loading import RAW_EXTENSIONS, HEIF_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,17 @@ def _convert_raw_cached(file_path: str, mtime: float) -> bytes:
     buffer = BytesIO()
     pil_img.save(buffer, format='JPEG', quality=92)
     return buffer.getvalue()
+
+
+@lru_cache(maxsize=32)
+def _convert_heif_cached(file_path: str, mtime: float) -> bytes:
+    """Convert a HEIF/HEIC file to JPEG bytes, cached by path+mtime."""
+    from PIL import Image as PILImage
+
+    buf = BytesIO()
+    with PILImage.open(file_path) as img:
+        img.convert("RGB").save(buf, format="JPEG", quality=92)
+    return buf.getvalue()
 
 
 @lru_cache(maxsize=_thumbnail_cache_size)
@@ -278,5 +289,15 @@ async def image(
         except Exception:
             logger.exception("Failed to convert RAW file: %s", real_disk)
             return Response(content="Failed to convert RAW file", status_code=500)
+
+    # Convert HEIF/HEIC to JPEG for browser compatibility (Firefox lacks native support)
+    if Path(real_disk).suffix.lower() in HEIF_EXTENSIONS:
+        try:
+            mtime = os.path.getmtime(real_disk)
+            jpeg_bytes = _convert_heif_cached(real_disk, mtime)
+            return _cached_image_response(jpeg_bytes, request)
+        except Exception:
+            logger.exception("Failed to convert HEIF file: %s", real_disk)
+            return Response(content="Failed to convert HEIF file", status_code=500)
 
     return FileResponse(real_disk)

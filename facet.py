@@ -43,7 +43,7 @@ except ImportError:
 
 # Import config module (lightweight, no cv2/torch dependency)
 from config import ScoringConfig, PercentileNormalizer
-from utils.image_loading import RAW_EXTENSIONS
+from utils.image_loading import RAW_EXTENSIONS, HEIF_EXTENSIONS
 
 
 
@@ -1100,7 +1100,7 @@ Configuration:
         exit(1)
 
     # 1. Gather files recursively from subfolders (or single files)
-    valid_suffixes = {'.jpg', '.jpeg'} | RAW_EXTENSIONS
+    valid_suffixes = {'.jpg', '.jpeg'} | HEIF_EXTENSIONS | RAW_EXTENSIONS
     all_files = []
 
     # Get scanning settings
@@ -1134,7 +1134,8 @@ Configuration:
     all_files = list({f.resolve(): f for f in all_files}.values())
 
     # Identify JPEGs to avoid double-processing if RAW+JPEG pairs exist
-    jpegs_stems = {f.stem.lower() for f in all_files if f.suffix.lower() in ['.jpg', '.jpeg']}
+    jpeg_like = {'.jpg', '.jpeg'} | HEIF_EXTENSIONS
+    jpegs_stems = {f.stem.lower() for f in all_files if f.suffix.lower() in jpeg_like}
     scanned_set = set() if args.force else scorer.get_already_scanned_set()
 
     # Filter the list to only include new or un-scanned files

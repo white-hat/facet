@@ -149,7 +149,7 @@ python viewer.py
 
 ## Dependencies
 
-Python packages: `torch`, `torchvision`, `open-clip-torch`, `opencv-python`, `pillow`, `imagehash`, `rawpy`, `fastapi`, `uvicorn`, `pyjwt`, `numpy`, `tqdm`, `exifread`, `insightface`, `scipy`, `scikit-learn`, `hdbscan`, `pyiqa`, `psutil`, `transformers>=4.57.0`, `accelerate>=0.25.0`, `reverse_geocoder`
+Python packages: `torch`, `torchvision`, `open-clip-torch`, `opencv-python`, `pillow`, `pillow-heif`, `imagehash`, `rawpy`, `fastapi`, `uvicorn`, `pyjwt`, `numpy`, `tqdm`, `exifread`, `insightface`, `scipy`, `scikit-learn`, `hdbscan`, `pyiqa`, `psutil`, `transformers>=4.57.0`, `accelerate>=0.25.0`, `reverse_geocoder`
 
 For GPU face clustering (optional): `cuml`, `cupy` (requires conda + CUDA)
 
@@ -191,7 +191,7 @@ All profiles additionally run: SAMP-Net (composition), InsightFace (faces), supp
 
 ### Data Flow
 
-1. `facet.py` scans directories for JPG/JPEG and RAW files (CR2, CR3, NEF, ARW, RAF, RW2, DNG, ORF, SRW, PEF)
+1. `facet.py` scans directories for JPG/JPEG, HEIF/HEIC, and RAW files (CR2, CR3, NEF, ARW, RAF, RW2, DNG, ORF, SRW, PEF)
 2. BatchProcessor processes images with continuous GPU batching (no inter-batch gaps)
 3. Each image gets: CLIP/SigLIP embedding + tags, aesthetic scores (TOPIQ + IAA + LIQE), face analysis, technical metrics, composition pattern, subject saliency
 4. Results stored in SQLite with 640x640 thumbnail BLOBs

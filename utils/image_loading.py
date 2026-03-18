@@ -15,8 +15,20 @@ from utils._lazy import ensure_cv2 as _ensure_cv2, ensure_pil as _ensure_pil
 
 logger = logging.getLogger("facet.image_loading")
 
+# Register HEIF/HEIC opener with PIL (soft dependency)
+_heif_available = False
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    _heif_available = True
+except ImportError:
+    logger.warning("pillow-heif not installed — HEIF/HEIC files will be skipped")
+
 # All RAW formats supported via rawpy/libraw
 RAW_EXTENSIONS = {'.cr2', '.cr3', '.nef', '.arw', '.raf', '.rw2', '.dng', '.orf', '.srw', '.pef'}
+
+# HEIF/HEIC formats (iPhone default since iOS 11) — empty when pillow-heif is missing
+HEIF_EXTENSIONS = {'.heic', '.heif'} if _heif_available else set()
 
 
 # Module-level lock for rawpy thread-safety
