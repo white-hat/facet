@@ -537,7 +537,7 @@ export class SharedViewComponent implements OnInit {
     const paths = [...this.selectedPaths()];
     for (const path of paths) {
       const a = document.createElement('a');
-      a.href = `/api/download?path=${encodeURIComponent(path)}`;
+      a.href = `/api/download?path=${encodeURIComponent(path)}&token=${encodeURIComponent(this.token)}`;
       a.download = '';
       document.body.appendChild(a);
       a.click();

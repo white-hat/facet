@@ -275,7 +275,7 @@ export class SharedPhotoDetailComponent implements OnInit {
       const path = this.route.snapshot.queryParamMap.get('path');
       if (path) {
         try {
-          const photo = await firstValueFrom(this.api.get<Photo>('/photo', { path }));
+          const photo = await firstValueFrom(this.api.get<Photo>('/photo', { path, token: this.token }));
           if (!photo.tags_list) {
             photo.tags_list = photo.tags ? photo.tags.split(',').map(t => t.trim()) : [];
           }
@@ -303,7 +303,7 @@ export class SharedPhotoDetailComponent implements OnInit {
 
   protected download(path: string): void {
     const a = document.createElement('a');
-    a.href = `/api/download?path=${encodeURIComponent(path)}`;
+    a.href = `/api/download?path=${encodeURIComponent(path)}&token=${encodeURIComponent(this.token)}`;
     a.download = '';
     document.body.appendChild(a);
     a.click();
