@@ -83,10 +83,12 @@ def _album_to_dict(album):
     return result
 
 
-def _fetch_album_photos(conn, album_row, user_id, page, per_page, sort_col, sort_dir):
+def _fetch_album_photos(conn, album_row, user_id, page, per_page, sort_col, sort_dir, filters=None):
     """Fetch paginated photos for an album (smart or regular).
 
     Returns a dict with keys: photos, total, page, per_page, total_pages, has_more.
+    ``filters`` is an optional dict of additional filter params (camera, lens, tag, date_from, etc.)
+    applied via ``_build_gallery_where`` for regular albums.
     """
     # Smart album: use saved filters
     if album_row['is_smart'] and album_row['smart_filter_json']:
@@ -112,14 +114,28 @@ def _fetch_album_photos(conn, album_row, user_id, page, per_page, sort_col, sort
         ).fetchall()
     else:
         # Regular album: join with album_photos
-        vis_sql, vis_params = get_visibility_clause(user_id)
         from_clause, from_params = get_photos_from_clause(user_id)
+        base_where = ["ap.album_id = ?"]
+        base_params = [album_row['id']]
+
+        vis_sql, vis_params = get_visibility_clause(user_id)
+        base_where.append(vis_sql)
+        base_params.extend(vis_params)
+
+        # Apply additional filters via _build_gallery_where
+        if filters:
+            from api.routers.gallery import _build_gallery_where
+            extra_clauses, extra_params = _build_gallery_where(filters, conn)
+            base_where.extend(extra_clauses)
+            base_params.extend(extra_params)
+
+        where_str = " AND ".join(base_where)
 
         row = conn.execute(
             f"SELECT COUNT(*) FROM album_photos ap "
             f"JOIN {from_clause} ON photos.path = ap.photo_path "
-            f"WHERE ap.album_id = ? AND {vis_sql}",
-            from_params + [album_row['id']] + vis_params
+            f"WHERE {where_str}",
+            from_params + base_params
         ).fetchone()
         total = row[0] if row else 0
 
@@ -132,9 +148,9 @@ def _fetch_album_photos(conn, album_row, user_id, page, per_page, sort_col, sort
         rows = conn.execute(
             f"SELECT {', '.join(select_cols)} FROM album_photos ap "
             f"JOIN {from_clause} ON photos.path = ap.photo_path "
-            f"WHERE ap.album_id = ? AND {vis_sql} "
+            f"WHERE {where_str} "
             f"ORDER BY {safe_sort} {sort_dir} LIMIT ? OFFSET ?",
-            from_params + [album_row['id']] + vis_params + [per_page, (page - 1) * per_page]
+            from_params + base_params + [per_page, (page - 1) * per_page]
         ).fetchall()
 
     tags_limit = VIEWER_CONFIG['display']['tags_per_photo']
@@ -153,6 +169,30 @@ def _fetch_album_photos(conn, album_row, user_id, page, per_page, sort_col, sort
         'per_page': per_page,
         'total_pages': total_pages,
         'has_more': page < total_pages,
+    }
+
+
+def _get_album_filter_options(conn, album_id):
+    """Return filter dropdown options scoped to a regular album's photos."""
+    base = (
+        "SELECT {col}, COUNT(*) as cnt FROM album_photos ap "
+        "JOIN photos ON photos.path = ap.photo_path "
+        "WHERE ap.album_id = ? AND {col} IS NOT NULL "
+        "GROUP BY {col} ORDER BY cnt DESC"
+    )
+    cameras = conn.execute(base.format(col='camera_model'), (album_id,)).fetchall()
+    lenses = conn.execute(base.format(col='lens_model'), (album_id,)).fetchall()
+    tags_rows = conn.execute(
+        "SELECT pt.tag, COUNT(*) as cnt FROM album_photos ap "
+        "JOIN photo_tags pt ON pt.photo_path = ap.photo_path "
+        "WHERE ap.album_id = ? "
+        "GROUP BY pt.tag ORDER BY cnt DESC",
+        (album_id,),
+    ).fetchall()
+    return {
+        'cameras': [{'value': r[0], 'count': r[1]} for r in cameras],
+        'lenses': [{'value': r[0], 'count': r[1]} for r in lenses],
+        'tags': [{'value': r[0], 'count': r[1]} for r in tags_rows],
     }
 
 
@@ -572,10 +612,29 @@ async def get_shared_album(
             sort = 'aggregate'
         sort_dir = 'ASC' if qp.get('sort_direction', 'DESC') == 'ASC' else 'DESC'
 
-        result = _fetch_album_photos(conn, album, user_id, page, per_page, sort, sort_dir)
+        # Build filters dict from query params (for regular albums)
+        is_manual = not album['is_smart']
+        filters = None
+        if is_manual:
+            _FILTER_KEYS = (
+                'camera', 'lens', 'tag', 'date_from', 'date_to',
+                'hide_blinks', 'hide_bursts', 'hide_duplicates',
+                'composition_pattern', 'category', 'is_monochrome',
+            )
+            filters = {k: qp[k] for k in _FILTER_KEYS if qp.get(k)}
+
+        result = _fetch_album_photos(conn, album, user_id, page, per_page, sort, sort_dir, filters=filters)
         result['album'] = _album_to_dict(album)
         if SORT_OPTIONS_GROUPED:
             result['sort_options_grouped'] = SORT_OPTIONS_GROUPED
+
+        # Include filter options for manual albums (first page only to avoid repeated work)
+        if is_manual and page == 1:
+            try:
+                result['filter_options'] = _get_album_filter_options(conn, album['id'])
+            except Exception:
+                logger.debug("Failed to build album filter options", exc_info=True)
+
         return result
     finally:
         conn.close()

@@ -401,7 +401,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
     this.scrollDirective()?.recheck();
     if (this.store.config()?.features?.show_albums) {
       firstValueFrom(this.albumService.list()).then(res =>
-        this.albumOptions.set(res.albums),
+        this.albumOptions.set(res.albums.filter(a => !a.is_smart)),
       ).catch(() => {});
     }
   }

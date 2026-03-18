@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, afterNextRender, viewChild, DestroyRef, ElementRef } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, effect, viewChild, DestroyRef, ElementRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatIconModule } from '@angular/material/icon';
@@ -8,6 +8,9 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
 import { Photo } from '../../models/photo.model';
 import { ApiService } from '../../../core/services/api.service';
@@ -25,6 +28,17 @@ interface SortOption {
   label: string;
 }
 
+interface FilterOption {
+  value: string;
+  count: number;
+}
+
+interface FilterOptions {
+  cameras: FilterOption[];
+  lenses: FilterOption[];
+  tags: FilterOption[];
+}
+
 interface SharedAlbumResponse {
   album: { id: number; name: string; description: string; is_smart?: boolean };
   photos: Photo[];
@@ -34,6 +48,7 @@ interface SharedAlbumResponse {
   total_pages: number;
   has_more: boolean;
   sort_options_grouped?: Record<string, SortOption[]>;
+  filter_options?: FilterOptions;
 }
 
 interface SharedPersonResponse {
@@ -50,6 +65,14 @@ interface ViewerConfig {
   sort_options_grouped?: Record<string, SortOption[]>;
 }
 
+interface SharedFilters {
+  camera: string;
+  lens: string;
+  tag: string;
+  date_from: string;
+  date_to: string;
+}
+
 @Component({
   selector: 'app-shared-view',
   standalone: true,
@@ -57,6 +80,7 @@ interface ViewerConfig {
   imports: [
     MatIconModule, MatButtonModule, MatProgressSpinnerModule,
     MatSelectModule, MatFormFieldModule, MatSnackBarModule, MatTooltipModule,
+    MatSidenavModule, MatExpansionModule, MatInputModule,
     TranslatePipe, PersonThumbnailUrlPipe,
     PhotoCardComponent, SlideshowComponent, InfiniteScrollDirective,
   ],
@@ -123,35 +147,144 @@ interface ViewerConfig {
               <button mat-icon-button (click)="slideshowActive.set(true)" [matTooltip]="'slideshow.start' | translate">
                 <mat-icon>slideshow</mat-icon>
               </button>
+              @if (isManualAlbum()) {
+                <button mat-icon-button (click)="filterDrawer.toggle()" [matTooltip]="'gallery.filters' | translate">
+                  <mat-icon [style.color]="activeFilterCount() ? 'var(--mat-sys-primary)' : ''">tune</mat-icon>
+                </button>
+              }
             </div>
           </div>
         }
       </div>
 
-      <main #contentArea class="overflow-y-auto" [style.height]="'calc(100% - ' + (selectionCount() > 0 ? '113' : '65') + 'px)'">
-        <div class="p-2">
-          @for (row of mosaicRows(); track $index) {
-            <div class="flex gap-2 mb-2">
-              @for (photo of row.photos; track photo.path; let i = $index) {
-                <app-photo-card
-                  [photo]="photo"
-                  [config]="cardConfig()"
-                  [hideDetails]="true"
-                  [mosaicMode]="true"
-                  [isEditionMode]="false"
-                  [isSelected]="selectedPaths().has(photo.path)"
-                  [thumbSize]="row.widths[i]"
-                  [style.width.px]="row.widths[i]"
-                  [style.height.px]="row.height"
-                  (selectionChange)="toggleSelection($event.photo, $event.event)"
-                  (doubleClicked)="openPhotoDetail($event)"
-                />
-              }
-            </div>
-          }
-          <div appInfiniteScroll scrollRoot="main" (scrollReached)="onScrollReached()"></div>
-        </div>
-      </main>
+      <mat-sidenav-container class="overflow-hidden" [style.height]="'calc(100% - ' + (selectionCount() > 0 ? '113' : '65') + 'px)'">
+        <mat-sidenav #filterDrawer mode="side" position="end" class="w-[min(320px,100vw)] p-0">
+          <div class="overflow-y-auto px-2 h-full">
+            <!-- Camera -->
+            @if (filterOptions()?.cameras?.length) {
+              <mat-expansion-panel class="!mb-1 mt-4">
+                <mat-expansion-panel-header>
+                  <mat-panel-title class="flex items-center gap-2">
+                    <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">photo_camera</mat-icon>
+                    {{ 'gallery.sidebar.equipment' | translate }}
+                    @if (filters().camera || filters().lens) {
+                      <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">{{ (filters().camera ? 1 : 0) + (filters().lens ? 1 : 0) }}</span>
+                    }
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="flex flex-col gap-2 pb-2">
+                  @if (filterOptions()?.cameras?.length) {
+                    <mat-form-field subscriptSizing="dynamic" class="w-full">
+                      <mat-label>{{ 'gallery.camera' | translate }}</mat-label>
+                      <mat-select [value]="filters().camera" (selectionChange)="updateFilter('camera', $event.value)">
+                        <mat-option value="">{{ 'gallery.all' | translate }}</mat-option>
+                        @for (c of filterOptions()!.cameras; track c.value) {
+                          <mat-option [value]="c.value">{{ c.value }} ({{ c.count }})</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  }
+                  @if (filterOptions()?.lenses?.length) {
+                    <mat-form-field subscriptSizing="dynamic" class="w-full">
+                      <mat-label>{{ 'gallery.lens' | translate }}</mat-label>
+                      <mat-select [value]="filters().lens" (selectionChange)="updateFilter('lens', $event.value)">
+                        <mat-option value="">{{ 'gallery.all' | translate }}</mat-option>
+                        @for (l of filterOptions()!.lenses; track l.value) {
+                          <mat-option [value]="l.value">{{ l.value }} ({{ l.count }})</mat-option>
+                        }
+                      </mat-select>
+                    </mat-form-field>
+                  }
+                </div>
+              </mat-expansion-panel>
+            }
+
+            <!-- Tags -->
+            @if (filterOptions()?.tags?.length) {
+              <mat-expansion-panel class="!mb-1">
+                <mat-expansion-panel-header>
+                  <mat-panel-title class="flex items-center gap-2">
+                    <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">label</mat-icon>
+                    {{ 'gallery.sidebar.content' | translate }}
+                    @if (filters().tag) {
+                      <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">1</span>
+                    }
+                  </mat-panel-title>
+                </mat-expansion-panel-header>
+                <div class="flex flex-col gap-2 pb-2">
+                  <mat-form-field subscriptSizing="dynamic" class="w-full">
+                    <mat-label>{{ 'gallery.tag' | translate }}</mat-label>
+                    <mat-select [value]="filters().tag" (selectionChange)="updateFilter('tag', $event.value)">
+                      <mat-option value="">{{ 'gallery.all' | translate }}</mat-option>
+                      @for (t of filterOptions()!.tags; track t.value) {
+                        <mat-option [value]="t.value">{{ t.value }} ({{ t.count }})</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+              </mat-expansion-panel>
+            }
+
+            <!-- Date range -->
+            <mat-expansion-panel class="!mb-1">
+              <mat-expansion-panel-header>
+                <mat-panel-title class="flex items-center gap-2">
+                  <mat-icon class="!text-base !w-5 !h-5 !leading-5 opacity-60">calendar_today</mat-icon>
+                  {{ 'gallery.sidebar.date' | translate }}
+                  @if (filters().date_from || filters().date_to) {
+                    <span class="text-xs rounded-full min-w-[1.25rem] h-5 px-1.5 flex items-center justify-center bg-[var(--mat-sys-primary)] text-[var(--mat-sys-on-primary)] leading-none">{{ (filters().date_from ? 1 : 0) + (filters().date_to ? 1 : 0) }}</span>
+                  }
+                </mat-panel-title>
+              </mat-expansion-panel-header>
+              <div class="flex flex-col gap-2 pb-2">
+                <mat-form-field subscriptSizing="dynamic" class="w-full">
+                  <mat-label>{{ 'gallery.date_from' | translate }}</mat-label>
+                  <input matInput type="date" [value]="filters().date_from" (change)="onDateChange('date_from', $event)" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic" class="w-full">
+                  <mat-label>{{ 'gallery.date_to' | translate }}</mat-label>
+                  <input matInput type="date" [value]="filters().date_to" (change)="onDateChange('date_to', $event)" />
+                </mat-form-field>
+              </div>
+            </mat-expansion-panel>
+
+            <!-- Reset filters -->
+            @if (activeFilterCount()) {
+              <div class="py-3 px-1">
+                <button mat-stroked-button class="w-full" (click)="resetFilters()">
+                  <mat-icon>close</mat-icon>
+                  {{ 'gallery.reset_filters' | translate }}
+                </button>
+              </div>
+            }
+          </div>
+        </mat-sidenav>
+
+        <mat-sidenav-content #contentArea>
+          <div class="p-2">
+            @for (row of mosaicRows(); track $index) {
+              <div class="flex gap-2 mb-2">
+                @for (photo of row.photos; track photo.path; let i = $index) {
+                  <app-photo-card
+                    [photo]="photo"
+                    [config]="cardConfig()"
+                    [hideDetails]="true"
+                    [mosaicMode]="true"
+                    [isEditionMode]="false"
+                    [isSelected]="selectedPaths().has(photo.path)"
+                    [thumbSize]="row.widths[i]"
+                    [style.width.px]="row.widths[i]"
+                    [style.height.px]="row.height"
+                    (selectionChange)="toggleSelection($event.photo, $event.event)"
+                    (doubleClicked)="openPhotoDetail($event)"
+                  />
+                }
+              </div>
+            }
+            <div appInfiniteScroll scrollRoot="mat-sidenav-content" (scrollReached)="onScrollReached()"></div>
+          </div>
+        </mat-sidenav-content>
+      </mat-sidenav-container>
 
       <!-- Selection action bar -->
       @if (selectionCount()) {
@@ -201,6 +334,7 @@ export class SharedViewComponent implements OnInit {
   protected readonly photos = signal<Photo[]>([]);
   protected readonly total = signal(0);
   protected readonly hasMore = signal(false);
+  protected readonly isManualAlbum = signal(false);
 
   // Config (for sort options and card config)
   protected readonly config = signal<ViewerConfig | null>(null);
@@ -219,6 +353,16 @@ export class SharedViewComponent implements OnInit {
     const grouped = this.config()?.sort_options_grouped;
     if (!grouped) return null;
     return Object.entries(grouped);
+  });
+
+  // Filters (for manual albums)
+  protected readonly filters = signal<SharedFilters>({
+    camera: '', lens: '', tag: '', date_from: '', date_to: '',
+  });
+  protected readonly filterOptions = signal<FilterOptions | null>(null);
+  protected readonly activeFilterCount = computed(() => {
+    const f = this.filters();
+    return [f.camera, f.lens, f.tag, f.date_from, f.date_to].filter(v => !!v).length;
   });
 
   // Mosaic
@@ -279,7 +423,13 @@ export class SharedViewComponent implements OnInit {
   private resizeObserver: ResizeObserver | null = null;
 
   constructor() {
-    afterNextRender(() => this.setupResizeObserver());
+    // Set up ResizeObserver once loading completes and mat-sidenav-content is in the DOM
+    effect(() => {
+      if (!this.loading() && !this.resizeObserver) {
+        // Defer to next microtask so Angular renders the sidenav container first
+        queueMicrotask(() => this.setupResizeObserver());
+      }
+    });
     this.destroyRef.onDestroy(() => {
       this.resizeObserver?.disconnect();
       this.resizeObserver = null;
@@ -318,6 +468,21 @@ export class SharedViewComponent implements OnInit {
 
   protected toggleSortDirection(): void {
     this.sortDirection.update(d => d === 'desc' ? 'asc' : 'desc');
+    this.reloadFromFirstPage();
+  }
+
+  protected updateFilter(key: keyof SharedFilters, value: string): void {
+    this.filters.update(f => ({ ...f, [key]: value }));
+    this.reloadFromFirstPage();
+  }
+
+  protected onDateChange(key: keyof SharedFilters, event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.updateFilter(key, value);
+  }
+
+  protected resetFilters(): void {
+    this.filters.set({ camera: '', lens: '', tag: '', date_from: '', date_to: '' } as SharedFilters);
     this.reloadFromFirstPage();
   }
 
@@ -428,19 +593,24 @@ export class SharedViewComponent implements OnInit {
   }
 
   private async loadAlbumPage(page: number, append: boolean): Promise<void> {
+    const params: Record<string, string | number> = {
+      token: this.token,
+      page,
+      sort: this.sortBy(),
+      sort_direction: this.sortDirection() === 'desc' ? 'DESC' : 'ASC',
+    };
+
+    // Add active filters to API call
+    for (const [key, value] of Object.entries(this.filters())) {
+      if (value) params[key] = value;
+    }
+
     const res = await firstValueFrom(
-      this.api.get<SharedAlbumResponse>(
-        `/shared/album/${this.entityId}`,
-        {
-          token: this.token,
-          page,
-          sort: this.sortBy(),
-          sort_direction: this.sortDirection() === 'desc' ? 'DESC' : 'ASC',
-        },
-      ),
+      this.api.get<SharedAlbumResponse>(`/shared/album/${this.entityId}`, params),
     );
     this.entityName.set(res.album.name);
     this.description.set(res.album.description);
+    this.isManualAlbum.set(!res.album.is_smart);
     this.total.set(res.total);
     this.hasMore.set(res.has_more);
     this.currentPage = res.page;
@@ -448,6 +618,11 @@ export class SharedViewComponent implements OnInit {
     // Apply sort_options_grouped from API response if available and config doesn't have them
     if (res.sort_options_grouped && !this.config()?.sort_options_grouped) {
       this.config.update(c => c ? { ...c, sort_options_grouped: res.sort_options_grouped } : { sort_options_grouped: res.sort_options_grouped });
+    }
+
+    // Store filter options (returned on page 1 for manual albums)
+    if (res.filter_options) {
+      this.filterOptions.set(res.filter_options);
     }
 
     this.applyPhotos(res.photos, append);
@@ -493,7 +668,7 @@ export class SharedViewComponent implements OnInit {
       }
     });
 
-    const content = this.contentArea()?.nativeElement ?? document.querySelector('main');
+    const content = document.querySelector('mat-sidenav-content') ?? this.contentArea()?.nativeElement;
     if (content) {
       this.resizeObserver.observe(content);
     }
