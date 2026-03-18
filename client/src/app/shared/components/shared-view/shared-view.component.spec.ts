@@ -84,7 +84,7 @@ describe('SharedViewComponent', () => {
 
         await component.ngOnInit();
 
-        expect(mockApi.get).toHaveBeenCalledWith('/shared/album/1', { token: 'abc123', page: 1 });
+        expect(mockApi.get).toHaveBeenCalledWith('/shared/album/1', expect.objectContaining({ token: 'abc123', page: 1 }));
         expect(component.entityName()).toBe('Shared Album');
         expect(component.description()).toBe('A shared album');
         expect(component.photos()).toHaveLength(2);
@@ -142,8 +142,10 @@ describe('SharedViewComponent', () => {
       });
     });
 
-    describe('loadMore', () => {
+    describe('onScrollReached (load more)', () => {
       beforeEach(async () => {
+        // Initial load must set hasMore=true so onScrollReached triggers
+        mockApi.get.mockReturnValue(of({ ...sharedAlbumResponse, has_more: true }));
         createComponent('album', '1', 'token');
         await component.ngOnInit();
         mockApi.get.mockClear();
@@ -160,9 +162,10 @@ describe('SharedViewComponent', () => {
           has_more: false,
         }));
 
-        await component.loadMore();
+        component.onScrollReached();
+        await flushPromises();
 
-        expect(mockApi.get).toHaveBeenCalledWith('/shared/album/1', { token: 'token', page: 2 });
+        expect(mockApi.get).toHaveBeenCalledWith('/shared/album/1', expect.objectContaining({ token: 'token', page: 2 }));
         expect(component.photos()).toHaveLength(3);
       });
 
@@ -173,10 +176,10 @@ describe('SharedViewComponent', () => {
           has_more: false,
         }));
 
-        const promise = component.loadMore();
+        component.onScrollReached();
         expect(component.loadingMore()).toBe(true);
 
-        await promise;
+        await flushPromises();
         expect(component.loadingMore()).toBe(false);
       });
     });
@@ -242,7 +245,7 @@ describe('SharedViewComponent', () => {
       });
     });
 
-    describe('loadMore', () => {
+    describe('onScrollReached (load more)', () => {
       beforeEach(async () => {
         createComponent('person', '5', 'token');
         await component.ngOnInit();
@@ -257,7 +260,8 @@ describe('SharedViewComponent', () => {
           has_more: false,
         }));
 
-        await component.loadMore();
+        component.onScrollReached();
+        await flushPromises();
 
         expect(mockApi.get).toHaveBeenCalledWith('/persons/5/photos', { token: 'token', page: 2, per_page: 48 });
         expect(component.photos()).toHaveLength(2);
@@ -265,3 +269,7 @@ describe('SharedViewComponent', () => {
     });
   });
 });
+
+function flushPromises(): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}

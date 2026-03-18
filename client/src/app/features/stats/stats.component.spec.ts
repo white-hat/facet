@@ -8,6 +8,8 @@ import { Router, ActivatedRoute } from '@angular/router';
 
 describe('StatsComponent', () => {
   let component: StatsComponent;
+  // Cast to `any` for test access to protected signals
+  const c = () => component as any;
   let mockApi: { get: jest.Mock };
 
   const mockOverview = {
@@ -139,7 +141,7 @@ describe('StatsComponent', () => {
 
       expect(mockApi.get).toHaveBeenCalledWith('/stats/overview', expect.any(Object));
       expect(component.statsFilters.overview()).toEqual(mockOverview);
-      expect(component.loading()).toBe(false);
+      expect(c().loading()).toBe(false);
     });
 
     it('should set loading to false even when overview fails', async () => {
@@ -151,7 +153,7 @@ describe('StatsComponent', () => {
 
       await flushPromises();
 
-      expect(component.loading()).toBe(false);
+      expect(c().loading()).toBe(false);
       expect(component.statsFilters.overview()).toBeNull();
     });
 
@@ -178,26 +180,26 @@ describe('StatsComponent', () => {
       component = createComponent(getMock);
       await flushPromises();
 
-      expect(component.cameras()).toEqual([{
+      expect(c().cameras()).toEqual([{
         name: 'Canon R5', count: 500, avg_score: 7.1, avg_aesthetic: 7.5,
         avg_sharpness: 6.8, avg_composition: 7.0, avg_exposure: 6.5, avg_color: 7.2,
         avg_iso: 400, avg_f_stop: 4.0, avg_focal_length: 50,
         avg_face_count: 1, avg_monochrome: 0.1, avg_dynamic_range: 12.0, history: [{ date: '2025-01', count: 100 }],
       }]);
-      expect(component.lenses()).toEqual([{
+      expect(c().lenses()).toEqual([{
         name: 'RF 50mm', count: 200, avg_score: 7.5, avg_aesthetic: 7.3,
         avg_sharpness: 7.0, avg_composition: 6.5, avg_exposure: 7.1, avg_color: 6.9,
         avg_iso: 200, avg_f_stop: 2.0, avg_focal_length: 50,
         avg_face_count: 1, avg_monochrome: 0.1, avg_dynamic_range: 12.0, history: [{ date: '2025-01', count: 50 }],
       }]);
-      expect(component.combos()).toEqual([{
+      expect(c().combos()).toEqual([{
         name: 'Canon R5 + RF 50mm', count: 100, avg_score: 7.2,
         avg_aesthetic: 7.4, avg_sharpness: 7.1, avg_composition: 6.8,
         avg_exposure: 7.0, avg_color: 7.1, avg_iso: 300, avg_f_stop: 2.8,
         avg_focal_length: 50,
         avg_face_count: 1.5, avg_monochrome: 0.2, avg_dynamic_range: 11.0, history: [{ date: '2025-01', count: 25 }],
       }]);
-      expect(component.gearLoading()).toBe(false);
+      expect(c().gearLoading()).toBe(false);
     });
 
     it('should set gearLoading to false on error', async () => {
@@ -208,7 +210,7 @@ describe('StatsComponent', () => {
       component = createComponent(getMock);
       await flushPromises();
 
-      expect(component.gearLoading()).toBe(false);
+      expect(c().gearLoading()).toBe(false);
     });
   });
 
@@ -221,8 +223,8 @@ describe('StatsComponent', () => {
       component = createComponent(getMock);
       await flushPromises();
 
-      expect(component.categoryStats()).toEqual(mockCategories);
-      expect(component.categoriesLoading()).toBe(false);
+      expect(c().categoryStats()).toEqual(mockCategories);
+      expect(c().categoriesLoading()).toBe(false);
     });
   });
 
@@ -277,8 +279,8 @@ describe('StatsComponent', () => {
       component = createComponent(getMock);
       await flushPromises();
 
-      expect(component.scoreBins()).toEqual(mockScoreBins);
-      expect(component.scoreLoading()).toBe(false);
+      expect(c().scoreBins()).toEqual(mockScoreBins);
+      expect(c().scoreLoading()).toBe(false);
     });
   });
 
@@ -291,7 +293,7 @@ describe('StatsComponent', () => {
       component = createComponent(getMock);
       await flushPromises();
 
-      expect(component.topCameras()).toEqual(mockTopCameras);
+      expect(c().topCameras()).toEqual(mockTopCameras);
     });
   });
 

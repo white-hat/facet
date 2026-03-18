@@ -118,6 +118,8 @@ function makeConfig(overrides: Partial<ViewerConfig> = {}): ViewerConfig {
       show_captions: false,
       show_timeline: false,
       show_map: false,
+      show_capsules: false,
+      show_folders: false,
     },
     quality_thresholds: { good: 6, great: 7, excellent: 8, best: 9 },
     ...overrides,

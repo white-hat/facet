@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { FoldersComponent } from './folders.component';
 
@@ -9,7 +9,7 @@ describe('FoldersComponent', () => {
   let component: any;
   let mockApi: { get: jest.Mock };
   let mockRouter: { navigate: jest.Mock };
-  let mockRoute: { queryParams: ReturnType<typeof of<Record<string, string>>> };
+  let mockRoute: { queryParams: Observable<Record<string, string>> };
 
   const foldersResponse = {
     folders: [
