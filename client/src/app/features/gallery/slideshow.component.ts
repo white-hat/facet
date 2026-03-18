@@ -86,8 +86,8 @@ interface Slide {
                 [src]="photo.path | imageUrl"
                 [alt]="photo.filename"
                 class="flex-1 min-w-0 h-full"
-                [class.object-contain]="slide.photos.length === 1"
-                [class.object-cover]="slide.photos.length > 1"
+                [class.object-contain]="slide.photos.length === 1 && !landscapeFill()"
+                [class.object-cover]="slide.photos.length > 1 || landscapeFill()"
                 (error)="onImageError($event, photo.path)"
               />
             }
@@ -109,8 +109,8 @@ interface Slide {
                 [src]="photo.path | imageUrl"
                 [alt]="photo.filename"
                 class="flex-1 min-w-0 h-full"
-                [class.object-contain]="slide.photos.length === 1"
-                [class.object-cover]="slide.photos.length > 1"
+                [class.object-contain]="slide.photos.length === 1 && !landscapeFill()"
+                [class.object-cover]="slide.photos.length > 1 || landscapeFill()"
                 (error)="onImageError($event, photo.path)"
               />
             }
@@ -253,6 +253,17 @@ export class SlideshowComponent implements OnDestroy {
     const isPhotoLandscape = photo.image_width > photo.image_height;
     const isViewportPortrait = this.viewportHeight() > this.viewportWidth();
     return isPhotoLandscape && isViewportPortrait;
+  });
+
+  /** Use object-cover for landscape photos on landscape viewports to fill the screen. */
+  readonly landscapeFill = computed(() => {
+    const slide = this.currentSlide();
+    if (!slide || slide.photos.length !== 1) return false;
+    const photo = slide.photos[0];
+    if (!photo.image_width || !photo.image_height) return false;
+    const isPhotoLandscape = photo.image_width > photo.image_height;
+    const isViewportLandscape = this.viewportWidth() > this.viewportHeight();
+    return isPhotoLandscape && isViewportLandscape;
   });
 
   /** Photo range for the current slide (1-based). */
