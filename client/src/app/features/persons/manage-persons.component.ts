@@ -79,6 +79,7 @@ export class MergeTargetDialogComponent {
     MatDialogModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
+    MatTooltipModule,
     TranslatePipe,
     PersonCardComponent,
     InfiniteScrollDirective,
@@ -88,7 +89,13 @@ export class MergeTargetDialogComponent {
       <!-- Header -->
       <div class="flex flex-wrap items-center justify-end gap-4 mb-3">
         @if (auth.isEdition()) {
-          <a mat-button routerLink="/merge-suggestions">
+          <!-- Small screen: icon-only button -->
+          <a mat-icon-button class="sm:!hidden" routerLink="/merge-suggestions"
+             [matTooltip]="'persons.merge_suggestions' | translate">
+            <mat-icon>auto_fix_high</mat-icon>
+          </a>
+          <!-- Larger screens: full button with label -->
+          <a mat-flat-button class="!hidden sm:!inline-flex" routerLink="/merge-suggestions">
             <mat-icon>auto_fix_high</mat-icon>
             {{ 'persons.merge_suggestions' | translate }}
           </a>

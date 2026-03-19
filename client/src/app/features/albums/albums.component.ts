@@ -28,7 +28,7 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/c
     TranslatePipe, ThumbnailUrlPipe, InfiniteScrollDirective,
   ],
   template: `
-    <div class="flex items-center justify-end mb-3">
+    <div class="flex items-center justify-start mb-3">
       @if (auth.isEdition()) {
         <div class="flex gap-2">
           <!-- Small screen: icon-only buttons -->
