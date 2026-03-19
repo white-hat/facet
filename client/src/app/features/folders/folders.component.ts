@@ -132,6 +132,7 @@ export class FoldersComponent implements OnInit {
         }),
       );
       // Auto-redirect to gallery if no subfolders (leaf directory)
+      // replaceUrl avoids a back-button loop (back → leaf folder → redirect → gallery → …)
       if (res.folders.length === 0 && this.currentPrefix()) {
         this.router.navigate(['/'], {
           queryParams: {
@@ -139,6 +140,7 @@ export class FoldersComponent implements OnInit {
             sort: 'date_taken',
             sort_direction: 'DESC',
           },
+          replaceUrl: true,
         });
         return;
       }
