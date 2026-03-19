@@ -108,16 +108,6 @@ export const routes: Routes = [
       import('./shared/components/shared-view/shared-photo-detail.component').then(m => m.SharedPhotoDetailComponent),
   },
   {
-    path: 'shared/person/:personId',
-    loadComponent: () =>
-      import('./shared/components/shared-view/shared-view.component').then(m => m.SharedViewComponent),
-  },
-  {
-    path: 'shared/person/:personId/photo',
-    loadComponent: () =>
-      import('./shared/components/shared-view/shared-photo-detail.component').then(m => m.SharedPhotoDetailComponent),
-  },
-  {
     path: '**',
     redirectTo: '',
   },

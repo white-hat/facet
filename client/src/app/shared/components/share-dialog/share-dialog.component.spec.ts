@@ -97,39 +97,6 @@ describe('ShareDialogComponent', () => {
     });
   });
 
-  describe('person sharing', () => {
-    const personData: ShareDialogData = {
-      entityType: 'person',
-      entityId: 42,
-      autoGenerate: true,
-      i18nPrefix: 'persons',
-      generateApi: {
-        method: 'get',
-        url: '/api/auth/person/42/share-token',
-        extractUrl: (res: Record<string, unknown>) => `/shared/person/42?token=${res['token']}`,
-      },
-    };
-
-    it('should auto-generate link via GET for person', async () => {
-      createComponent(personData);
-
-      await component.ngOnInit();
-
-      expect(mockApi.get).toHaveBeenCalledWith('/api/auth/person/42/share-token');
-      expect(component.shareUrl()).toBe('/shared/person/42?token=xyz');
-    });
-
-    it('should not revoke when revokeApi is absent', async () => {
-      createComponent(personData);
-      component.shareUrl.set('/shared/person/42?token=xyz');
-
-      await component.revoke();
-
-      expect(mockApi.delete).not.toHaveBeenCalled();
-      expect(mockDialogRef.close).not.toHaveBeenCalled();
-    });
-  });
-
   describe('fullShareUrl', () => {
     it('should prepend window.location.origin to shareUrl', () => {
       createComponent({

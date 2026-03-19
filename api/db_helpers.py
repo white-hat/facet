@@ -53,6 +53,21 @@ HIDE_BURSTS_SQL = "(is_burst_lead = 1 OR is_burst_lead IS NULL)"
 HIDE_DUPLICATES_SQL = "(is_duplicate_lead = 1 OR is_duplicate_lead IS NULL OR duplicate_group_id IS NULL)"
 
 
+DATE_FILTER_EXPR = "DATE(REPLACE(SUBSTR(date_taken,1,10),':','-'))"
+
+
+def build_date_range_clauses(date_from, date_to):
+    """Build WHERE clauses for date range filtering on EXIF date_taken."""
+    clauses, params = [], []
+    if date_from:
+        clauses.append(f"{DATE_FILTER_EXPR} >= ?")
+        params.append(date_from)
+    if date_to:
+        clauses.append(f"{DATE_FILTER_EXPR} <= ?")
+        params.append(date_to)
+    return clauses, params
+
+
 def build_hide_clauses(hide_blinks: str, hide_bursts: str, hide_duplicates: str) -> list[str]:
     """Convert hide-toggle string params ('1'/'true') to SQL WHERE fragments."""
     clauses = []

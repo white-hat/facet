@@ -410,10 +410,6 @@ export class App implements OnInit {
     if (el) el.value = '';
   }
 
-  protected onPersonChange(ids: string[]): void {
-    this.store.updateFilter('person_id', ids.join(','));
-  }
-
   protected switchLang(lang: string): void {
     this.i18n.setLocale(lang);
   }

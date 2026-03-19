@@ -11,7 +11,8 @@ from api.auth import CurrentUser, get_optional_user
 from api.config import VIEWER_CONFIG
 from api.database import get_db_connection
 from api.db_helpers import (
-    build_hide_clauses, build_photo_select_columns, sanitize_float_values,
+    build_hide_clauses, build_date_range_clauses,
+    build_photo_select_columns, sanitize_float_values,
     split_photo_tags, attach_person_data,
     get_visibility_clause, get_photos_from_clause,
     format_date,
@@ -240,13 +241,9 @@ async def api_timeline_dates(
 
         where_clauses.extend(build_hide_clauses(hide_blinks, hide_bursts, hide_duplicates))
 
-        date_filter_expr = "DATE(REPLACE(SUBSTR(date_taken,1,10),':','-'))"
-        if date_from:
-            where_clauses.append(f"{date_filter_expr} >= ?")
-            sql_params.append(date_from)
-        if date_to:
-            where_clauses.append(f"{date_filter_expr} <= ?")
-            sql_params.append(date_to)
+        date_clauses, date_params = build_date_range_clauses(date_from, date_to)
+        where_clauses.extend(date_clauses)
+        sql_params.extend(date_params)
 
         # Filter by year (EXIF format: YYYY:MM:DD)
         year_prefix = str(year)
@@ -298,13 +295,9 @@ async def api_timeline_years(
 
         where_clauses.extend(build_hide_clauses(hide_blinks, hide_bursts, hide_duplicates))
 
-        date_filter_expr = "DATE(REPLACE(SUBSTR(date_taken,1,10),':','-'))"
-        if date_from:
-            where_clauses.append(f"{date_filter_expr} >= ?")
-            sql_params.append(date_from)
-        if date_to:
-            where_clauses.append(f"{date_filter_expr} <= ?")
-            sql_params.append(date_to)
+        date_clauses, date_params = build_date_range_clauses(date_from, date_to)
+        where_clauses.extend(date_clauses)
+        sql_params.extend(date_params)
 
         year_expr = "SUBSTR(REPLACE(SUBSTR(date_taken,1,10),':','-'),1,4)"
         rows = _fetch_grouped_summaries(conn, from_clause, where_clauses, sql_params, year_expr, 'DESC')
@@ -348,13 +341,9 @@ async def api_timeline_months(
 
         where_clauses.extend(build_hide_clauses(hide_blinks, hide_bursts, hide_duplicates))
 
-        date_filter_expr = "DATE(REPLACE(SUBSTR(date_taken,1,10),':','-'))"
-        if date_from:
-            where_clauses.append(f"{date_filter_expr} >= ?")
-            sql_params.append(date_from)
-        if date_to:
-            where_clauses.append(f"{date_filter_expr} <= ?")
-            sql_params.append(date_to)
+        date_clauses, date_params = build_date_range_clauses(date_from, date_to)
+        where_clauses.extend(date_clauses)
+        sql_params.extend(date_params)
 
         month_expr = "SUBSTR(REPLACE(SUBSTR(date_taken,1,7),':','-'),1,7)"
         rows = _fetch_grouped_summaries(conn, from_clause, where_clauses, sql_params, month_expr, 'ASC')

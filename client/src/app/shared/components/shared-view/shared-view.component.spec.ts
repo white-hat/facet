@@ -7,15 +7,12 @@ import { I18nService } from '../../../core/services/i18n.service';
 import { SharedViewComponent } from './shared-view.component';
 
 function buildMockRoute(
-  entityType: 'album' | 'person',
   id: string | null,
   token: string | null,
 ) {
-  const paramKey = entityType === 'album' ? 'albumId' : 'personId';
   return {
     snapshot: {
-      url: [{ path: 'shared' }, { path: entityType }],
-      paramMap: { get: jest.fn((key: string) => key === paramKey ? id : null) },
+      paramMap: { get: jest.fn((key: string) => key === 'albumId' ? id : null) },
       queryParamMap: { get: jest.fn((key: string) => key === 'token' ? token : null) },
     },
   };
@@ -40,22 +37,11 @@ describe('SharedViewComponent', () => {
     has_more: false,
   };
 
-  const sharedPersonResponse = {
-    person: { id: 5, name: 'Alice', face_count: 20 },
-    photos: [
-      { path: '/a1.jpg', filename: 'a1.jpg', aggregate: 9.0 },
-    ],
-    total: 15,
-    page: 1,
-    has_more: true,
-  };
-
   function createComponent(
-    entityType: 'album' | 'person',
     id: string | null = '1',
     token: string | null = 'valid_token',
   ) {
-    const mockRoute = buildMockRoute(entityType, id, token);
+    const mockRoute = buildMockRoute(id, token);
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
@@ -80,7 +66,7 @@ describe('SharedViewComponent', () => {
   describe('album mode', () => {
     describe('ngOnInit', () => {
       it('should load shared album data', async () => {
-        createComponent('album', '1', 'abc123');
+        createComponent('1', 'abc123');
 
         await component.ngOnInit();
 
@@ -93,7 +79,7 @@ describe('SharedViewComponent', () => {
       });
 
       it('should set error when albumId is missing', async () => {
-        createComponent('album', null, 'abc123');
+        createComponent(null, 'abc123');
 
         await component.ngOnInit();
 
@@ -103,7 +89,7 @@ describe('SharedViewComponent', () => {
       });
 
       it('should set error when token is missing', async () => {
-        createComponent('album', '1', null);
+        createComponent('1', null);
 
         await component.ngOnInit();
 
@@ -113,7 +99,7 @@ describe('SharedViewComponent', () => {
       });
 
       it('should set error when albumId is 0', async () => {
-        createComponent('album', '0', 'token');
+        createComponent('0', 'token');
 
         await component.ngOnInit();
 
@@ -123,7 +109,7 @@ describe('SharedViewComponent', () => {
 
       it('should set revoked error on 403 response', async () => {
         mockApi.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
-        createComponent('album', '1', 'expired_token');
+        createComponent('1', 'expired_token');
 
         await component.ngOnInit();
 
@@ -133,7 +119,7 @@ describe('SharedViewComponent', () => {
 
       it('should set generic error on other HTTP errors', async () => {
         mockApi.get.mockReturnValue(throwError(() => ({ status: 500 })));
-        createComponent('album', '1', 'token');
+        createComponent('1', 'token');
 
         await component.ngOnInit();
 
@@ -146,7 +132,7 @@ describe('SharedViewComponent', () => {
       beforeEach(async () => {
         // Initial load must set hasMore=true so onScrollReached triggers
         mockApi.get.mockReturnValue(of({ ...sharedAlbumResponse, has_more: true }));
-        createComponent('album', '1', 'token');
+        createComponent('1', 'token');
         await component.ngOnInit();
         mockApi.get.mockClear();
       });
@@ -185,89 +171,6 @@ describe('SharedViewComponent', () => {
     });
   });
 
-  describe('person mode', () => {
-    beforeEach(() => {
-      mockApi.get.mockReturnValue(of(sharedPersonResponse));
-    });
-
-    describe('ngOnInit', () => {
-      it('should load shared person data', async () => {
-        createComponent('person', '5', 'tok123');
-
-        await component.ngOnInit();
-
-        expect(mockApi.get).toHaveBeenCalledWith('/persons/5/photos', { token: 'tok123', page: 1, per_page: 48 });
-        expect(component.entityName()).toBe('Alice');
-        expect(component.photos()).toHaveLength(1);
-        expect(component.total()).toBe(15);
-        expect(component.hasMore()).toBe(true);
-        expect(component.loading()).toBe(false);
-      });
-
-      it('should set error when personId is missing', async () => {
-        createComponent('person', null, 'tok123');
-
-        await component.ngOnInit();
-
-        expect(component.error()).toBe('persons.invalid_share_link');
-        expect(component.loading()).toBe(false);
-        expect(mockApi.get).not.toHaveBeenCalled();
-      });
-
-      it('should set share_link_error on 403 response', async () => {
-        mockApi.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
-        createComponent('person', '5', 'bad_token');
-
-        await component.ngOnInit();
-
-        expect(component.error()).toBe('persons.share_link_error');
-        expect(component.loading()).toBe(false);
-      });
-
-      it('should set share_link_error on 401 response', async () => {
-        mockApi.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
-        createComponent('person', '5', 'bad_token');
-
-        await component.ngOnInit();
-
-        expect(component.error()).toBe('persons.share_link_error');
-        expect(component.loading()).toBe(false);
-      });
-
-      it('should set generic error on other HTTP errors', async () => {
-        mockApi.get.mockReturnValue(throwError(() => ({ status: 500 })));
-        createComponent('person', '5', 'token');
-
-        await component.ngOnInit();
-
-        expect(component.error()).toBe('persons.load_error');
-        expect(component.loading()).toBe(false);
-      });
-    });
-
-    describe('onScrollReached (load more)', () => {
-      beforeEach(async () => {
-        createComponent('person', '5', 'token');
-        await component.ngOnInit();
-        mockApi.get.mockClear();
-      });
-
-      it('should load next page and append photos', async () => {
-        mockApi.get.mockReturnValue(of({
-          ...sharedPersonResponse,
-          photos: [{ path: '/a2.jpg', filename: 'a2.jpg', aggregate: 7.5 }],
-          page: 2,
-          has_more: false,
-        }));
-
-        component.onScrollReached();
-        await flushPromises();
-
-        expect(mockApi.get).toHaveBeenCalledWith('/persons/5/photos', { token: 'token', page: 2, per_page: 48 });
-        expect(component.photos()).toHaveLength(2);
-      });
-    });
-  });
 });
 
 function flushPromises(): Promise<void> {

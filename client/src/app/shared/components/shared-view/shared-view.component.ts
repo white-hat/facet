@@ -16,12 +16,9 @@ import { Photo } from '../../models/photo.model';
 import { ApiService } from '../../../core/services/api.service';
 import { I18nService } from '../../../core/services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
-import { PersonThumbnailUrlPipe } from '../../pipes/thumbnail-url.pipe';
 import { PhotoCardComponent } from '../photo-card/photo-card.component';
 import { SlideshowComponent } from '../../../features/gallery/slideshow.component';
 import { InfiniteScrollDirective } from '../../directives/infinite-scroll.directive';
-
-type EntityType = 'album' | 'person';
 
 interface SortOption {
   column: string;
@@ -53,14 +50,6 @@ interface SharedAlbumResponse {
   filter_options?: FilterOptions;
 }
 
-interface SharedPersonResponse {
-  person: { id: number; name: string; face_count: number };
-  photos: Photo[];
-  total: number;
-  page: number;
-  has_more: boolean;
-}
-
 interface ViewerConfig {
   quality_thresholds?: { excellent: number; great: number; good: number };
   features?: Record<string, boolean>;
@@ -83,7 +72,7 @@ interface SharedFilters {
     MatIconModule, MatButtonModule, MatProgressSpinnerModule,
     MatSelectModule, MatFormFieldModule, MatSnackBarModule, MatTooltipModule,
     MatSidenavModule, MatExpansionModule, MatInputModule,
-    TranslatePipe, PersonThumbnailUrlPipe,
+    TranslatePipe,
     PhotoCardComponent, SlideshowComponent, InfiniteScrollDirective,
   ],
   template: `
@@ -98,65 +87,46 @@ interface SharedFilters {
       </div>
     } @else {
       <div class="bg-[var(--mat-sys-surface)] border-b border-[var(--mat-sys-outline-variant)] px-4 py-3">
-        @if (entityType === 'person') {
-          <div class="flex items-center gap-3">
-            @if (entityId) {
-              <img
-                [src]="entityId | personThumbnailUrl"
-                class="w-12 h-12 rounded-full object-cover"
-                alt=""
-              />
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <h1 class="text-xl font-semibold truncate">{{ entityName() }}</h1>
+            @if (description()) {
+              <p class="text-sm opacity-70 mt-1">{{ description() }}</p>
             }
-            <div class="flex-1">
-              <h1 class="text-xl font-semibold">{{ entityName() }}</h1>
-              <p class="text-xs opacity-50">{{ 'ui.labels.photo_count' | translate:{ count: total() } }}</p>
-            </div>
+            <p class="text-xs opacity-50 mt-1">{{ 'albums.photos_count' | translate:{ count: total() } }}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <mat-form-field class="w-48" subscriptSizing="dynamic">
+              <mat-label>{{ 'gallery.sort' | translate }}</mat-label>
+              <mat-select panelWidth="auto" panelClass="nowrap-panel" [value]="sortBy()" (selectionChange)="onSortChange($event.value)">
+                @if (sortGroups(); as groups) {
+                  @for (group of groups; track group[0]) {
+                    <mat-optgroup [label]="group[0]">
+                      @for (opt of group[1]; track opt.column) {
+                        <mat-option [value]="opt.column">{{ opt.label }}</mat-option>
+                      }
+                    </mat-optgroup>
+                  }
+                } @else {
+                  <mat-option value="aggregate">{{ 'gallery.sort_aggregate' | translate }}</mat-option>
+                  <mat-option value="aesthetic">{{ 'gallery.sort_aesthetic' | translate }}</mat-option>
+                  <mat-option value="date_taken">{{ 'gallery.sort_date' | translate }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-icon-button (click)="toggleSortDirection()" [matTooltip]="sortDirection() === 'desc' ? ('gallery.sort_desc' | translate) : ('gallery.sort_asc' | translate)">
+              <mat-icon>{{ sortDirection() === 'desc' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
+            </button>
             <button mat-icon-button (click)="slideshowActive.set(true)" [matTooltip]="'slideshow.start' | translate">
               <mat-icon>slideshow</mat-icon>
             </button>
-          </div>
-        } @else {
-          <div class="flex items-center justify-between gap-2">
-            <div class="min-w-0 flex-1">
-              <h1 class="text-xl font-semibold truncate">{{ entityName() }}</h1>
-              @if (description()) {
-                <p class="text-sm opacity-70 mt-1">{{ description() }}</p>
-              }
-              <p class="text-xs opacity-50 mt-1">{{ 'albums.photos_count' | translate:{ count: total() } }}</p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0">
-              <mat-form-field class="w-48" subscriptSizing="dynamic">
-                <mat-label>{{ 'gallery.sort' | translate }}</mat-label>
-                <mat-select panelWidth="auto" panelClass="nowrap-panel" [value]="sortBy()" (selectionChange)="onSortChange($event.value)">
-                  @if (sortGroups(); as groups) {
-                    @for (group of groups; track group[0]) {
-                      <mat-optgroup [label]="group[0]">
-                        @for (opt of group[1]; track opt.column) {
-                          <mat-option [value]="opt.column">{{ opt.label }}</mat-option>
-                        }
-                      </mat-optgroup>
-                    }
-                  } @else {
-                    <mat-option value="aggregate">{{ 'gallery.sort_aggregate' | translate }}</mat-option>
-                    <mat-option value="aesthetic">{{ 'gallery.sort_aesthetic' | translate }}</mat-option>
-                    <mat-option value="date_taken">{{ 'gallery.sort_date' | translate }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-              <button mat-icon-button (click)="toggleSortDirection()" [matTooltip]="sortDirection() === 'desc' ? ('gallery.sort_desc' | translate) : ('gallery.sort_asc' | translate)">
-                <mat-icon>{{ sortDirection() === 'desc' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
+            @if (isManualAlbum()) {
+              <button mat-icon-button (click)="filterDrawer.toggle()" [matTooltip]="'gallery.filters' | translate">
+                <mat-icon [style.color]="activeFilterCount() ? 'var(--mat-sys-primary)' : ''">tune</mat-icon>
               </button>
-              <button mat-icon-button (click)="slideshowActive.set(true)" [matTooltip]="'slideshow.start' | translate">
-                <mat-icon>slideshow</mat-icon>
-              </button>
-              @if (isManualAlbum()) {
-                <button mat-icon-button (click)="filterDrawer.toggle()" [matTooltip]="'gallery.filters' | translate">
-                  <mat-icon [style.color]="activeFilterCount() ? 'var(--mat-sys-primary)' : ''">tune</mat-icon>
-                </button>
-              }
-            </div>
+            }
           </div>
-        }
+        </div>
       </div>
 
       <mat-sidenav-container class="overflow-hidden" [style.height]="'calc(100% - ' + (selectionCount() > 0 ? '113' : '65') + 'px)'">
@@ -418,8 +388,7 @@ export class SharedViewComponent implements OnInit {
   protected readonly selectionCount = computed(() => this.selectedPaths().size);
   private lastSelectedIndex = -1;
 
-  protected entityType: EntityType = 'album';
-  protected entityId = 0;
+  private entityId = 0;
   private token = '';
   private currentPage = 1;
   private sortApplied = false;
@@ -440,15 +409,11 @@ export class SharedViewComponent implements OnInit {
   }
 
   async ngOnInit(): Promise<void> {
-    this.entityType = this.route.snapshot.url[1]?.path === 'person' ? 'person' : 'album';
-
-    const paramKey = this.entityType === 'album' ? 'albumId' : 'personId';
-    this.entityId = Number(this.route.snapshot.paramMap.get(paramKey));
+    this.entityId = Number(this.route.snapshot.paramMap.get('albumId'));
     this.token = this.route.snapshot.queryParamMap.get('token') ?? '';
 
     if (!this.entityId || !this.token) {
-      const i18nPrefix = this.entityType === 'album' ? 'albums' : 'persons';
-      this.error.set(this.i18n.t(`${i18nPrefix}.invalid_share_link`));
+      this.error.set(this.i18n.t('albums.invalid_share_link'));
       this.loading.set(false);
       return;
     }
@@ -556,9 +521,8 @@ export class SharedViewComponent implements OnInit {
   // --- Photo detail navigation ---
 
   protected openPhotoDetail(photo: Photo): void {
-    const entityPath = this.entityType === 'album' ? 'album' : 'person';
     this.router.navigate(
-      [`/shared/${entityPath}/${this.entityId}/photo`],
+      [`/shared/album/${this.entityId}/photo`],
       {
         queryParams: { path: photo.path, token: this.token },
         state: { photo },
@@ -579,20 +543,12 @@ export class SharedViewComponent implements OnInit {
 
   private async loadPage(page: number, append = false): Promise<void> {
     try {
-      if (this.entityType === 'album') {
-        await this.loadAlbumPage(page, append);
-      } else {
-        await this.loadPersonPage(page, append);
-      }
+      await this.loadAlbumPage(page, append);
     } catch (e: unknown) {
-      const i18nPrefix = this.entityType === 'album' ? 'albums' : 'persons';
       if (e instanceof HttpErrorResponse && (e.status === 403 || e.status === 401)) {
-        const errorKey = this.entityType === 'album'
-          ? 'albums.share_link_revoked'
-          : 'persons.share_link_error';
-        this.error.set(this.i18n.t(errorKey));
+        this.error.set(this.i18n.t('albums.share_link_revoked'));
       } else {
-        this.error.set(this.i18n.t(`${i18nPrefix}.load_error`));
+        this.error.set(this.i18n.t('albums.load_error'));
       }
     } finally {
       this.loading.set(false);
@@ -642,20 +598,6 @@ export class SharedViewComponent implements OnInit {
       this.filterOptions.set(res.filter_options);
     }
 
-    this.applyPhotos(res.photos, append);
-  }
-
-  private async loadPersonPage(page: number, append: boolean): Promise<void> {
-    const res = await firstValueFrom(
-      this.api.get<SharedPersonResponse>(
-        `/persons/${this.entityId}/photos`,
-        { token: this.token, page, per_page: 48 },
-      ),
-    );
-    this.entityName.set(res.person.name);
-    this.total.set(res.total);
-    this.hasMore.set(res.has_more);
-    this.currentPage = res.page;
     this.applyPhotos(res.photos, append);
   }
 

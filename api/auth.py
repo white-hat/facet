@@ -12,12 +12,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import jwt
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from api.config import (
     JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRY_HOURS,
-    VIEWER_CONFIG, _share_secret,
+    VIEWER_CONFIG,
     is_multi_user_enabled, get_user_config
 )
 
@@ -48,15 +48,14 @@ def decode_access_token(token: str) -> Optional[dict]:
 
 class CurrentUser:
     """Represents the current authenticated user."""
-    __slots__ = ('user_id', 'role', 'display_name', 'edition_authenticated', 'shared_person_id')
+    __slots__ = ('user_id', 'role', 'display_name', 'edition_authenticated')
 
     def __init__(self, user_id=None, role='user', display_name='',
-                 edition_authenticated=False, shared_person_id=None):
+                 edition_authenticated=False):
         self.user_id = user_id
         self.role = role
         self.display_name = display_name
         self.edition_authenticated = edition_authenticated
-        self.shared_person_id = shared_person_id
 
     @property
     def is_authenticated(self):
@@ -83,20 +82,9 @@ class CurrentUser:
 # --- DEPENDENCY INJECTION ---
 
 async def get_optional_user(
-    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(_bearer_scheme),
 ) -> Optional[CurrentUser]:
-    """Extract user from JWT token if present, without requiring auth.
-
-    Also checks for share tokens in query params for person page sharing.
-    """
-    # Check for share token on person-related requests
-    share_token = request.query_params.get('token')
-    person_id = request.path_params.get('person_id')
-    if share_token and person_id:
-        if verify_person_share_token(int(person_id), share_token):
-            return CurrentUser(shared_person_id=int(person_id))
-
+    """Extract user from JWT token if present, without requiring auth."""
     if credentials is None:
         # No password mode — everyone is authenticated
         if not is_multi_user_enabled() and not VIEWER_CONFIG.get('password', ''):
@@ -189,19 +177,6 @@ def verify_password(password: str, stored_hash: str) -> bool:
         return False
 
 
-# --- PERSON SHARE TOKENS ---
-
-def generate_person_share_token(person_id: int) -> str:
-    """Generate an HMAC token for sharing a person page."""
-    return hmac.new(_share_secret.encode(), str(person_id).encode(), 'sha256').hexdigest()
-
-
-def verify_person_share_token(person_id: int, token: str) -> bool:
-    """Verify an HMAC share token for a person page."""
-    expected = generate_person_share_token(person_id)
-    return hmac.compare_digest(token, expected)
-
-
 # --- EDITION MODE HELPERS ---
 
 def is_edition_enabled() -> bool:
@@ -217,9 +192,6 @@ def is_edition_authenticated(user: Optional[CurrentUser]) -> bool:
     Share-token visitors are excluded.
     """
     if user is None:
-        return False
-    # Share-token users never get edition access
-    if user.shared_person_id is not None:
         return False
     if not is_multi_user_enabled() and not VIEWER_CONFIG.get('edition_password', ''):
         return True

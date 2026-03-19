@@ -1,7 +1,7 @@
 """
 Authentication router.
 
-Handles login, logout, edition auth, auth status, and person share tokens.
+Handles login, logout, edition auth, and auth status.
 """
 
 import hmac
@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from api.auth import (
     create_access_token, verify_password,
-    generate_person_share_token,
     CurrentUser, get_optional_user, require_authenticated,
     is_edition_enabled, is_edition_authenticated,
 )
@@ -115,13 +114,3 @@ async def auth_status(user: Optional[CurrentUser] = Depends(get_optional_user)):
     )
 
 
-@router.get("/person/{person_id}/share-token")
-async def person_share_token(
-    person_id: int,
-    user: CurrentUser = Depends(require_authenticated),
-):
-    """Generate a share URL token for a person page."""
-    if user.shared_person_id is not None:
-        raise HTTPException(status_code=403, detail="Share visitors cannot generate share tokens")
-    token = generate_person_share_token(person_id)
-    return {'token': token}
