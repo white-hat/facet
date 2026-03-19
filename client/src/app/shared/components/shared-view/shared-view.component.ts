@@ -569,6 +569,8 @@ export class SharedViewComponent implements OnInit {
   // --- Data loading ---
 
   private async reloadFromFirstPage(): Promise<void> {
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = null;
     this.loading.set(true);
     this.photos.set([]);
     this.currentPage = 1;
