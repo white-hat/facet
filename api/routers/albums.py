@@ -625,13 +625,29 @@ async def get_shared_album(
         except (ValueError, TypeError):
             per_page = VIEWER_CONFIG['pagination']['default_per_page']
 
-        sort = qp.get('sort', 'aggregate')
+        explicit_sort = qp.get('sort')
+        explicit_sort_dir = qp.get('sort_direction')
+
+        # For smart albums with no explicit sort, use saved sort from smart_filter_json
+        is_manual = not album['is_smart']
+        saved_sort = None
+        saved_sort_dir = None
+        if not is_manual and album['smart_filter_json']:
+            try:
+                import json as _json
+                smart_filters = _json.loads(album['smart_filter_json'])
+                saved_sort = smart_filters.get('sort')
+                saved_sort_dir = smart_filters.get('sort_direction')
+            except (ValueError, TypeError):
+                pass
+
+        sort = explicit_sort or saved_sort or 'aggregate'
         if sort not in VALID_SORT_COLS:
             sort = 'aggregate'
-        sort_dir = 'ASC' if qp.get('sort_direction', 'DESC') == 'ASC' else 'DESC'
+        effective_sort_dir = explicit_sort_dir or saved_sort_dir or 'DESC'
+        sort_dir = 'ASC' if effective_sort_dir == 'ASC' else 'DESC'
 
         # Build filters dict from query params (for regular albums)
-        is_manual = not album['is_smart']
         filters = None
         if is_manual:
             _FILTER_KEYS = (
@@ -643,6 +659,8 @@ async def get_shared_album(
 
         result = _fetch_album_photos(conn, album, user_id, page, per_page, sort, sort_dir, filters=filters)
         result['album'] = _album_to_dict(album)
+        result['effective_sort'] = sort
+        result['effective_sort_direction'] = sort_dir
         if SORT_OPTIONS_GROUPED:
             result['sort_options_grouped'] = SORT_OPTIONS_GROUPED
 

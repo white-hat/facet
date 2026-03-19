@@ -47,6 +47,8 @@ interface SharedAlbumResponse {
   per_page: number;
   total_pages: number;
   has_more: boolean;
+  effective_sort?: string;
+  effective_sort_direction?: string;
   sort_options_grouped?: Record<string, SortOption[]>;
   filter_options?: FilterOptions;
 }
@@ -420,6 +422,7 @@ export class SharedViewComponent implements OnInit {
   protected entityId = 0;
   private token = '';
   private currentPage = 1;
+  private sortApplied = false;
   private resizeObserver: ResizeObserver | null = null;
 
   constructor() {
@@ -462,11 +465,13 @@ export class SharedViewComponent implements OnInit {
   }
 
   protected onSortChange(value: string): void {
+    this.sortApplied = true;
     this.sortBy.set(value);
     this.reloadFromFirstPage();
   }
 
   protected toggleSortDirection(): void {
+    this.sortApplied = true;
     this.sortDirection.update(d => d === 'desc' ? 'asc' : 'desc');
     this.reloadFromFirstPage();
   }
@@ -596,9 +601,13 @@ export class SharedViewComponent implements OnInit {
     const params: Record<string, string | number> = {
       token: this.token,
       page,
-      sort: this.sortBy(),
-      sort_direction: this.sortDirection() === 'desc' ? 'DESC' : 'ASC',
     };
+
+    // Only send sort params if user has explicitly changed sort (let backend use saved default otherwise)
+    if (this.sortApplied) {
+      params['sort'] = this.sortBy();
+      params['sort_direction'] = this.sortDirection() === 'desc' ? 'DESC' : 'ASC';
+    }
 
     // Add active filters to API call
     for (const [key, value] of Object.entries(this.filters())) {
@@ -614,6 +623,12 @@ export class SharedViewComponent implements OnInit {
     this.total.set(res.total);
     this.hasMore.set(res.has_more);
     this.currentPage = res.page;
+
+    // Sync sort signals from API response (for saved smart album defaults)
+    if (res.effective_sort) {
+      this.sortBy.set(res.effective_sort);
+      this.sortDirection.set(res.effective_sort_direction === 'ASC' ? 'asc' : 'desc');
+    }
 
     // Apply sort_options_grouped from API response if available and config doesn't have them
     if (res.sort_options_grouped && !this.config()?.sort_options_grouped) {

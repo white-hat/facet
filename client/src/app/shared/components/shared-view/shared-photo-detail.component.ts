@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, HostListener } from '@angular/core';
+import { Component, inject, signal, computed, effect, OnInit, HostListener } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -6,6 +6,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { firstValueFrom } from 'rxjs';
 import { Photo } from '../../models/photo.model';
 import { ApiService } from '../../../core/services/api.service';
+import { I18nService } from '../../../core/services/i18n.service';
 import { FixedPipe } from '../../pipes/fixed.pipe';
 import { ShutterSpeedPipe } from '../../pipes/shutter-speed.pipe';
 import { TranslatePipe } from '../../pipes/translate.pipe';
@@ -70,6 +71,18 @@ import { IsLensNamePipe } from '../../pipes/is-lens-name.pipe';
               <span class="text-[var(--mat-sys-primary)] font-semibold ml-auto">{{ p.aggregate | fixed:1 }}</span>
             </div>
           </div>
+
+          <!-- Caption (read-only) -->
+          @if (displayCaption()) {
+            <div class="border-t border-[var(--mat-sys-outline-variant)] pt-3">
+              <div class="text-[0.625rem] uppercase tracking-wider text-[var(--mat-sys-on-surface-variant)] mb-2">{{ 'photo_detail.caption' | translate }}</div>
+              @if (translatingCaption()) {
+                <p class="text-[var(--mat-sys-on-surface-variant)] opacity-60 italic text-xs">{{ 'photo_detail.translating_caption' | translate }}</p>
+              } @else {
+                <p class="text-[var(--mat-sys-on-surface-variant)]">{{ displayCaption() }}</p>
+              }
+            </div>
+          }
 
           <!-- Quality section -->
           <div class="border-t border-[var(--mat-sys-outline-variant)] pt-3">
@@ -238,9 +251,13 @@ export class SharedPhotoDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly api = inject(ApiService);
+  private readonly i18n = inject(I18nService);
 
   protected readonly photo = signal<Photo | null>(null);
   protected readonly fullImageLoaded = signal(false);
+  protected readonly translatingCaption = signal(false);
+  protected readonly translatedCaption = signal<string | null>(null);
+  protected readonly displayCaption = computed(() => this.translatedCaption() ?? this.photo()?.caption ?? null);
 
   protected readonly fullImageUrl = computed(() => {
     const p = this.photo();
@@ -251,6 +268,30 @@ export class SharedPhotoDetailComponent implements OnInit {
     const p = this.photo();
     if (!p) return false;
     return !!(p.camera_model || p.lens_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso);
+  });
+
+  private readonly captionTranslationEffect = effect(() => {
+    const p = this.photo();
+    const locale = this.i18n.locale();
+    if (!p?.caption || locale === 'en') {
+      this.translatedCaption.set(null);
+      return;
+    }
+    if (p.caption_translated) {
+      this.translatedCaption.set(p.caption_translated);
+      return;
+    }
+    this.translatingCaption.set(true);
+    firstValueFrom(this.api.get<{ caption: string; lang?: string }>('/caption', { path: p.path, lang: locale }))
+      .then(res => {
+        if (res.lang) {
+          this.translatedCaption.set(res.caption);
+        } else {
+          this.translatedCaption.set(null);
+        }
+      })
+      .catch(() => this.translatedCaption.set(null))
+      .finally(() => this.translatingCaption.set(false));
   });
 
   private get token(): string {
