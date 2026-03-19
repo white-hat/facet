@@ -219,20 +219,22 @@ def _get_first_photo_path(conn, album_row, user_id=None):
             saved_filters = _normalize_smart_filters(saved_filters)
             # Apply viewer defaults for hide filters (excluded from smart_filter_json but active by default)
             defaults = VIEWER_CONFIG.get('defaults', {})
-            for key in ('hide_blinks', 'hide_bursts', 'hide_duplicates'):
+            for key in ('hide_blinks', 'hide_bursts', 'hide_duplicates', 'hide_rejected'):
                 if key not in saved_filters:
                     saved_filters[key] = '1' if defaults.get(key, False) else '0'
             where_clauses, sql_params = _build_gallery_where(saved_filters, conn, user_id=user_id)
             from_clause, from_params = get_photos_from_clause(user_id)
             all_params = from_params + sql_params
             where_str = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
-            safe_sorts = ('aggregate', 'aesthetic', 'date_taken', 'comp_score', 'tech_sharpness')
             sort_col = saved_filters.get('sort', 'aggregate')
-            if sort_col not in safe_sorts:
+            if sort_col not in VALID_SORT_COLS:
                 sort_col = 'aggregate'
+            if sort_col == 'top_picks_score':
+                from api.top_picks import get_top_picks_score_sql
+                sort_col = f"({get_top_picks_score_sql()})"
             sort_dir = 'ASC' if saved_filters.get('sort_direction') == 'ASC' else 'DESC'
             row = conn.execute(
-                f"SELECT path FROM {from_clause}{where_str} ORDER BY {sort_col} {sort_dir} LIMIT 1",
+                f"SELECT path FROM {from_clause}{where_str} ORDER BY {sort_col} {sort_dir}, path ASC LIMIT 1",
                 all_params
             ).fetchone()
             return row['path'] if row else None

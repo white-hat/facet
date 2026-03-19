@@ -23,6 +23,7 @@ from api.config import (
     VIEWER_CONFIG, _FULL_CONFIG, _CONFIG_PATH, FACET_SCRIPT,
     get_comparison_mode_settings, map_disk_path,
     reload_config, _stats_cache, get_all_scan_directories,
+    is_multi_user_enabled,
 )
 from api.database import get_db_connection
 from api.db_helpers import get_visibility_clause
@@ -177,8 +178,9 @@ async def api_download_single(
     # Map database path to local disk path
     disk_path = map_disk_path(db_path)
     real_disk = os.path.realpath(disk_path)
-    if not any(real_disk.startswith(os.path.realpath(d) + os.sep) for d in get_all_scan_directories()):
-        raise HTTPException(status_code=404, detail='File not found')
+    if is_multi_user_enabled():
+        if not any(real_disk.startswith(os.path.realpath(d) + os.sep) for d in get_all_scan_directories()):
+            raise HTTPException(status_code=404, detail='File not found')
 
     if not os.path.isfile(real_disk):
         raise HTTPException(status_code=404, detail='File not found on disk')
