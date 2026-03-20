@@ -1,11 +1,9 @@
-import { GalleryFilters } from '../../features/gallery/gallery.store';
-
 export interface AdditionalFilterDef {
   id: string;
   labelKey: string;
   sectionKey: string;
-  minKey: keyof GalleryFilters;
-  maxKey: keyof GalleryFilters;
+  minKey: string;
+  maxKey: string;
   sliderMin: number;
   sliderMax: number;
   step: number;

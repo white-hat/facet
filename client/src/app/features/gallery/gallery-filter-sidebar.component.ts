@@ -20,7 +20,7 @@ import { AlbumService, Album } from '../../core/services/album.service';
 import { AuthService } from '../../core/services/auth.service';
 import { SaveSmartAlbumDialogComponent } from '../albums/save-smart-album-dialog.component';
 
-const ADDITIONAL_FILTERS: AdditionalFilterDef[] = [
+export const ADDITIONAL_FILTERS: AdditionalFilterDef[] = [
   // Quality
   { id: 'score_range', labelKey: 'gallery.score_range', sectionKey: 'gallery.sidebar.quality', minKey: 'min_score', maxKey: 'max_score', sliderMin: 0, sliderMax: 10, step: 0.5, spanWidth: 'w-16' },
   { id: 'aesthetic_range', labelKey: 'gallery.aesthetic_range', sectionKey: 'gallery.sidebar.quality', minKey: 'min_aesthetic', maxKey: 'max_aesthetic', sliderMin: 0, sliderMax: 10, step: 0.5, spanWidth: 'w-16' },
@@ -64,7 +64,7 @@ const ADDITIONAL_FILTERS: AdditionalFilterDef[] = [
   { id: 'star_rating_range', labelKey: 'gallery.star_rating_range', sectionKey: 'gallery.sidebar.ratings', minKey: 'min_star_rating', maxKey: 'max_star_rating', sliderMin: 0, sliderMax: 5, step: 1, spanWidth: 'w-16' },
 ];
 
-const SECTION_ORDER = [
+export const SECTION_ORDER = [
   'gallery.sidebar.quality',
   'gallery.sidebar.extended_quality',
   'gallery.sidebar.face',
@@ -75,15 +75,26 @@ const SECTION_ORDER = [
   'gallery.sidebar.ratings',
 ];
 
-interface FilterGroup {
+export interface FilterGroup {
   sectionKey: string;
   filters: AdditionalFilterDef[];
 }
 
 // Pre-built map for O(1) section lookup — both filterGroups and sectionActiveCounts use this.
-const FILTERS_BY_SECTION: Record<string, AdditionalFilterDef[]> = Object.fromEntries(
+export const FILTERS_BY_SECTION: Record<string, AdditionalFilterDef[]> = Object.fromEntries(
   SECTION_ORDER.map(key => [key, ADDITIONAL_FILTERS.filter(f => f.sectionKey === key)])
 );
+
+export const SECTION_ICONS: Record<string, string> = {
+  'gallery.sidebar.quality': 'star',
+  'gallery.sidebar.extended_quality': 'analytics',
+  'gallery.sidebar.face': 'face',
+  'gallery.sidebar.composition': 'grid_3x3',
+  'gallery.sidebar.saliency': 'center_focus_strong',
+  'gallery.sidebar.technical': 'tune',
+  'gallery.sidebar.exposure_range': 'exposure',
+  'gallery.sidebar.ratings': 'grade',
+};
 
 const SIDEBAR_SECTIONS_KEY = 'facet_sidebar_sections';
 // One-time cleanup of legacy localStorage key from v3.x.
@@ -399,10 +410,10 @@ function saveSectionStates(states: Record<string, boolean>): void {
                 <div class="flex items-center gap-1">
                   <mat-slider [min]="def.sliderMin" [max]="def.sliderMax" [step]="def.step" class="flex-1">
                     <input matSliderStartThumb
-                      [value]="store.filters()[def.minKey] ? +store.filters()[def.minKey] : def.sliderMin"
+                      [value]="$any(store.filters())[def.minKey] ? +$any(store.filters())[def.minKey] : def.sliderMin"
                       (valueChange)="onDynamicRangeChange(def, 'min', $event)" />
                     <input matSliderEndThumb
-                      [value]="store.filters()[def.maxKey] ? +store.filters()[def.maxKey] : def.sliderMax"
+                      [value]="$any(store.filters())[def.maxKey] ? +$any(store.filters())[def.maxKey] : def.sliderMax"
                       (valueChange)="onDynamicRangeChange(def, 'max', $event)" />
                   </mat-slider>
                   <span class="text-xs opacity-60 text-right" [class]="def.spanWidth">{{ store.filters() | filterDisplay:def }}</span>
@@ -465,16 +476,7 @@ export class GalleryFilterSidebarComponent {
   readonly sectionStates = signal<Record<string, boolean>>(loadSectionStates());
   readonly sliderConfig = computed(() => this.store.config()?.display?.thumbnail_slider ?? null);
 
-  readonly sectionIcons: Record<string, string> = {
-    'gallery.sidebar.quality': 'star',
-    'gallery.sidebar.extended_quality': 'analytics',
-    'gallery.sidebar.face': 'face',
-    'gallery.sidebar.composition': 'grid_3x3',
-    'gallery.sidebar.saliency': 'center_focus_strong',
-    'gallery.sidebar.technical': 'tune',
-    'gallery.sidebar.exposure_range': 'exposure',
-    'gallery.sidebar.ratings': 'grade',
-  };
+  readonly sectionIcons = SECTION_ICONS;
 
   readonly filterGroups: FilterGroup[] = SECTION_ORDER.map(sectionKey => ({
     sectionKey,
@@ -489,9 +491,10 @@ export class GalleryFilterSidebarComponent {
       equipment: (f.camera ? 1 : 0) + (f.lens ? 1 : 0),
       display: (f.favorites_only ? 1 : 0) + (f.is_monochrome ? 1 : 0) + (f.hide_rejected ? 1 : 0),
     };
+    const fAny = f as Record<string, any>;
     for (const sectionKey of SECTION_ORDER) {
       counts[sectionKey] = FILTERS_BY_SECTION[sectionKey].filter(
-        def => (f[def.minKey] as string) || (f[def.maxKey] as string)
+        def => fAny[def.minKey] || fAny[def.maxKey]
       ).length;
     }
     return counts;
@@ -506,9 +509,7 @@ export class GalleryFilterSidebarComponent {
   }
 
   onDynamicRangeChange(def: AdditionalFilterDef, side: 'min' | 'max', value: number): void {
-    // When min is still at default, redirect max thumb interaction to set min instead.
-    // Users typically want to set a minimum threshold first.
-    const effectiveSide = (side === 'max' && !(this.store.filters()[def.minKey] as string)) ? 'min' : side;
+    const effectiveSide = (side === 'max' && !(this.store.filters() as Record<string, any>)[def.minKey]) ? 'min' : side;
     const key = effectiveSide === 'min' ? def.minKey : def.maxKey;
     const boundary = effectiveSide === 'min' ? def.sliderMin : def.sliderMax;
     const filterValue = value === boundary ? '' : String(value);
