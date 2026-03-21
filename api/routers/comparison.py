@@ -13,7 +13,7 @@ import traceback
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ async def api_download_options(
 @router.get("/api/download")
 async def api_download_single(
     path: str = Query(...),
-    type: str = Query('original'),
+    type: Literal['original', 'darktable', 'raw'] = Query('original'),
     profile: str = Query(''),
     user: Optional[CurrentUser] = Depends(get_optional_user),
 ):

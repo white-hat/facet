@@ -18,6 +18,7 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { FilterDisplayPipe } from '../../shared/pipes/filter-display.pipe';
 import { PersonThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
 import { AdditionalFilterDef } from '../../shared/models/filter-def.model';
+import { computeRangeFilterUpdate } from '../../shared/utils/range-filter';
 import { AlbumService, Album } from '../../core/services/album.service';
 import { AuthService } from '../../core/services/auth.service';
 import { SaveSmartAlbumDialogComponent } from '../albums/save-smart-album-dialog.component';
@@ -636,10 +637,9 @@ export class GalleryFilterSidebarComponent {
   }
 
   onDynamicRangeChange(def: AdditionalFilterDef, side: 'min' | 'max', value: number): void {
-    const effectiveSide = (side === 'max' && !(this.store.filters() as Record<string, any>)[def.minKey]) ? 'min' : side;
-    const key = effectiveSide === 'min' ? def.minKey : def.maxKey;
-    const boundary = effectiveSide === 'min' ? def.sliderMin : def.sliderMax;
-    const filterValue = value === boundary ? '' : String(value);
+    const { key, value: filterValue } = computeRangeFilterUpdate(
+      def, side, value, (this.store.filters() as Record<string, any>)[def.minKey],
+    );
     this.store.updateFilter(key as 'min_score', filterValue);
   }
 

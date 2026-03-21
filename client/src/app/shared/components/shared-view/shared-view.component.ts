@@ -23,8 +23,11 @@ import { TranslatePipe } from '../../pipes/translate.pipe';
 import { SortGroupKeyPipe } from '../../pipes/sort-group-key.pipe';
 import { FilterDisplayPipe } from '../../pipes/filter-display.pipe';
 import { AdditionalFilterDef } from '../../models/filter-def.model';
+import { computeRangeFilterUpdate } from '../../utils/range-filter';
+import { useDesktopSignal } from '../../utils/media-query';
+import { downloadAll } from '../../utils/download';
 import {
-  ADDITIONAL_FILTERS, SECTION_ORDER, FILTERS_BY_SECTION,
+  SECTION_ORDER, FILTERS_BY_SECTION,
   FilterGroup, SECTION_ICONS,
 } from '../../../features/gallery/gallery-filter-sidebar.component';
 import { PhotoCardComponent } from '../photo-card/photo-card.component';
@@ -498,8 +501,9 @@ export class SharedViewComponent implements OnInit {
     const f = this.filters();
     let count = [f.camera, f.lens, f.tag, f.date_from, f.date_to, f.composition_pattern, f.category].filter(v => !!v).length
       + (f.hide_blinks ? 1 : 0) + (f.hide_bursts ? 1 : 0) + (f.hide_duplicates ? 1 : 0) + (f.is_monochrome ? 1 : 0);
-    for (const def of ADDITIONAL_FILTERS) {
-      if (f[def.minKey] || f[def.maxKey]) count++;
+    const sectionCounts = this.rangeSectionActiveCounts();
+    for (const key of SECTION_ORDER) {
+      count += sectionCounts[key] ?? 0;
     }
     return count;
   });
@@ -513,9 +517,8 @@ export class SharedViewComponent implements OnInit {
   });
 
   // Responsive: force single-column grid on small screens
-  protected readonly isDesktop = signal(false);
-  private desktopMql: MediaQueryList | null = null;
-  private desktopMqlHandler: ((e: MediaQueryListEvent) => void) | null = null;
+  private readonly desktop = useDesktopSignal();
+  protected readonly isDesktop = this.desktop.isDesktop;
 
   // Mosaic
   protected readonly containerWidth = signal(0);
@@ -576,11 +579,7 @@ export class SharedViewComponent implements OnInit {
 
   constructor() {
     afterNextRender(() => {
-      const mql = window.matchMedia('(min-width: 768px)');
-      this.isDesktop.set(mql.matches);
-      this.desktopMql = mql;
-      this.desktopMqlHandler = (e: MediaQueryListEvent) => this.isDesktop.set(e.matches);
-      mql.addEventListener('change', this.desktopMqlHandler);
+      this.desktop.setup();
     });
 
     // Set up ResizeObserver once loading completes and mat-sidenav-content is in the DOM
@@ -591,9 +590,7 @@ export class SharedViewComponent implements OnInit {
       }
     });
     this.destroyRef.onDestroy(() => {
-      if (this.desktopMql && this.desktopMqlHandler) {
-        this.desktopMql.removeEventListener('change', this.desktopMqlHandler);
-      }
+      this.desktop.cleanup();
       if (this.rangeDebounce) clearTimeout(this.rangeDebounce);
       this.resizeObserver?.disconnect();
       this.resizeObserver = null;
@@ -646,10 +643,9 @@ export class SharedViewComponent implements OnInit {
   private rangeDebounce: ReturnType<typeof setTimeout> | null = null;
 
   protected onDynamicRangeChange(def: AdditionalFilterDef, side: 'min' | 'max', value: number): void {
-    const effectiveSide = (side === 'max' && !this.filters()[def.minKey]) ? 'min' : side;
-    const key = effectiveSide === 'min' ? def.minKey : def.maxKey;
-    const boundary = effectiveSide === 'min' ? def.sliderMin : def.sliderMax;
-    const filterValue = value === boundary ? '' : String(value);
+    const { key, value: filterValue } = computeRangeFilterUpdate(
+      def, side, value, this.filters()[def.minKey],
+    );
     this.filters.update(f => ({ ...f, [key]: filterValue }));
     if (this.rangeDebounce) clearTimeout(this.rangeDebounce);
     this.rangeDebounce = setTimeout(() => this.refreshFiltered(), 300);
@@ -720,19 +716,11 @@ export class SharedViewComponent implements OnInit {
   protected async downloadSelected(type = 'original', profile?: string): Promise<void> {
     this.downloading.set(true);
     try {
-      const paths = [...this.selectedPaths()];
-      for (const path of paths) {
-        const url = this.api.downloadUrl(path, type, profile, this.token);
-        const blob = await firstValueFrom(this.api.getRaw(url));
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = path.split(/[\\/]/).pop() ?? '';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      }
+      await downloadAll(
+        [...this.selectedPaths()],
+        path => this.api.downloadUrl(path, type, profile, this.token),
+        url => this.api.getRaw(url),
+      );
     } finally {
       this.downloading.set(false);
     }

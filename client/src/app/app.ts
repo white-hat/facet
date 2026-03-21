@@ -1,4 +1,4 @@
-import { Component, inject, computed, signal, OnInit, WritableSignal, viewChild, ElementRef } from '@angular/core';
+import { Component, inject, computed, signal, OnInit, WritableSignal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
@@ -18,7 +18,6 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
-import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { ApiService } from './core/services/api.service';
 import { AuthService } from './core/services/auth.service';
 import { I18nService } from './core/services/i18n.service';
@@ -102,7 +101,6 @@ export class EditionDialogComponent {
     PersonThumbnailUrlPipe,
     ThumbnailUrlPipe,
     MatSliderModule,
-    MatAutocompleteModule,
   ],
   templateUrl: './app.html',
   host: { class: 'block h-full' },
@@ -156,28 +154,6 @@ export class App implements OnInit {
     const grouped = this.store.config()?.sort_options_grouped;
     if (!grouped) return null;
     return Object.entries(grouped);
-  });
-
-  protected readonly selectedPersonIds = computed(() => {
-    const raw = this.store.filters().person_id;
-    return raw ? raw.split(',') : [];
-  });
-
-  protected readonly selectedPersons = computed(() => {
-    const ids = new Set(this.selectedPersonIds());
-    if (!ids.size) return [];
-    return this.store.persons().filter(p => ids.has(String(p.id)));
-  });
-
-  protected readonly personSearchQuery = signal('');
-  private readonly personInput = viewChild<ElementRef<HTMLInputElement>>('personInput');
-
-  protected readonly filteredPersons = computed(() => {
-    const query = this.personSearchQuery().toLowerCase().trim();
-    const selected = new Set(this.selectedPersonIds());
-    const all = this.store.persons().filter(p => !selected.has(String(p.id)));
-    if (!query) return all;
-    return all.filter(p => p.name?.toLowerCase().includes(query));
   });
 
   private static readonly RANGE_CHIPS: { minKey: string; maxKey: string; labelKey: string }[] = [
@@ -394,22 +370,6 @@ export class App implements OnInit {
     const value = (event.target as HTMLInputElement).value;
     if (field === 'from') service.dateFrom.set(value);
     else service.dateTo.set(value);
-  }
-
-  protected removePersonChip(id: number): void {
-    const ids = this.selectedPersonIds().filter(pid => pid !== String(id));
-    this.store.updateFilter('person_id', ids.join(','));
-  }
-
-  protected onPersonAutoSelected(event: MatAutocompleteSelectedEvent): void {
-    const id = String(event.option.value);
-    const current = this.selectedPersonIds();
-    if (!current.includes(id)) {
-      this.store.updateFilter('person_id', [...current, id].join(','));
-    }
-    this.personSearchQuery.set('');
-    const el = this.personInput()?.nativeElement;
-    if (el) el.value = '';
   }
 
   protected switchLang(lang: string): void {

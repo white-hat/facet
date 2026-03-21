@@ -23,6 +23,8 @@ import { firstValueFrom } from 'rxjs';
 import { GalleryStore } from './gallery.store';
 import { Photo } from '../../shared/models/photo.model';
 import { AuthService } from '../../core/services/auth.service';
+import { useDesktopSignal } from '../../shared/utils/media-query';
+import { downloadAll } from '../../shared/utils/download';
 import { I18nService } from '../../core/services/i18n.service';
 import { ApiService } from '../../core/services/api.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -286,7 +288,10 @@ export class GalleryComponent implements OnInit, OnDestroy {
   readonly cardWidth = computed(() => this.store.cardWidth() || 168);
 
   /** Whether the viewport is md+ (768px) — mosaic is only available on desktop */
-  protected readonly isDesktop = signal(false);
+  private readonly desktop = useDesktopSignal({
+    onChange: matches => { if (!matches) this.tooltipPhoto.set(null); },
+  });
+  protected readonly isDesktop = this.desktop.isDesktop;
 
   /** Effective gallery mode: force grid on small viewports */
   readonly effectiveGalleryMode = computed(() =>
@@ -347,24 +352,10 @@ export class GalleryComponent implements OnInit, OnDestroy {
     return rows;
   });
 
-  private isBrowser = false;
-  private desktopMql: MediaQueryList | null = null;
-  private desktopMqlHandler: ((e: MediaQueryListEvent) => void) | null = null;
-
   constructor() {
     afterNextRender(() => {
-      this.isBrowser = true;
       this.isTouchDevice.set(window.matchMedia('(hover: none)').matches);
-
-      const mql = window.matchMedia('(min-width: 768px)');
-      this.isDesktop.set(mql.matches);
-      this.desktopMql = mql;
-      this.desktopMqlHandler = (e: MediaQueryListEvent) => {
-        this.isDesktop.set(e.matches);
-        if (!e.matches) this.tooltipPhoto.set(null);
-      };
-      mql.addEventListener('change', this.desktopMqlHandler);
-
+      this.desktop.setup();
       this.setupResizeObserver();
     });
 
@@ -423,9 +414,7 @@ export class GalleryComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.resizeObserver?.disconnect();
-    if (this.desktopMql && this.desktopMqlHandler) {
-      this.desktopMql.removeEventListener('change', this.desktopMqlHandler);
-    }
+    this.desktop.cleanup();
   }
 
   /** Save/restore sidebar scroll position on drawer open/close */
@@ -499,19 +488,6 @@ export class GalleryComponent implements OnInit, OnDestroy {
     await this.executeBatchAction(p => this.store.batchRating(p, rating), 'gallery.selection.batch_rated', { rating });
   }
 
-  private async triggerDownload(path: string, type = 'original', profile?: string): Promise<void> {
-    const url = this.api.downloadUrl(path, type, profile);
-    const blob = await firstValueFrom(this.api.getRaw(url));
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = path.split(/[\\/]/).pop() ?? '';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(blobUrl);
-  }
-
   protected downloadPhoto(photo: Photo): void {
     this.router.navigate(['/photo'], {
       queryParams: { path: photo.path },
@@ -522,10 +498,11 @@ export class GalleryComponent implements OnInit, OnDestroy {
   protected async downloadSelected(type = 'original', profile?: string): Promise<void> {
     this.downloading.set(true);
     try {
-      const paths = [...this.selectedPaths()];
-      for (const path of paths) {
-        await this.triggerDownload(path, type, profile);
-      }
+      await downloadAll(
+        [...this.selectedPaths()],
+        path => this.api.downloadUrl(path, type, profile),
+        url => this.api.getRaw(url),
+      );
     } finally {
       this.downloading.set(false);
     }

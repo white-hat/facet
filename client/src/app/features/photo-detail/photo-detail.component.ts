@@ -22,13 +22,7 @@ import { PersonThumbnailUrlPipe } from '../../shared/pipes/thumbnail-url.pipe';
 import { CategoryLabelPipe } from '../gallery/photo-tooltip.component';
 import { IsLensNamePipe } from '../../shared/pipes/is-lens-name.pipe';
 import { DownloadIconPipe } from '../../shared/pipes/download-icon.pipe';
-
-interface DownloadOption {
-  type: 'original' | 'darktable' | 'raw';
-  profile?: string;
-  label: string;
-  extension?: string;
-}
+import { DownloadOption } from '../../shared/models/download.model';
 import { GalleryStore } from '../gallery/gallery.store';
 import * as L from 'leaflet';
 import { createLeafletMap } from '../../shared/leaflet';
@@ -427,6 +421,10 @@ export class PhotoDetailComponent implements OnInit {
   private downloadOptionsEffect = effect(() => {
     const p = this.photo();
     if (!p) { this.downloadOptions.set([]); return; }
+    if (!this.auth.downloadProfiles().length) {
+      this.downloadOptions.set([{ type: 'original', label: 'original' }]);
+      return;
+    }
     firstValueFrom(this.api.get<{ options: DownloadOption[] }>('/download/options', { path: p.path }))
       .then(res => this.downloadOptions.set(res.options))
       .catch(() => this.downloadOptions.set([{ type: 'original', label: 'original' }]));

@@ -84,14 +84,37 @@ def find_companion_raw(disk_path: str) -> str | None:
     if p.suffix.lower() in RAW_EXTENSIONS:
         return disk_path
 
-    stem = p.stem
-    parent = p.parent
-    for ext in RAW_EXTENSIONS:
+    return _find_companion_raw_cached(p.stem, str(p.parent), RAW_EXTENSIONS)
+
+
+_companion_raw_cache: dict[tuple[str, str], tuple[float, str | None]] = {}
+_COMPANION_RAW_TTL = 300  # 5 minutes
+_COMPANION_RAW_MAX = 2048
+
+
+def _find_companion_raw_cached(stem: str, parent_dir: str, raw_extensions: set[str]) -> str | None:
+    import time
+    key = (stem, parent_dir)
+    now = time.monotonic()
+    entry = _companion_raw_cache.get(key)
+    if entry and (now - entry[0]) < _COMPANION_RAW_TTL:
+        return entry[1]
+
+    parent = Path(parent_dir)
+    result: str | None = None
+    for ext in raw_extensions:
         for candidate_ext in (ext, ext.upper()):
             candidate = parent / (stem + candidate_ext)
             if candidate.is_file():
-                return str(candidate)
-    return None
+                result = str(candidate)
+                break
+        if result:
+            break
+
+    if len(_companion_raw_cache) >= _COMPANION_RAW_MAX:
+        _companion_raw_cache.clear()
+    _companion_raw_cache[key] = (now, result)
+    return result
 
 
 # ---------------------------------------------------------------------------

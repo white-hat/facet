@@ -15,13 +15,7 @@ import { ThumbnailUrlPipe } from '../../pipes/thumbnail-url.pipe';
 import { CategoryLabelPipe } from '../../../features/gallery/photo-tooltip.component';
 import { IsLensNamePipe } from '../../pipes/is-lens-name.pipe';
 import { DownloadIconPipe } from '../../pipes/download-icon.pipe';
-
-interface DownloadOption {
-  type: 'original' | 'darktable' | 'raw';
-  profile?: string;
-  label: string;
-  extension?: string;
-}
+import { DownloadOption } from '../../models/download.model';
 
 @Component({
   selector: 'app-shared-photo-detail',

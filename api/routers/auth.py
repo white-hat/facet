@@ -102,8 +102,8 @@ async def auth_status(user: Optional[CurrentUser] = Depends(get_optional_user)):
     authenticated = user is not None and user.is_authenticated
     edition_auth = is_edition_authenticated(user) if user else False
 
-    dt_profiles = VIEWER_CONFIG.get('raw_processor', {}).get('darktable', {}).get('profiles', [])
-    profile_names = [p['name'] for p in dt_profiles if 'name' in p]
+    from api.raw_processing import get_darktable_profiles
+    profile_names = get_darktable_profiles()
 
     return AuthStatusResponse(
         authenticated=authenticated,
