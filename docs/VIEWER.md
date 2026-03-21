@@ -719,6 +719,7 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/photos` | Paginated photo list with filters |
+| `GET /api/photo` | Single photo details |
 | `GET /api/type_counts` | Photo counts per type |
 | `GET /api/similar_photos/{path}` | Similar photos (modes: `visual`, `color`, `person`) |
 | `GET /api/search?q=&limit=&threshold=` | Semantic text-to-image search |
@@ -770,8 +771,11 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 |----------|-------------|
 | `GET /api/persons` | List all persons |
 | `POST /api/persons/{id}/rename` | Rename a person |
-| `POST /api/persons/{id}/merge` | Merge person into another |
-| `DELETE /api/persons/{id}` | Delete a person |
+| `POST /api/persons/merge` | Merge two persons (JSON body) |
+| `POST /api/persons/merge/{source_id}/{target_id}` | Merge source person into target |
+| `POST /api/persons/merge_batch` | Merge multiple persons at once |
+| `POST /api/persons/{id}/delete` | Delete a person |
+| `POST /api/persons/delete_batch` | Delete multiple persons at once |
 
 ### Albums
 
@@ -787,7 +791,6 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 | `DELETE /api/albums/{id}/photos` | Remove photos from album |
 | `POST /api/albums/{id}/share` | Generate share token |
 | `DELETE /api/albums/{id}/share` | Revoke share token |
-| `POST /api/albums/auto-generate` | Auto-generate albums from photo clusters |
 | `GET /api/shared/album/{id}?token=` | View shared album (no auth) |
 
 ### Memories, Timeline, Map & Captions
@@ -795,18 +798,24 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 | Endpoint | Description |
 |----------|-------------|
 | `GET /api/memories?date=` | Photos taken on this date in previous years |
+| `GET /api/memories/check` | Check if memories exist for a date |
 | `GET /api/caption?path=` | Get or generate AI caption |
 | `PUT /api/caption` | Update photo caption (edition mode) |
 | `GET /api/timeline?cursor=&limit=&direction=` | Paginated timeline photos |
 | `GET /api/timeline/dates?year=&month=` | Available dates for navigation |
+| `GET /api/timeline/years` | Available years with photo counts |
+| `GET /api/timeline/months` | Available months for a year |
 | `GET /api/photos/map?bounds=&zoom=&limit=` | Geotagged photos within bounds |
 | `GET /api/photos/map/count` | Count of geotagged photos |
-| `GET /api/similar-groups?threshold=&page=&per_page=` | Groups of visually similar photos |
 
 ### Statistics
 
 | Endpoint | Description |
 |----------|-------------|
+| `GET /api/stats/overview` | Overall scoring statistics summary |
+| `GET /api/stats/score_distribution` | Score distribution histogram data |
+| `GET /api/stats/top_cameras` | Top cameras by photo count |
+| `GET /api/stats/categories` | Category counts and averages |
 | `GET /api/stats/gear` | Camera/lens/combo counts |
 | `GET /api/stats/settings` | Shooting settings distributions |
 | `GET /api/stats/timeline` | Timeline data |
@@ -823,12 +832,114 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 
 | Endpoint | Description |
 |----------|-------------|
+| `GET /api/comparison/next_pair` | Get next photo pair for comparison |
+| `POST /api/comparison/submit` | Submit comparison result |
+| `POST /api/comparison/reset` | Reset comparison data |
+| `GET /api/comparison/stats` | Comparison session statistics |
+| `GET /api/comparison/history` | List past comparisons |
+| `POST /api/comparison/edit` | Edit a comparison result |
+| `POST /api/comparison/delete` | Delete a comparison |
+| `GET /api/comparison/coverage` | Category coverage of comparisons |
+| `GET /api/comparison/confidence` | Confidence metrics for learned scores |
 | `GET /api/comparison/photo_metrics` | Raw metrics for photos |
 | `GET /api/comparison/category_weights` | Category weights/filters |
+| `GET /api/comparison/learned_weights` | Suggested weights from comparisons |
 | `POST /api/comparison/preview_score` | Preview with custom weights |
-| `GET /api/comparison/learned_weights` | Suggested weights |
 | `POST /api/comparison/suggest_filters` | Analyze filter conflicts |
 | `POST /api/comparison/override_category` | Override photo category |
+| `POST /api/recalculate` | Recalculate scores with current weights |
+
+### Burst Culling
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/burst-groups` | List burst groups for culling |
+| `POST /api/burst-groups/select` | Select keepers from a burst group |
+| `GET /api/similar-groups?threshold=&page=&per_page=` | Groups of visually similar photos |
+| `POST /api/similar-groups/select` | Select keepers from a similar group |
+| `GET /api/culling-groups` | Combined burst and similar groups |
+| `POST /api/culling-groups/confirm` | Confirm culling selections |
+
+### Scan
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/scan/start` | Start a scoring scan (superadmin only) |
+| `GET /api/scan/status` | Check scan progress |
+| `GET /api/scan/directories` | List configured scan directories |
+
+### Face Management
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/person/{id}/faces` | List faces for a person |
+| `POST /api/person/{id}/avatar` | Set person avatar face |
+| `GET /api/photo/faces` | List faces detected in a photo |
+| `POST /api/face/{id}/assign` | Assign a face to a person |
+| `POST /api/photo/assign_all_faces` | Assign all faces in a photo to a person |
+| `POST /api/photo/unassign_person` | Unassign a person from a photo |
+
+### Photo Actions
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/photo/set_rating` | Set star rating for a photo |
+| `POST /api/photo/toggle_favorite` | Toggle favorite status |
+| `POST /api/photo/toggle_rejected` | Toggle rejected status |
+
+### Config Management
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /api/config/update_weights` | Update scoring weights |
+| `GET /api/config/weight_snapshots` | List saved weight snapshots |
+| `POST /api/config/save_snapshot` | Save current weights as snapshot |
+| `POST /api/config/restore_weights` | Restore weights from snapshot |
+
+### Merge Suggestions
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/merge_suggestions` | Suggested person merges based on face similarity |
+
+### Folders
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/folders` | List photo folder structure |
+
+### Download
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/download` | Download full-resolution photo |
+
+### Plugins
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/plugins` | List configured plugins |
+| `POST /api/plugins/test-webhook` | Test a webhook plugin |
+
+### Health
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /health` | Server health check |
+| `GET /ready` | Server readiness check |
+
+### Internationalization
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/i18n/languages` | List available languages |
+| `GET /api/i18n/{lang}` | Get translations for a language |
+
+### Filter Options (additional)
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/filter_options/location_name?lat=&lng=` | Reverse geocode coordinates to place name |
 
 ## Troubleshooting
 

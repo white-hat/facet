@@ -16,14 +16,14 @@ Run `/agents:code-review-agent` to review commits and changes. Supports reviewin
 
 | Skill | Triggers | Purpose |
 |-------|----------|---------|
-| `signal-patterns` | signal, computed, effect, UI not updating | Signal-based state management for Angular 20 |
-| `effect-safety-validator` | infinite loop, ObjectUnsubscribedError, effect safety | Detect unsafe effect patterns in Angular signals |
-| `test-creation` | create tests, fix test, TS2345, test coverage | Test suites for Angular 20 zoneless signal components |
+| `signal-patterns` | signal, computed, effect, UI not updating, array mutation, object mutation, zoneless, change detection | Signal-based state management for Angular 20 |
+| `effect-safety-validator` | infinite loop, NG0101, Maximum call stack, ObjectUnsubscribedError, effect safety, form patchValue | Detect unsafe effect patterns in Angular signals |
+| `test-creation` | create tests, fix test, TS2345, NullInjectorError, fakeAsync, flushEffects, test coverage | Test suites for Angular 20 zoneless signal components |
 | `code-quality-analyzer` | duplicate code, DRY, refactor, code smell | Code smells and refactoring opportunities |
-| `css-layout-patterns` | @apply, flex layout, overflow, dark theme | CSS/Tailwind v4 layout patterns |
-| `chrome-devtools-debugging` | UI issue, network request, console error | Browser debugging with Chrome DevTools MCP |
-| `/agents:code-review-agent` | code review, review commit | Expert code review for Facet changes |
+| `css-layout-patterns` | @apply, flex layout, overflow, dark theme, responsive | CSS/Tailwind v4 layout patterns |
+| `chrome-devtools-debugging` | UI issue, button not working, network request, console error, 422 error, screenshot | Browser debugging with Chrome DevTools MCP |
 | `/reflexion` | audit .claude, ecosystem health | Audit .claude/ ecosystem for quality and coherence |
+| `/adaptive` | complex task, multi-step, orchestrate agents | Autonomous multi-agent workflow orchestrator |
 
 ## Patterns (`.claude/patterns/`)
 
@@ -125,6 +125,13 @@ python facet.py --fix-thumbnail-rotation  # Fix rotation of existing thumbnails 
 # Configuration commands
 python facet.py --validate-categories  # Validate category configurations and show list
 
+# Pairwise comparison and weight optimization
+python facet.py --comparison-stats              # Show pairwise comparison statistics
+python facet.py --optimize-weights              # Optimize scoring weights from comparisons
+
+# Face clustering (additional)
+python facet.py --cluster-faces-incremental-named  # Cluster preserving only named persons
+
 # Tag existing photos using stored CLIP embeddings
 python tag_existing.py
 python tag_existing.py --dry-run --threshold 0.25
@@ -139,9 +146,24 @@ python database.py --vacuum         # Reclaim space and defragment the database
 python database.py --analyze        # Update query planner statistics
 python database.py --optimize       # Run both VACUUM and ANALYZE for full optimization
 
+# Export lightweight viewer database (strips BLOBs, downsizes thumbnails)
+python database.py --export-viewer-db                    # Incremental export to default path
+python database.py --export-viewer-db output.db          # Custom output path
+python database.py --export-viewer-db --force-export     # Full re-export
+
+# Cleanup and storage migration
+python database.py --cleanup-orphaned-persons    # Delete persons with no assigned faces
+python database.py --migrate-storage-fs          # Migrate thumbnails/embeddings from DB to filesystem
+python database.py --migrate-storage-db          # Migrate thumbnails/embeddings from filesystem to DB
+
 # User management (multi-user mode)
 python database.py --add-user USERNAME --role ROLE [--display-name NAME]
 python database.py --migrate-user-preferences --user USERNAME
+
+# Database consistency validation
+python validate_db.py               # Run all consistency checks
+python validate_db.py --auto-fix    # Auto-fix detected issues
+python validate_db.py --report-only # Report only, no prompts
 
 # Run web viewer (FastAPI + Angular on localhost:5000)
 python viewer.py
@@ -265,17 +287,23 @@ SQLite table `photos` with columns:
 
 **Core:** path (PK), filename, date_taken, camera_model, lens_model, ISO, f_stop, shutter_speed, focal_length, image_width, image_height
 
-**Scores:** aesthetic, face_count, face_quality, eye_sharpness, face_ratio, tech_sharpness, color_score, exposure_score, comp_score, aggregate, aesthetic_iaa, face_quality_iqa, liqe_score
+**Scores:** aesthetic, face_count, face_quality, eye_sharpness, face_ratio, tech_sharpness, color_score, exposure_score, comp_score, aggregate, aesthetic_iaa, face_quality_iqa, liqe_score, topiq_score, quality_score
 
-**Technical:** noise_sigma, contrast_score, dynamic_range_stops, mean_saturation, is_monochrome
+**Faces (extended):** face_sharpness, face_confidence, is_silhouette, is_group_portrait, raw_eye_sharpness
 
-**Composition:** composition_pattern (SAMP-Net), power_point_score, leading_lines_score
+**Technical:** noise_sigma, contrast_score, dynamic_range_stops, mean_saturation, is_monochrome, focal_length_35mm, scoring_model
+
+**Histogram:** histogram_spread, histogram_bimodality, mean_luminance, raw_color_entropy, shadow_clipped, highlight_clipped
+
+**Composition:** composition_pattern (SAMP-Net), power_point_score, leading_lines_score, composition_explanation, isolation_bonus
 
 **Subject Saliency:** subject_sharpness, subject_prominence, subject_placement, bg_separation
 
-**Duplicates:** duplicate_group_id, is_duplicate_lead
+**Burst/Duplicates:** burst_group_id, is_burst_lead, is_blink, duplicate_group_id, is_duplicate_lead, phash
 
-**AI/Content:** caption (VLM-generated text description)
+**User Actions:** star_rating, is_favorite, is_rejected
+
+**AI/Content:** caption (VLM-generated text description), caption_translated
 
 **Location:** gps_latitude, gps_longitude
 
@@ -290,6 +318,13 @@ SQLite table `photos` with columns:
 - `albums(id, user_id, name, description, cover_photo_path, is_smart, smart_filter_json, share_token, created_at, updated_at)` - Photo albums (manual, smart, and shared)
 - `album_photos(id, album_id, photo_path, position, added_at)` - Album membership with ordering
 - `location_names(lat_grid, lon_grid, city, region, country, display_name)` - Reverse geocoding cache (0.1° grid cells)
+- `comparisons(id, photo_a_path, photo_b_path, winner, category, timestamp, session_id, user_id)` - Pairwise photo comparisons
+- `learned_scores(photo_path, learned_score, comparison_count, category, updated_at, user_id)` - Scores derived from comparisons
+- `weight_optimization_runs(id, timestamp, category, comparisons_used, old_weights, new_weights, mse_before, mse_after)` - Weight optimization history
+- `weight_config_snapshots(id, timestamp, category, weights, description, accuracy_before, accuracy_after, comparisons_used, created_by)` - Saved weight configurations
+- `recommendation_history(id, run_timestamp, config_version_hash, issue_type, target_category, target_key, old_value, proposed_value, was_applied)` - Scoring recommendation audit trail
+- `user_preferences(user_id, photo_path, star_rating, is_favorite, is_rejected)` - Per-user photo ratings (multi-user mode)
+- `stats_cache(key, value, updated_at)` - Precomputed statistics with TTL
 
 ### Performance Optimizations
 
@@ -356,6 +391,26 @@ See [docs/FACE_RECOGNITION.md](docs/FACE_RECOGNITION.md) for the complete workfl
 
 **Capsules:** `GET /api/capsules?page=&per_page=&refresh=&date_from=&date_to=` — curated photo diaporamas grouped by theme. `GET /api/capsules/{id}/photos` — photos for a capsule. `POST /api/capsules/{id}/save-album` — save capsule as album. Angular route: `/capsules`. Capsule types: journey (GPS trips with reverse geocoding), faces_of, seasonal, golden, color_story, this_week, location, person_pair, seeded, progress, color_palette, rare_pair, favorites, plus dimension-based: year, month, week, camera, lens, tag, day_of_week, composition, focal_range, category, time_of_day, star_rating, and cross-dimensional combos. Slideshow supports themed transitions (crossfade, slide, zoom, kenburns) per capsule type. Cache TTL configurable via `capsules.freshness_hours` (default: 24).
 
+**Burst Culling:** `GET /api/burst-groups`, `POST /api/burst-groups/select`, `GET /api/culling-groups`, `POST /api/culling-groups/confirm` — burst and similar group culling workflow.
+
+**Scan:** `POST /api/scan/start`, `GET /api/scan/status`, `GET /api/scan/directories` — trigger and monitor scoring scans (superadmin only).
+
+**Face Management:** `GET /api/person/{id}/faces`, `POST /api/person/{id}/avatar`, `GET /api/photo/faces`, `POST /api/face/{id}/assign`, `POST /api/photo/assign_all_faces`, `POST /api/photo/unassign_person` — face-to-person assignment and avatar management.
+
+**Photo Actions:** `POST /api/photo/set_rating`, `POST /api/photo/toggle_favorite`, `POST /api/photo/toggle_rejected` — single-photo ratings. Batch variants: `POST /api/photos/batch_favorite`, `POST /api/photos/batch_reject`, `POST /api/photos/batch_rating`.
+
+**Comparison Mode:** Full pairwise comparison workflow — `GET /api/comparison/next_pair`, `POST /api/comparison/submit`, `GET /api/comparison/stats`, `GET /api/comparison/history`, `GET /api/comparison/coverage`, `GET /api/comparison/confidence`, plus weight management via `POST /api/config/update_weights`, `GET /api/config/weight_snapshots`, `POST /api/config/save_snapshot`, `POST /api/config/restore_weights`.
+
+**Merge Suggestions:** `GET /api/merge_suggestions` — suggested person merges based on face embedding similarity.
+
+**Plugins:** `GET /api/plugins`, `POST /api/plugins/test-webhook` — plugin listing and webhook testing.
+
+**Health:** `GET /health`, `GET /ready` — server health and readiness checks.
+
+**i18n:** `GET /api/i18n/languages`, `GET /api/i18n/{lang}` — language list and translation bundles.
+
+**Folders:** `GET /api/folders` — photo folder structure for folder-based browsing.
+
 ### Key Implementation Details
 
 - **Embeddings:** SigLIP 2 NaFlex SO400M (1152-dim, 16gb/24gb, native aspect ratio via `transformers`) or CLIP ViT-L-14 (768-dim, legacy/8gb via `open_clip`)
@@ -402,11 +457,17 @@ For quick reference, here are the actual defaults from the config file:
 | `viewer.features` | `show_semantic_search` | `true` |
 | `viewer.features` | `show_albums` | `true` |
 | `viewer.features` | `show_critique` | `true` |
-| `viewer.features` | `show_vlm_critique` | `false` |
+| `viewer.features` | `show_vlm_critique` | `true` |
 | `viewer.features` | `show_memories` | `true` |
 | `viewer.features` | `show_captions` | `true` |
 | `viewer.features` | `show_timeline` | `true` |
 | `viewer.features` | `show_map` | `true` |
+| `viewer.features` | `show_capsules` | `true` |
+| `viewer.features` | `show_similar_button` | `true` |
+| `viewer.features` | `show_merge_suggestions` | `true` |
+| `viewer.features` | `show_rating_controls` | `true` |
+| `viewer.features` | `show_rating_badge` | `true` |
+| `viewer.features` | `show_folders` | `true` |
 | `capsules` | `freshness_hours` | `24` |
 | `capsules` | `reverse_geocoding` | `true` |
 | `capsules` | `min_aggregate` | `6.0` |
