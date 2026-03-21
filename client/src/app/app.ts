@@ -32,6 +32,7 @@ import { CompareFiltersService } from './features/comparison/compare-filters.ser
 import { MapFiltersService } from './features/map/map-filters.service';
 import { CapsuleFiltersService } from './features/capsules/capsule-filters.service';
 import { TranslatePipe } from './shared/pipes/translate.pipe';
+import { SortGroupKeyPipe } from './shared/pipes/sort-group-key.pipe';
 import { PersonThumbnailUrlPipe, ThumbnailUrlPipe } from './shared/pipes/thumbnail-url.pipe';
 import { MemoriesDialogComponent } from './features/gallery/memories-dialog.component';
 
@@ -97,6 +98,7 @@ export class EditionDialogComponent {
     MatBadgeModule,
     MatDividerModule,
     TranslatePipe,
+    SortGroupKeyPipe,
     PersonThumbnailUrlPipe,
     ThumbnailUrlPipe,
     MatSliderModule,
@@ -155,10 +157,6 @@ export class App implements OnInit {
     if (!grouped) return null;
     return Object.entries(grouped);
   });
-
-  protected sortGroupKey(groupName: string): string {
-    return groupName.toLowerCase().replace(/\s+/g, '_');
-  }
 
   protected readonly selectedPersonIds = computed(() => {
     const raw = this.store.filters().person_id;

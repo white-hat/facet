@@ -18,6 +18,7 @@ import { Photo } from '../../models/photo.model';
 import { ApiService } from '../../../core/services/api.service';
 import { I18nService } from '../../../core/services/i18n.service';
 import { TranslatePipe } from '../../pipes/translate.pipe';
+import { SortGroupKeyPipe } from '../../pipes/sort-group-key.pipe';
 import { FilterDisplayPipe } from '../../pipes/filter-display.pipe';
 import { AdditionalFilterDef } from '../../models/filter-def.model';
 import {
@@ -89,7 +90,7 @@ interface SharedFilters {
     MatIconModule, MatButtonModule, MatProgressSpinnerModule,
     MatSelectModule, MatFormFieldModule, MatSnackBarModule, MatTooltipModule,
     MatSliderModule, MatSidenavModule, MatExpansionModule, MatInputModule, MatCheckboxModule,
-    TranslatePipe, FilterDisplayPipe,
+    TranslatePipe, FilterDisplayPipe, SortGroupKeyPipe,
     PhotoCardComponent, SlideshowComponent, InfiniteScrollDirective,
   ],
   template: `
@@ -118,7 +119,7 @@ interface SharedFilters {
               <mat-select panelWidth="auto" panelClass="nowrap-panel" [value]="sortBy()" (selectionChange)="onSortChange($event.value)">
                 @if (sortGroups(); as groups) {
                   @for (group of groups; track group[0]) {
-                    <mat-optgroup [label]="('sort_groups.' + sortGroupKey(group[0])) | translate">
+                    <mat-optgroup [label]="('sort_groups.' + (group[0] | sortGroupKey)) | translate">
                       @for (opt of group[1]; track opt.column) {
                         <mat-option [value]="opt.column">{{ 'sort_options.' + opt.column | translate }}</mat-option>
                       }
@@ -578,6 +579,7 @@ export class SharedViewComponent implements OnInit {
       if (this.desktopMql && this.desktopMqlHandler) {
         this.desktopMql.removeEventListener('change', this.desktopMqlHandler);
       }
+      if (this.rangeDebounce) clearTimeout(this.rangeDebounce);
       this.resizeObserver?.disconnect();
       this.resizeObserver = null;
     });
@@ -651,10 +653,6 @@ export class SharedViewComponent implements OnInit {
   private async refreshFiltered(): Promise<void> {
     this.currentPage = 1;
     await this.loadPage(1);
-  }
-
-  protected sortGroupKey(groupName: string): string {
-    return groupName.toLowerCase().replace(/\s+/g, '_');
   }
 
   protected onScrollReached(): void {
