@@ -912,7 +912,16 @@ Interactive API documentation is available at `/api/docs` (Swagger UI) and the O
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/download` | Download full-resolution photo |
+| `GET /api/download/options` | Available download types for a photo (`path`, optional `is_shared`) |
+| `GET /api/download` | Download a photo (`path`, `type=original\|darktable\|raw`, optional `profile`) |
+
+**Download types:**
+
+- `original` — Serve the file as-is (JPG/HEIF) or rawpy-converted to JPEG (RAW files).
+- `darktable` — Convert companion RAW with a named darktable profile (requires `profile` param). Falls back to original if no companion RAW exists.
+- `raw` — Serve the companion RAW file as-is (not available in shared albums).
+
+The `/api/download/options` endpoint detects companion RAW files automatically and returns available options including configured darktable profiles. The viewer uses this to populate a per-photo download menu.
 
 ### Plugins
 

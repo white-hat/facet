@@ -411,6 +411,8 @@ See [docs/FACE_RECOGNITION.md](docs/FACE_RECOGNITION.md) for the complete workfl
 
 **Folders:** `GET /api/folders` — photo folder structure for folder-based browsing.
 
+**Download:** `GET /api/download/options?path=<path>&is_shared=<bool>` — available download types (original, darktable profiles, raw). `GET /api/download?path=<path>&type=original|darktable|raw&profile=<name>` — download with companion RAW detection and darktable profile conversion.
+
 ### Key Implementation Details
 
 - **Embeddings:** SigLIP 2 NaFlex SO400M (1152-dim, 16gb/24gb, native aspect ratio via `transformers`) or CLIP ViT-L-14 (768-dim, legacy/8gb via `open_clip`)
@@ -477,4 +479,6 @@ For quick reference, here are the actual defaults from the config file:
 | `similarity_groups` | `min_group_size` | `2` |
 | `similarity_groups` | `max_photos` | `10000` |
 | `similarity_groups` | `max_group_size` | `50` |
+| `viewer.raw_processor` | `darktable.executable` | `"darktable-cli"` |
+| `viewer.raw_processor` | `darktable.profiles` | `[]` (array of `{name, hq, width, height, extra_args}`) |
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for the complete reference.

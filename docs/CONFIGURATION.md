@@ -1078,12 +1078,13 @@ Web gallery display and behavior.
 | `max_tags` | `20` | Max tags |
 | `min_photos_for_person` | `10` | Hide persons with fewer photos from dropdown |
 | **raw_processor** | | |
-| `backend` | `"rawpy"` | RAW conversion backend: `"rawpy"` (in-process libraw) or `"darktable"` (darktable-cli, honours XMP sidecars) |
 | `darktable.executable` | `"darktable-cli"` | darktable-cli binary name or absolute path |
-| `darktable.hq` | `true` | Pass `--hq true` for high-quality export |
-| `darktable.width` | `null` | Max output width (`null` = full resolution) |
-| `darktable.height` | `null` | Max output height (`null` = full resolution) |
-| `darktable.extra_args` | `[]` | Additional CLI arguments (e.g., `["--style", "my-look"]`) |
+| `darktable.profiles` | `[]` | Array of named darktable export profiles (see below) |
+| `darktable.profiles[].name` | *(required)* | Profile display name (used in download menu and API `profile` param) |
+| `darktable.profiles[].hq` | `true` | Pass `--hq true` for high-quality export |
+| `darktable.profiles[].width` | *(omit)* | Max output width (omit for full resolution) |
+| `darktable.profiles[].height` | *(omit)* | Max output height (omit for full resolution) |
+| `darktable.profiles[].extra_args` | `[]` | Additional CLI arguments (e.g., `["--style", "monochrome"]`) |
 | **display** | | |
 | `tags_per_photo` | `4` | Tags shown on cards |
 | `card_width_px` | `168` | Card width |
