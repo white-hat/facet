@@ -20,6 +20,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from db import init_database, get_connection
+from db.vec import sync_vec_row, sync_vec_batch
 
 # Optional tqdm for progress bars
 try:
@@ -2053,6 +2054,14 @@ class Facet:
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', face_records)
 
+            # Sync clip embeddings to photos_vec for vector search
+            vec_records = [
+                (res['path'], res['clip_embedding'])
+                for res, _ in results_with_images
+                if res.get('clip_embedding')
+            ]
+            sync_vec_batch(conn, vec_records)
+
             # Commit the entire batch in one transaction
             conn.commit()
 
@@ -2171,6 +2180,7 @@ class Facet:
                 "UPDATE photos SET clip_embedding = ? WHERE path = ?",
                 [(emb, path) for path, emb in results]
             )
+            sync_vec_batch(conn, [(path, emb) for path, emb in results if emb])
             conn.commit()
 
     def update_aggregates_batch(self, results):

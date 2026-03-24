@@ -24,6 +24,7 @@ interface AppConfig {
 @Component({
   selector: 'app-photo-card',
   standalone: true,
+  host: { role: 'gridcell', style: 'content-visibility: auto; contain-intrinsic-size: auto 300px' },
   imports: [
     MatIconModule,
     MatButtonModule,
@@ -56,8 +57,9 @@ interface AppConfig {
            [class.md:h-full]="hideDetails()">
         <img
           [src]="photo().path | thumbnailUrl:thumbSize()"
-          [alt]="photo().filename"
+          [alt]="photo().caption || photo().filename"
           loading="lazy"
+          decoding="async"
           class="w-full bg-[var(--mat-sys-surface-container)] transition-opacity duration-500"
           [class.md:h-full]="hideDetails()"
           [class.md:object-cover]="hideDetails()"

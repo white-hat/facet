@@ -160,6 +160,8 @@ def _resolve_vlm_config() -> Optional[dict]:
     model_key_map = {
         'qwen3-vl-2b': 'qwen3_vl_2b',
         'qwen2.5-vl-7b': 'qwen2_5_vl_7b',
+        'qwen3.5-2b': 'qwen3_5_2b',
+        'qwen3.5-4b': 'qwen3_5_4b',
     }
     config_key = model_key_map.get(tagging_model)
     if not config_key:

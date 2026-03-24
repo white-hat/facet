@@ -4,6 +4,7 @@ Filter options router — lazy-loaded dropdown options.
 """
 
 import logging
+import sqlite3
 from typing import Optional
 from fastapi import APIRouter, Depends
 
@@ -97,7 +98,7 @@ async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
                     LIMIT ?
                 """, vp + [max_tags]).fetchall()
                 return {'tags': [(r[0], r[1]) for r in rows], 'cached': False}
-            except Exception:
+            except sqlite3.Error:
                 logger.debug("photo_tags query failed, falling back to split", exc_info=True)
 
         tag_query = f"""
@@ -118,7 +119,7 @@ async def tags(user: Optional[CurrentUser] = Depends(get_optional_user)):
         try:
             rows = conn.execute(tag_query, vp + [max_tags]).fetchall()
             return {'tags': [(r[0], r[1]) for r in rows], 'cached': False}
-        except Exception:
+        except sqlite3.Error:
             logger.exception("Failed to query tags")
             return {'tags': [], 'cached': False}
     finally:
@@ -158,7 +159,7 @@ async def persons(ids: Optional[str] = None, user: Optional[CurrentUser] = Depen
                     """, missing + vp).fetchall()
                     result = [(r[0], r[1], r[2]) for r in extra] + result
             return result
-        except Exception:
+        except sqlite3.Error:
             logger.exception("Failed to query persons")
             return []
 
@@ -185,7 +186,7 @@ async def patterns(user: Optional[CurrentUser] = Depends(get_optional_user)):
                 GROUP BY composition_pattern ORDER BY cnt DESC
             """, vp).fetchall()
             return [(r[0], r[1]) for r in rows]
-        except Exception:
+        except sqlite3.Error:
             logger.exception("Failed to query composition patterns")
             return []
     return _cached_filter_query('composition_patterns', 'patterns', query)
@@ -204,7 +205,7 @@ async def apertures(user: Optional[CurrentUser] = Depends(get_optional_user)):
                 GROUP BY ap ORDER BY ap ASC
             """, vp).fetchall()
             return [(r[0], r[1]) for r in rows]
-        except Exception:
+        except sqlite3.Error:
             logger.exception("Failed to query apertures")
             return []
     return _cached_filter_query('apertures', 'apertures', query)
@@ -223,7 +224,7 @@ async def focal_lengths(user: Optional[CurrentUser] = Depends(get_optional_user)
                 GROUP BY fl ORDER BY fl ASC
             """, vp).fetchall()
             return [(r[0], r[1]) for r in rows]
-        except Exception:
+        except sqlite3.Error:
             logger.exception("Failed to query focal lengths")
             return []
     return _cached_filter_query('focal_lengths', 'focal_lengths', query)
@@ -241,7 +242,7 @@ async def categories(user: Optional[CurrentUser] = Depends(get_optional_user)):
                 GROUP BY category ORDER BY cnt DESC
             """, vp).fetchall()
             return [(r[0], r[1]) for r in rows]
-        except Exception:
+        except sqlite3.Error:
             logger.exception("Failed to query categories")
             return []
     return _cached_filter_query('categories', 'categories', query)

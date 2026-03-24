@@ -5,12 +5,21 @@ Provides connection creation, PRAGMA configuration, and context manager.
 """
 
 import json
+import logging
 import os
 import sqlite3
 from contextlib import contextmanager
 
 DEFAULT_DB_PATH = os.environ.get('DB_PATH', 'photo_scores_pro.db')
 _CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'scoring_config.json')
+
+logger = logging.getLogger("facet.db_connection")
+
+try:
+    import sqlite_vec
+    HAS_SQLITE_VEC = True
+except ImportError:
+    HAS_SQLITE_VEC = False
 
 
 def get_pragma_values():
@@ -31,6 +40,17 @@ def get_pragma_values():
     }
 
 
+def load_sqlite_vec(conn):
+    if not HAS_SQLITE_VEC:
+        return
+    try:
+        conn.enable_load_extension(True)
+        sqlite_vec.load(conn)
+        conn.enable_load_extension(False)
+    except Exception as e:
+        logger.debug("Could not load sqlite-vec extension: %s", e)
+
+
 def apply_pragmas(conn, mmap_size_mb=None, cache_size_mb=None):
     """Apply standard PRAGMA settings to a connection.
 
@@ -49,6 +69,8 @@ def apply_pragmas(conn, mmap_size_mb=None, cache_size_mb=None):
     conn.execute(f"PRAGMA cache_size = -{cache_kb}")
     conn.execute("PRAGMA temp_store = MEMORY")
     conn.execute(f"PRAGMA mmap_size = {mmap_bytes}")
+    conn.execute("PRAGMA journal_size_limit = 67108864")  # 64MB WAL size limit
+    load_sqlite_vec(conn)
 
 
 @contextmanager

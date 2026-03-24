@@ -7,7 +7,7 @@ Single source of truth for all table and index definitions.
 import logging
 import sqlite3
 
-from db.connection import apply_pragmas
+from db.connection import apply_pragmas, HAS_SQLITE_VEC
 
 logger = logging.getLogger("facet.schema")
 
@@ -346,6 +346,34 @@ USER_PREFERENCES_INDEXES = [
     ('idx_user_prefs_rating', 'user_preferences', 'user_id, star_rating'),
 ]
 
+# FTS5 full-text search virtual table and sync triggers
+PHOTOS_FTS_CREATE = """
+CREATE VIRTUAL TABLE IF NOT EXISTS photos_fts USING fts5(
+    path UNINDEXED,
+    caption,
+    tags,
+    content='photos',
+    content_rowid='rowid'
+)
+"""
+
+PHOTOS_FTS_TRIGGERS = [
+    """CREATE TRIGGER IF NOT EXISTS photos_fts_ai AFTER INSERT ON photos BEGIN
+    INSERT INTO photos_fts(rowid, path, caption, tags)
+    VALUES (new.rowid, new.path, new.caption, new.tags);
+END""",
+    """CREATE TRIGGER IF NOT EXISTS photos_fts_ad AFTER DELETE ON photos BEGIN
+    INSERT INTO photos_fts(photos_fts, rowid, path, caption, tags)
+    VALUES ('delete', old.rowid, old.path, old.caption, old.tags);
+END""",
+    """CREATE TRIGGER IF NOT EXISTS photos_fts_au AFTER UPDATE OF caption, tags ON photos BEGIN
+    INSERT INTO photos_fts(photos_fts, rowid, path, caption, tags)
+    VALUES ('delete', old.rowid, old.path, old.caption, old.tags);
+    INSERT INTO photos_fts(rowid, path, caption, tags)
+    VALUES (new.rowid, new.path, new.caption, new.tags);
+END""",
+]
+
 
 def _build_create_table_sql(table_name, columns, constraints=None):
     """Build CREATE TABLE IF NOT EXISTS SQL from column definitions."""
@@ -483,6 +511,10 @@ def init_database(db_path='photo_scores_pro.db'):
             constraints=['PRIMARY KEY (user_id, photo_path)']
         ))
 
+        # Create photos_vec virtual table for vector search (requires sqlite-vec)
+        if HAS_SQLITE_VEC:
+            _init_vec_table(conn)
+
         # Create all indexes
         for idx_name, table, column_expr in INDEXES:
             conn.execute(
@@ -529,4 +561,50 @@ def init_database(db_path='photo_scores_pro.db'):
         _migrate_add_missing_columns(conn, 'comparisons', COMPARISONS_COLUMNS)
         _migrate_add_missing_columns(conn, 'learned_scores', LEARNED_SCORES_COLUMNS)
 
+        # Create FTS5 full-text search table and sync triggers
+        conn.execute(PHOTOS_FTS_CREATE)
+        for trigger_sql in PHOTOS_FTS_TRIGGERS:
+            conn.execute(trigger_sql)
+
         conn.commit()
+
+
+def detect_embedding_dim(conn):
+    """Detect the embedding dimension from existing data.
+
+    Returns 1152 for SigLIP, 768 for CLIP, or None if no embeddings exist.
+    """
+    row = conn.execute(
+        "SELECT LENGTH(clip_embedding) FROM photos WHERE clip_embedding IS NOT NULL LIMIT 1"
+    ).fetchone()
+    if not row or not row[0]:
+        return None
+    return row[0] // 4  # float32 = 4 bytes
+
+
+def _init_vec_table(conn):
+    """Create the photos_vec virtual table if sqlite-vec is available.
+
+    Detects the embedding dimension from existing data. If no embeddings
+    exist yet, defers creation until populate_vec_table is called.
+    """
+    tables = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'"
+    ).fetchall()}
+    if 'photos_vec' in tables:
+        return
+
+    dim = detect_embedding_dim(conn)
+    if dim is None:
+        return
+
+    try:
+        conn.execute(f'''
+            CREATE VIRTUAL TABLE IF NOT EXISTS photos_vec USING vec0(
+                path TEXT PRIMARY KEY,
+                embedding float[{dim}] distance_metric=cosine
+            )
+        ''')
+        logger.info("Created photos_vec virtual table (dim=%d, cosine)", dim)
+    except Exception as e:
+        logger.warning("Could not create photos_vec: %s", e)

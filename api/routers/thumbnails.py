@@ -197,7 +197,7 @@ def _get_face_thumbnail_data(face_id: int):
         buf = BytesIO()
         face_crop.save(buf, format="JPEG", quality=VIEWER_CONFIG['face_thumbnails']['jpeg_quality'])
         return buf.getvalue(), etag
-    except Exception:
+    except (OSError, ValueError, TypeError):
         logger.debug("Failed to generate face thumbnail on-the-fly", exc_info=True)
         return None, None
 
@@ -280,7 +280,7 @@ async def image(
             quality = _get_image_jpeg_quality()
             jpeg_bytes = _convert_raw_cached(real_disk, mtime, quality)
             return _cached_image_response(jpeg_bytes, request)
-        except Exception:
+        except (OSError, ValueError):
             logger.exception("Failed to convert RAW file: %s", real_disk)
             return Response(content="Failed to convert RAW file", status_code=500)
 
@@ -291,7 +291,7 @@ async def image(
             quality = _get_image_jpeg_quality()
             jpeg_bytes = _convert_heif_cached(real_disk, mtime, quality)
             return _cached_image_response(jpeg_bytes, request)
-        except Exception:
+        except (OSError, ValueError):
             logger.exception("Failed to convert HEIF file: %s", real_disk)
             return Response(content="Failed to convert HEIF file", status_code=500)
 

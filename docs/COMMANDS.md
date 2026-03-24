@@ -41,7 +41,7 @@ updating specific metrics without full reprocessing. Available passes:
 | `composition` | SAMP-Net | `composition_pattern` (14 patterns) + `comp_score` | ~2 GB |
 | `faces` | InsightFace buffalo_l | Face detection, landmarks, blink detection, recognition embeddings | ~2 GB |
 | `embeddings` | CLIP ViT-L-14 or SigLIP 2 NaFlex | `clip_embedding` BLOB for similarity/tagging | 4-5 GB |
-| `saliency` | BiRefNet | `subject_sharpness`, `subject_prominence`, `subject_placement`, `bg_separation` | ~2 GB |
+| `saliency` | BiRefNet-dynamic | `subject_sharpness`, `subject_prominence`, `subject_placement`, `bg_separation` | ~2 GB |
 
 ## Preview & Export
 
@@ -64,7 +64,7 @@ These commands update specific metrics without full photo reprocessing.
 | `python facet.py --recompute-category portrait` | Recompute scores for a single category only |
 | `python facet.py --recompute-tags` | Re-tag all photos using configured model |
 | `python facet.py --recompute-tags-vlm` | Re-tag all photos using VLM tagger |
-| `python facet.py --recompute-saliency` | Recompute subject saliency metrics (BiRefNet, GPU) |
+| `python facet.py --recompute-saliency` | Recompute subject saliency metrics (BiRefNet-dynamic, GPU) |
 | `python facet.py --recompute-composition-cpu` | Recompute composition (rule-based, CPU) |
 | `python facet.py --recompute-composition-gpu` | Rescan with SAMP-Net (GPU required) |
 | `python facet.py --recompute-iqa` | Recompute supplementary IQA metrics (TOPIQ IAA, NR-Face, LIQE) from thumbnails |
@@ -95,7 +95,7 @@ These models share VRAM with the primary TOPIQ model and run as part of the defa
 
 ### Subject Saliency
 
-The `--pass saliency` and `--recompute-saliency` commands use BiRefNet (`ZhengPeng7/BiRefNet` from HuggingFace, via the `transformers` library) to generate a binary subject mask, then derive four metrics:
+The `--pass saliency` and `--recompute-saliency` commands use BiRefNet-dynamic (`ZhengPeng7/BiRefNet-dynamic` from HuggingFace, via the `transformers` library) to generate a binary subject mask, then derive four metrics:
 
 - **Subject Sharpness**: Laplacian variance on the subject mask region vs background. Detects whether the main subject is in focus.
 - **Subject Prominence**: Ratio of subject area to total frame area. High values indicate a dominant subject (e.g., macro photos).
@@ -112,8 +112,8 @@ The tagging model is selected per VRAM profile:
 |---------|-------|-------------|
 | `legacy` | CLIP similarity | Cosine similarity between image embedding and tag text embeddings — captures mood/atmosphere (dramatic, golden_hour, vintage). No extra model load. |
 | `8gb` | CLIP similarity | Same as legacy. Uses stored CLIP ViT-L-14 embeddings. |
-| `16gb` | Qwen3-VL-2B | Vision-language model prompted with vocabulary list — best semantic scene understanding for size (landscape, architecture, reflection). |
-| `24gb` | Qwen2.5-VL-7B | Largest VLM — most capable for complex/ambiguous scenes with nuanced tags. |
+| `16gb` | Qwen3.5-2B | Native multimodal model with early vision fusion — best semantic scene understanding for size (landscape, architecture, reflection). |
+| `24gb` | Qwen3.5-4B | Larger native multimodal model — most capable for complex/ambiguous scenes with nuanced tags. |
 
 All taggers map output to the configured tag vocabulary. Use `--recompute-tags` to re-tag with the profile's default model, or `--recompute-tags-vlm` for VLM-based re-tagging.
 
@@ -215,6 +215,8 @@ Checks: Score ranges, face metrics, BLOB corruption, embedding sizes, orphaned f
 | `python database.py` | Initialize/upgrade schema |
 | `python database.py --info` | Show schema information |
 | `python database.py --migrate-tags` | Populate photo_tags lookup (10-50x faster queries) |
+| `python database.py --rebuild-fts` | Rebuild FTS5 full-text search index from captions/tags |
+| `python database.py --populate-vec` | Populate sqlite-vec vector search table from embeddings |
 | `python database.py --refresh-stats` | Refresh statistics cache |
 | `python database.py --stats-info` | Show cache status and age |
 | `python database.py --vacuum` | Reclaim space, defragment |
@@ -229,7 +231,7 @@ Checks: Score ranges, face metrics, BLOB corruption, embedding sizes, orphaned f
 | `python database.py --add-user alice --role user --display-name "Alice"` | Add user with display name |
 | `python database.py --migrate-user-preferences --user alice` | Copy ratings from photos to user_preferences |
 
-**Performance tip:** For large databases (50k+ photos), run `--migrate-tags` once and `--optimize` periodically.
+**Performance tip:** For large databases (50k+ photos), run `--migrate-tags`, `--rebuild-fts`, and `--populate-vec` once, then `--optimize` periodically.
 
 ## Web Viewer
 

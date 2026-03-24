@@ -236,9 +236,11 @@ This is useful when the viewer runs on the same machine that has GPU access for 
 
 ## Semantic Search
 
-Search photos by natural language description using stored CLIP/SigLIP embeddings. Type a query like "sunset over mountains" or "child playing in snow" and the viewer returns visually matching photos ranked by similarity.
+Hybrid search combining CLIP/SigLIP embedding similarity (70%) with FTS5 BM25 text matching on captions and tags (30%). Type a query like "sunset over mountains" or "child playing in snow" and the viewer returns matching photos ranked by combined score.
 
 - Requires stored `clip_embedding` data (computed during scoring)
+- Uses sqlite-vec for KNN vector search when installed, falls back to in-memory NumPy
+- FTS5 text search on AI captions/tags provides additional keyword matching (run `database.py --rebuild-fts` to enable)
 - Uses the same embedding model as the active VRAM profile (SigLIP 2 for 16gb/24gb, CLIP ViT-L-14 for legacy/8gb)
 - Controlled by `viewer.features.show_semantic_search` (default: `true`)
 
@@ -301,7 +303,7 @@ Available on all VRAM profiles. Analyzes stored metrics (aesthetic, composition,
 
 ### VLM Critique
 
-Uses the configured VLM (Qwen3-VL-2B or Qwen2.5-VL-7B) to provide a richer, context-aware critique. Requires 16gb or 24gb VRAM profile and `viewer.features.show_vlm_critique: true`.
+Uses the configured VLM (Qwen3.5-2B or Qwen3.5-4B) to provide a richer, context-aware critique. Requires 16gb or 24gb VRAM profile and `viewer.features.show_vlm_critique: true`.
 
 ### API
 

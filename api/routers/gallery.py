@@ -5,6 +5,7 @@ Gallery router — photo listing, type counts, similar photos.
 
 import logging
 import math
+import sqlite3
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -279,7 +280,7 @@ async def api_photo(
         return photo
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch photo details")
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -481,7 +482,7 @@ async def api_photos(
 
         attach_person_data(photos, conn)
 
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch gallery photos")
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -847,7 +848,7 @@ async def api_similar_photos(
             response['message'] = message
         return response
 
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to find similar photos")
         return {'error': 'Internal server error'}
     finally:
@@ -880,7 +881,7 @@ async def api_config(user: Optional[CurrentUser] = Depends(get_optional_user)):
         # Check if albums table exists
         try:
             conn.execute("SELECT 1 FROM albums LIMIT 0")
-        except Exception:
+        except sqlite3.OperationalError:
             features['show_albums'] = False
     finally:
         conn.close()

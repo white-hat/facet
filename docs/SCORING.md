@@ -207,12 +207,12 @@ Default weights are optimized for **TOPIQ** (0.93 SRCC), the aesthetic model for
 
 | Profile | Aesthetic Model | Embeddings | Tagger | Recommendations |
 |---------|-----------------|-----------|--------|-----------------|
-| `24gb` | TOPIQ (0.93 SRCC) | SigLIP 2 NaFlex SO400M | Qwen2.5-VL-7B | Best accuracy, default weights |
-| `16gb` | TOPIQ (0.93 SRCC) | SigLIP 2 NaFlex SO400M | Qwen3-VL-2B | Default weights |
+| `24gb` | TOPIQ (0.93 SRCC) | SigLIP 2 NaFlex SO400M | Qwen3.5-4B | Best accuracy, default weights |
+| `16gb` | TOPIQ (0.93 SRCC) | SigLIP 2 NaFlex SO400M | Qwen3.5-2B | Default weights |
 | `8gb` | CLIP+MLP (0.76 SRCC) | CLIP ViT-L-14 | CLIP similarity | Default weights work well |
 | `legacy` | CLIP+MLP on CPU | CLIP ViT-L-14 | CLIP similarity | Default weights, slower |
 
-All profiles additionally run supplementary PyIQA models (TOPIQ IAA, TOPIQ NR-Face, LIQE) and optionally BiRefNet for subject saliency.
+All profiles additionally run supplementary PyIQA models (TOPIQ IAA, TOPIQ NR-Face, LIQE) and optionally BiRefNet-dynamic for subject saliency.
 
 Run `--compute-recommendations` after switching profiles to analyze score distributions.
 

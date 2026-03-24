@@ -2,6 +2,7 @@
 
 import logging
 import re
+import sqlite3
 import time
 from typing import Optional
 
@@ -128,7 +129,7 @@ async def get_capsules(
             cached = generate_all_capsules(conn, config=_FULL_CONFIG, user_id=user_id,
                                            date_from=date_from, date_to=date_to)
             _set_cached_capsules(user_id, cached, date_from=date_from, date_to=date_to)
-        except Exception:
+        except (sqlite3.Error, ValueError, TypeError, KeyError):
             logger.exception("Failed to generate capsules")
             raise HTTPException(status_code=500, detail="Failed to generate capsules")
         finally:
@@ -200,7 +201,7 @@ async def get_capsule_photos(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch capsule photos for %s", capsule_id)
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
@@ -238,7 +239,7 @@ async def save_capsule_as_album(
         )
         conn.commit()
         return {"album_id": album_id, "name": name}
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to save capsule %s as album", capsule_id)
         raise HTTPException(status_code=500, detail="Failed to save album")
     finally:

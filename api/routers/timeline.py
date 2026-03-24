@@ -4,6 +4,7 @@ Timeline router — date-grouped photo browsing and calendar heatmap.
 """
 
 import logging
+import sqlite3
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -27,7 +28,7 @@ def _get_photos_per_group():
     try:
         from api.config import _FULL_CONFIG
         return _FULL_CONFIG.get('timeline', {}).get('photos_per_group', 30)
-    except Exception:
+    except (KeyError, TypeError, ValueError):
         return 30
 
 
@@ -202,7 +203,7 @@ async def api_timeline(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch timeline")
         return {'groups': [], 'next_cursor': None, 'has_more': False}
     finally:
@@ -265,7 +266,7 @@ async def api_timeline_dates(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch timeline dates")
         return {'dates': []}
     finally:
@@ -309,7 +310,7 @@ async def api_timeline_years(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch timeline years")
         return {'years': []}
     finally:
@@ -355,7 +356,7 @@ async def api_timeline_months(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch timeline months")
         return {'months': []}
     finally:

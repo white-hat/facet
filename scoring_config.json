@@ -1933,19 +1933,19 @@
         "aesthetic_model": "topiq",
         "clip_config": "clip",
         "composition_model": "samp-net",
-        "tagging_model": "qwen3-vl-2b",
+        "tagging_model": "qwen3.5-2b",
         "supplementary_pyiqa": ["topiq_iaa", "topiq_nr_face", "liqe"],
         "saliency_enabled": true,
-        "description": "TOPIQ aesthetic + SigLIP 2 embeddings + SAMP-Net composition (~14GB VRAM)"
+        "description": "TOPIQ aesthetic + SigLIP 2 embeddings + Qwen3.5-2B tagging (~14GB VRAM)"
       },
       "24gb": {
         "aesthetic_model": "topiq",
         "clip_config": "clip",
         "composition_model": "qwen2-vl-2b",
-        "tagging_model": "qwen2.5-vl-7b",
+        "tagging_model": "qwen3.5-4b",
         "supplementary_pyiqa": ["topiq_iaa", "topiq_nr_face", "liqe"],
         "saliency_enabled": true,
-        "description": "TOPIQ aesthetic + SigLIP 2 embeddings + Qwen2-VL composition (~18GB VRAM)"
+        "description": "TOPIQ aesthetic + SigLIP 2 embeddings + Qwen3.5-4B tagging (~18GB VRAM)"
       }
     },
     "qwen2_vl": {
@@ -1997,6 +1997,18 @@
       "max_new_tokens": 100,
       "vlm_batch_size": 4
     },
+    "qwen3_5_2b": {
+      "model_path": "Qwen/Qwen3.5-2B",
+      "torch_dtype": "bfloat16",
+      "max_new_tokens": 100,
+      "vlm_batch_size": 4
+    },
+    "qwen3_5_4b": {
+      "model_path": "Qwen/Qwen3.5-4B",
+      "torch_dtype": "bfloat16",
+      "max_new_tokens": 100,
+      "vlm_batch_size": 2
+    },
     "florence_2_large": {
       "model_path": "florence-community/Florence-2-large",
       "torch_dtype": "float32",
@@ -2004,11 +2016,11 @@
       "max_new_tokens": 256
     },
     "saliency": {
-      "model": "ZhengPeng7/BiRefNet",
+      "model": "ZhengPeng7/BiRefNet-dynamic",
       "resolution": 1024,
       "mask_threshold": 0.3,
       "min_subject_pixels": 50,
-      "description": "BiRefNet subject saliency detection (~2 GB VRAM)"
+      "description": "BiRefNet-dynamic subject saliency detection, multi-resolution (~2 GB VRAM)"
     }
   },
   "quality": {

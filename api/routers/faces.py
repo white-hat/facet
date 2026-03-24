@@ -3,6 +3,9 @@ Faces API router — face management, rating, favorites, rejected.
 
 """
 
+import logging
+import sqlite3
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -11,6 +14,8 @@ from api.auth import CurrentUser, require_edition, require_auth
 from api.config import is_multi_user_enabled, _stats_cache
 from api.database import get_db_connection
 from api.db_helpers import update_person_face_count
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["faces"])
 
@@ -98,7 +103,8 @@ async def api_set_person_avatar(
         return {'success': True}
     except HTTPException:
         raise
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error setting person avatar %d", person_id)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -151,7 +157,8 @@ async def api_assign_face(
         return {'success': True}
     except HTTPException:
         raise
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error assigning face %d", face_id)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -186,7 +193,8 @@ async def api_assign_all_faces(
         return {'success': True, 'assigned_count': len(face_ids)}
     except HTTPException:
         raise
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error assigning all faces for photo %s", body.photo_path)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -236,7 +244,8 @@ async def api_unassign_person(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error unassigning person %d from photo %s", body.person_id, body.photo_path)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -265,7 +274,8 @@ async def api_set_rating(
         conn.commit()
         _stats_cache.clear()
         return {'success': True, 'rating': body.rating}
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error setting rating for photo %s", body.photo_path)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -313,7 +323,8 @@ async def api_toggle_favorite(
         return {'success': True, 'is_favorite': new_value == 1, 'is_rejected': False if new_value == 1 else None}
     except HTTPException:
         raise
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error toggling favorite for photo %s", body.photo_path)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -361,7 +372,8 @@ async def api_toggle_rejected(
         return {'success': True, 'is_rejected': new_value == 1, 'star_rating': 0 if new_value == 1 else None, 'is_favorite': False if new_value == 1 else None}
     except HTTPException:
         raise
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error toggling rejected for photo %s", body.photo_path)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -391,7 +403,8 @@ def _batch_update(
         return {'success': True, 'count': len(photo_paths)}
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
+        logger.exception("Database error in batch update")
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:

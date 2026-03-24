@@ -4,8 +4,11 @@ Stats router — gear, settings, timeline, correlations, category analysis.
 """
 
 import json
+import asyncio
+import logging
 import math
 import shutil
+import sqlite3
 import subprocess
 import sys
 from collections import defaultdict
@@ -24,6 +27,7 @@ from api.database import get_db_connection
 from api.db_helpers import get_visibility_clause, to_exif_date, to_iso_date
 
 router = APIRouter(tags=["stats"])
+logger = logging.getLogger(__name__)
 
 # Pre-built SQL fragments keyed by metric name (server-origin constants, not user strings)
 _METRIC_SQL: dict[str, str] = {m: f'ROUND(AVG({m}), 3)' for m in CORRELATION_Y_METRICS}
@@ -139,14 +143,14 @@ def api_stats_overview(
                 faces_row = cur.execute(f'''SELECT COUNT(*) FROM faces
                     WHERE photo_path IN (SELECT path FROM photos WHERE 1=1{vis})''', vp).fetchone()
                 total_faces = faces_row[0] if faces_row else 0
-            except Exception:
+            except sqlite3.OperationalError:
                 total_faces = 0
 
             # Total persons
             try:
                 persons_row = cur.execute('SELECT COUNT(*) FROM persons').fetchone()
                 total_persons = persons_row[0] if persons_row else 0
-            except Exception:
+            except sqlite3.OperationalError:
                 total_persons = 0
 
             # Total distinct tags
@@ -157,7 +161,7 @@ def api_stats_overview(
                 else:
                     tags_row = (0,)
                 total_tags = tags_row[0] if tags_row else 0
-            except Exception:
+            except sqlite3.OperationalError:
                 total_tags = 0
         finally:
             conn.close()
@@ -1091,46 +1095,53 @@ def api_stats_categories_update(
 
 
 @router.post('/api/stats/categories/recompute')
-def api_stats_categories_recompute(
+async def api_stats_categories_recompute(
     body: CategoryRecomputeRequest,
     user: CurrentUser = Depends(require_edition),
 ):
     """Recompute aggregate scores for a single category.
 
-    Runs ``python facet.py --recompute-category <name>`` as a subprocess.
+    Runs ``python facet.py --recompute-category <name>`` as an async subprocess.
     """
     if not body.category:
         raise HTTPException(status_code=400, detail='Missing category')
 
     try:
         config_path = str(_CONFIG_PATH)
-        result = subprocess.run(
-            [sys.executable, FACET_SCRIPT, '--recompute-category', body.category,
-             '--config', config_path],
-            capture_output=True,
-            text=True,
-            timeout=300,
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, FACET_SCRIPT, '--recompute-category', body.category,
+            '--config', config_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=300)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            raise HTTPException(
+                status_code=500,
+                detail=f'Recomputation timed out (>5 min). Run manually: python facet.py --recompute-category {body.category}',
+            )
 
-        if result.returncode == 0:
+        stdout = stdout_bytes.decode(errors='replace')
+        stderr = stderr_bytes.decode(errors='replace')
+
+        if proc.returncode == 0:
             _stats_cache.clear()
             return {
                 'success': True,
                 'message': f'Scores recomputed for "{body.category}"',
-                'output': result.stdout,
+                'output': stdout,
             }
         else:
             raise HTTPException(
                 status_code=500,
-                detail=result.stderr or result.stdout,
+                detail=stderr or stdout,
             )
 
-    except subprocess.TimeoutExpired:
-        raise HTTPException(
-            status_code=500,
-            detail=f'Recomputation timed out (>5 min). Run manually: python facet.py --recompute-category {body.category}',
-        )
     except HTTPException:
         raise
     except Exception:
+        logger.exception("Category recomputation failed for %s", body.category)
         raise HTTPException(status_code=500, detail='Recomputation failed')

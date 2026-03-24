@@ -70,6 +70,8 @@ import { InfiniteScrollDirective } from '../../shared/directives/infinite-scroll
         @if (store.photos().length) {
           @if (effectiveGalleryMode() === 'grid') {
             <div
+              role="grid"
+              [attr.aria-label]="'gallery.photo_grid' | translate"
               class="grid grid-cols-1 gap-2 p-2 md:p-4 gallery-grid"
               [style.--gallery-cols]="'repeat(auto-fill, minmax(' + cardWidth() + 'px, 1fr))'"
             >
@@ -102,7 +104,7 @@ import { InfiniteScrollDirective } from '../../shared/directives/infinite-scroll
           } @else {
             <div class="flex flex-col gap-2 p-2 md:p-4">
               @for (row of mosaicRows(); track $index) {
-                <div class="flex gap-2">
+                <div class="flex gap-2" style="content-visibility: auto; contain-intrinsic-size: auto 300px">
                   @for (photo of row.photos; track photo.path; let i = $index) {
                     <app-photo-card
                       [photo]="photo"

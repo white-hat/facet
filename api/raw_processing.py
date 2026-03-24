@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import shutil
@@ -42,7 +43,7 @@ def convert_raw_to_jpeg(file_path: str, quality: int = 96) -> bytes:
 # ---------------------------------------------------------------------------
 
 def convert_raw_darktable(file_path: str, profile_name: str, quality: int = 96) -> bytes:
-    """Convert a RAW file to JPEG using a named darktable profile.
+    """Convert a RAW file to JPEG using a named darktable profile (sync).
 
     Raises ``ValueError`` if the profile is not found in the config.
     Raises ``RuntimeError`` if darktable-cli fails.
@@ -56,6 +57,23 @@ def convert_raw_darktable(file_path: str, profile_name: str, quality: int = 96) 
         raise ValueError(f"Unknown darktable profile: {profile_name}")
 
     return _convert_darktable(file_path, quality, dt_config, profile)
+
+
+async def convert_raw_darktable_async(file_path: str, profile_name: str, quality: int = 96) -> bytes:
+    """Convert a RAW file to JPEG using a named darktable profile (async).
+
+    Non-blocking version that uses asyncio subprocess to avoid blocking
+    the FastAPI event loop during darktable-cli execution.
+    """
+    raw_config = _get_raw_config()
+    dt_config = raw_config.get('darktable', {})
+    profiles = dt_config.get('profiles', [])
+
+    profile = next((p for p in profiles if p.get('name') == profile_name), None)
+    if profile is None:
+        raise ValueError(f"Unknown darktable profile: {profile_name}")
+
+    return await _convert_darktable_async(file_path, quality, dt_config, profile)
 
 
 def get_darktable_profiles() -> list[str]:
@@ -193,6 +211,74 @@ def _convert_darktable(file_path: str, quality: int, dt_config: dict, profile: d
             raise RuntimeError(
                 f"darktable-cli failed (exit {result.returncode}): "
                 f"{(result.stderr or result.stdout)[:500]}"
+            )
+
+        if not os.path.isfile(tmp_output) or os.path.getsize(tmp_output) == 0:
+            raise RuntimeError("darktable-cli produced no output file")
+
+        with open(tmp_output, 'rb') as f:
+            return f.read()
+    finally:
+        if os.path.exists(tmp_output):
+            os.unlink(tmp_output)
+
+
+async def _convert_darktable_async(file_path: str, quality: int, dt_config: dict, profile: dict) -> bytes:
+    """Async version of _convert_darktable using asyncio subprocess."""
+    executable = dt_config.get('executable', 'darktable-cli')
+
+    resolved = shutil.which(executable) if not os.path.isabs(executable) else executable
+    if not resolved or not os.path.isfile(resolved):
+        raise RuntimeError(f"darktable-cli not found: {executable}")
+
+    fd, tmp_output = tempfile.mkstemp(suffix='.jpg')
+    os.close(fd)
+    os.unlink(tmp_output)
+
+    try:
+        cmd: list[str] = [resolved, file_path]
+
+        xmp_path = file_path + '.xmp'
+        cmd.append(xmp_path if os.path.isfile(xmp_path) else '')
+        cmd.append(tmp_output)
+
+        if profile.get('hq', True):
+            cmd.extend(['--hq', 'true'])
+
+        width = profile.get('width')
+        if width:
+            cmd.extend(['--width', str(int(width))])
+
+        height = profile.get('height')
+        if height:
+            cmd.extend(['--height', str(int(height))])
+
+        extra = profile.get('extra_args', [])
+        if extra and isinstance(extra, list):
+            cmd.extend(str(a) for a in extra)
+
+        cmd.extend([
+            '--core',
+            '--conf', f'plugins/imageio/format/jpeg/quality={quality}',
+        ])
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        try:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            raise RuntimeError("darktable-cli timed out (>120s)")
+
+        if proc.returncode != 0:
+            err_text = (stderr or stdout or b'').decode(errors='replace')[:500]
+            raise RuntimeError(
+                f"darktable-cli failed (exit {proc.returncode}): {err_text}"
             )
 
         if not os.path.isfile(tmp_output) or os.path.getsize(tmp_output) == 0:

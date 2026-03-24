@@ -3,6 +3,8 @@ Persons API router -- person management.
 
 """
 
+import logging
+import sqlite3
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,6 +12,8 @@ from pydantic import BaseModel
 
 from api.auth import CurrentUser, require_edition, require_authenticated
 from api.database import get_db_connection
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["persons"])
 
@@ -153,7 +157,8 @@ async def _do_merge(source_id: int, target_id: int):
         return {"success": True, "new_count": count}
     except HTTPException:
         raise
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error merging person %d into %d", source_id, target_id)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -207,7 +212,8 @@ async def merge_persons_batch(
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error in batch merge to person %d", body.target_id)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -231,7 +237,8 @@ async def delete_person(
         conn.commit()
 
         return {"success": True}
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error deleting person %d", person_id)
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -265,7 +272,8 @@ async def delete_persons_batch(
         conn.commit()
 
         return {"success": True, "deleted_count": len(body.person_ids)}
-    except Exception as e:
+    except sqlite3.Error:
+        logger.exception("Database error in batch delete persons")
         conn.rollback()
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:

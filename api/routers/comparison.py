@@ -7,9 +7,10 @@ import json
 import logging
 import os
 import shutil
+import asyncio
+import sqlite3
 import subprocess
 import sys
-import traceback
 from datetime import datetime
 from io import BytesIO
 from pathlib import Path
@@ -222,7 +223,7 @@ async def api_download_single(
     - ``darktable`` — convert companion RAW with a named darktable profile.
     - ``raw`` — serve the companion RAW file as-is.
     """
-    from api.raw_processing import convert_raw_to_jpeg, convert_raw_darktable, find_companion_raw
+    from api.raw_processing import convert_raw_to_jpeg, convert_raw_darktable_async, find_companion_raw
 
     db_path, real_disk = _validate_and_resolve(path, user)
 
@@ -237,7 +238,7 @@ async def api_download_single(
             return _serve_original(real_disk, db_path, quality)
 
         try:
-            jpeg_bytes = convert_raw_darktable(raw_path, profile, quality)
+            jpeg_bytes = await convert_raw_darktable_async(raw_path, profile, quality)
         except ValueError:
             raise HTTPException(status_code=400, detail=f'Unknown darktable profile: {profile}')
         except Exception:
@@ -322,19 +323,18 @@ async def api_comparison_reset(
     user: CurrentUser = Depends(require_edition),
 ):
     """Reset all comparison data."""
+    conn = get_db_connection()
     try:
-        conn = get_db_connection()
-        try:
-            conn.execute("DELETE FROM comparisons")
-            conn.execute("DELETE FROM learned_scores")
-            conn.execute("DELETE FROM weight_optimization_runs")
-            conn.commit()
-        finally:
-            conn.close()
+        conn.execute("DELETE FROM comparisons")
+        conn.execute("DELETE FROM learned_scores")
+        conn.execute("DELETE FROM weight_optimization_runs")
+        conn.commit()
         return {'success': True, 'message': 'All comparison data has been reset'}
-    except Exception:
-        traceback.print_exc()
+    except sqlite3.Error:
+        logger.exception("Failed to reset comparison data")
         raise HTTPException(status_code=500, detail='Reset failed')
+    finally:
+        conn.close()
 
 
 @router.post("/api/recalculate")
@@ -348,34 +348,40 @@ async def api_recalculate(
     try:
         config_path = str(_CONFIG_PATH)
 
-        result = subprocess.run(
-            [sys.executable, FACET_SCRIPT, '--recompute-average', '--config', config_path],
-            capture_output=True,
-            text=True,
-            timeout=300,
+        proc = await asyncio.create_subprocess_exec(
+            sys.executable, FACET_SCRIPT, '--recompute-average', '--config', config_path,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=300)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.communicate()
+            raise HTTPException(
+                status_code=500,
+                detail='Recalculation timed out (>5 minutes). Run manually with: python facet.py --recompute-average',
+            )
 
-        if result.returncode == 0:
+        stdout = stdout_bytes.decode(errors='replace')
+        stderr = stderr_bytes.decode(errors='replace')
+
+        if proc.returncode == 0:
             return {
                 'success': True,
                 'message': 'Recalculation complete',
-                'output': result.stdout,
+                'output': stdout,
             }
         else:
             raise HTTPException(
                 status_code=500,
-                detail=f'Recalculation failed: {result.stderr or result.stdout}',
+                detail=f'Recalculation failed: {stderr or stdout}',
             )
 
-    except subprocess.TimeoutExpired:
-        raise HTTPException(
-            status_code=500,
-            detail='Recalculation timed out (>5 minutes). Run manually with: python facet.py --recompute-average',
-        )
     except HTTPException:
         raise
     except Exception:
-        traceback.print_exc()
+        logger.exception("Recalculation failed")
         raise HTTPException(status_code=500, detail='Recalculation failed')
 
 
@@ -434,22 +440,30 @@ async def api_update_weights(
         # Optionally trigger recalculation (only for the updated category)
         if body.recalculate:
             try:
-                recalc_result = subprocess.run(
-                    [sys.executable, FACET_SCRIPT, '--recompute-category', body.category,
-                     '--config', config_path],
-                    capture_output=True,
-                    text=True,
-                    timeout=300,
+                proc = await asyncio.create_subprocess_exec(
+                    sys.executable, FACET_SCRIPT, '--recompute-category', body.category,
+                    '--config', config_path,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
                 )
-                if recalc_result.returncode == 0:
-                    result['recalculated'] = True
-                    result['message'] += ' and scores recalculated'
-                else:
+                try:
+                    stdout_bytes, stderr_bytes = await asyncio.wait_for(proc.communicate(), timeout=300)
+                except asyncio.TimeoutError:
+                    proc.kill()
+                    await proc.communicate()
                     result['recalculated'] = False
-                    result['recalculate_error'] = recalc_result.stderr or recalc_result.stdout
-            except subprocess.TimeoutExpired:
+                    result['recalculate_error'] = 'Recalculation timed out'
+                else:
+                    if proc.returncode == 0:
+                        result['recalculated'] = True
+                        result['message'] += ' and scores recalculated'
+                    else:
+                        result['recalculated'] = False
+                        result['recalculate_error'] = (stderr_bytes or stdout_bytes).decode(errors='replace')
+            except Exception:
+                logger.exception("Post-update recalculation failed for category %s", body.category)
                 result['recalculated'] = False
-                result['recalculate_error'] = 'Recalculation timed out'
+                result['recalculate_error'] = 'Recalculation failed'
 
         return result
 
@@ -460,7 +474,7 @@ async def api_update_weights(
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail='Invalid JSON in config')
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to update weights")
         raise HTTPException(status_code=500, detail='Failed to update weights')
 
 
@@ -673,7 +687,7 @@ async def api_comparison_learned_weights(
         return response
 
     except Exception:
-        traceback.print_exc()
+        logger.exception("Weight optimization failed")
         return {
             'available': False,
             'message': 'Optimization error',
@@ -1083,7 +1097,7 @@ async def api_comparison_history(
         )
         return result
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to fetch comparison history")
         raise HTTPException(status_code=500, detail='Internal server error')
 
 
@@ -1111,7 +1125,7 @@ async def api_comparison_edit(
     except HTTPException:
         raise
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to edit comparison")
         raise HTTPException(status_code=500, detail='Internal server error')
 
 
@@ -1137,7 +1151,7 @@ async def api_comparison_delete(
     except HTTPException:
         raise
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to delete comparison")
         raise HTTPException(status_code=500, detail='Internal server error')
 
 
@@ -1155,7 +1169,7 @@ async def api_comparison_coverage(
         result = manager.get_comparison_coverage(category=category)
         return result
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to fetch comparison coverage")
         raise HTTPException(status_code=500, detail='Internal server error')
 
 
@@ -1206,7 +1220,7 @@ async def api_comparison_confidence(
             'comparisons_used': result.get('comparisons_used', 0),
         }
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to compute weight confidence")
         raise HTTPException(status_code=500, detail='Internal server error')
 
 
@@ -1249,7 +1263,7 @@ async def api_weight_snapshots(
         finally:
             conn.close()
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to list weight snapshots")
         raise HTTPException(status_code=500, detail='Internal server error')
 
 
@@ -1289,7 +1303,7 @@ async def api_save_weight_snapshot(
 
         return {'success': True, 'snapshot_id': snapshot_id}
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to save weight snapshot")
         raise HTTPException(status_code=500, detail='Internal server error')
 
 
@@ -1360,5 +1374,5 @@ async def api_restore_weights(
     except HTTPException:
         raise
     except Exception:
-        traceback.print_exc()
+        logger.exception("Failed to restore weights from snapshot")
         raise HTTPException(status_code=500, detail='Internal server error')

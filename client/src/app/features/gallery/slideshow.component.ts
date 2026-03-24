@@ -291,8 +291,14 @@ export class SlideshowComponent implements OnDestroy {
   readonly layerBFilter = signal('none');
   readonly frontLayer = signal<'a' | 'b'>('a');
 
+  /** True when the user prefers reduced motion (WCAG 2.2). */
+  private readonly prefersReducedMotion = signal(
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+
   /** Compute the animated transition CSS for the current transitionType. */
   private getAnimateTransition(): string {
+    if (this.prefersReducedMotion()) return 'opacity 150ms ease';
     const t = this.transitionType();
     const dur = this.slideDuration();
     switch (t) {
@@ -308,6 +314,7 @@ export class SlideshowComponent implements OnDestroy {
 
   /** Duration in ms for the active part of the transition. */
   private getTransitionDuration(): number {
+    if (this.prefersReducedMotion()) return 150;
     switch (this.transitionType()) {
       case 'slide': case 'flip': return 500;
       case 'zoom': case 'fade_black': case 'blur': return 400;

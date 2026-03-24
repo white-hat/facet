@@ -1,9 +1,10 @@
 """
 VLM Tagger Module for Facet
 
-Unified vision-language model tagger supporting both Qwen2.5-VL-7B and Qwen3-VL-2B.
-Generates semantic tags from images using the config-driven tag vocabulary, with
-true batched inference, edit-distance tag matching, and logprob confidence scores.
+Unified vision-language model tagger supporting Qwen2.5-VL, Qwen3-VL, and Qwen3.5
+model families. Generates semantic tags from images using the config-driven tag
+vocabulary, with true batched inference, edit-distance tag matching, and logprob
+confidence scores.
 """
 
 import logging
@@ -47,14 +48,14 @@ def _levenshtein(a: str, b: str) -> int:
 
 class VLMTagger:
     """
-    Unified VLM tagger supporting Qwen2.5-VL and Qwen3-VL model families.
+    Unified VLM tagger supporting Qwen2.5-VL, Qwen3-VL, and Qwen3.5 model families.
 
     Auto-detects model family from model_path and handles the API differences:
-    - Different transformers model class
-    - Qwen3 uses processor.apply_chat_template(tokenize=True, return_dict=True)
+    - Different transformers model class per family
+    - Qwen3/Qwen3.5 use processor.apply_chat_template(tokenize=True, return_dict=True)
       vs Qwen2.5 uses separate apply_chat_template + processor()
-    - Qwen3 needs token_type_ids removal
-    - Qwen3 supports max_pixels on the processor
+    - Qwen3 needs token_type_ids removal; Qwen3.5 uses mm_token_type_ids natively
+    - Qwen3/Qwen3.5 support max_pixels on the processor
     """
 
     def __init__(self, model_config: Dict[str, Any], scoring_config=None):
@@ -73,13 +74,15 @@ class VLMTagger:
 
         # Detect model family from path
         model_path = model_config.get('model_path', '')
-        if 'Qwen3' in model_path or 'qwen3' in model_path:
+        if 'Qwen3.5' in model_path or 'qwen3_5' in model_path or 'qwen3.5' in model_path:
+            self.family = 'qwen3_5'
+        elif 'Qwen3' in model_path or 'qwen3' in model_path:
             self.family = 'qwen3'
         else:
             self.family = 'qwen2_5'
 
         # Batch size for VLM inference
-        self.batch_size = model_config.get('vlm_batch_size', 4 if self.family == 'qwen3' else 2)
+        self.batch_size = model_config.get('vlm_batch_size', 4 if self.family in ('qwen3', 'qwen3_5') else 2)
 
         # Build valid tag set from config
         self.valid_tags = set()
@@ -153,17 +156,24 @@ Tags:"""
 
         _ensure_imports()
 
-        model_path = self.model_config.get('model_path',
-            'Qwen/Qwen3-VL-2B-Instruct' if self.family == 'qwen3'
-            else 'Qwen/Qwen2.5-VL-7B-Instruct')
+        default_paths = {
+            'qwen3_5': 'Qwen/Qwen3.5-2B',
+            'qwen3': 'Qwen/Qwen3-VL-2B-Instruct',
+            'qwen2_5': 'Qwen/Qwen2.5-VL-7B-Instruct',
+        }
+        model_path = self.model_config.get('model_path', default_paths[self.family])
         dtype_str = self.model_config.get('torch_dtype', 'bfloat16')
         torch_dtype = getattr(torch, dtype_str, torch.bfloat16)
 
-        family_label = 'Qwen3-VL' if self.family == 'qwen3' else 'Qwen2.5-VL'
+        family_labels = {'qwen3_5': 'Qwen3.5', 'qwen3': 'Qwen3-VL', 'qwen2_5': 'Qwen2.5-VL'}
+        family_label = family_labels[self.family]
         logger.info("Loading %s from %s...", family_label, model_path)
 
         # Import the correct model class
-        if self.family == 'qwen3':
+        if self.family == 'qwen3_5':
+            from transformers import Qwen3_5ForConditionalGeneration
+            model_cls = Qwen3_5ForConditionalGeneration
+        elif self.family == 'qwen3':
             from transformers import Qwen3VLForConditionalGeneration
             model_cls = Qwen3VLForConditionalGeneration
         else:
@@ -177,9 +187,9 @@ Tags:"""
             trust_remote_code=True,
         )
 
-        # Qwen3 supports max_pixels to control VRAM during inference
+        # Qwen3/Qwen3.5 support max_pixels to control VRAM during inference
         processor_kwargs = {'trust_remote_code': True}
-        if self.family == 'qwen3':
+        if self.family in ('qwen3', 'qwen3_5'):
             max_pixels = self.model_config.get('max_pixels', 512 * 28 * 28)
             processor_kwargs['max_pixels'] = max_pixels
 
@@ -199,8 +209,8 @@ Tags:"""
 
         _ensure_imports()
         torch.cuda.empty_cache()
-        family_label = 'Qwen3-VL' if self.family == 'qwen3' else 'Qwen2.5-VL'
-        logger.info("%s tagger unloaded", family_label)
+        family_labels = {'qwen3_5': 'Qwen3.5', 'qwen3': 'Qwen3-VL', 'qwen2_5': 'Qwen2.5-VL'}
+        logger.info("%s tagger unloaded", family_labels[self.family])
 
     def tag_image(self, image: PIL.Image.Image, max_tags: int = 5) -> List[str]:
         """
@@ -231,7 +241,7 @@ Tags:"""
             }
         ]
 
-        if self.family == 'qwen3':
+        if self.family in ('qwen3', 'qwen3_5'):
             inputs = self.processor.apply_chat_template(
                 messages,
                 tokenize=True,
@@ -288,7 +298,7 @@ Tags:"""
             }
         ]
 
-        if self.family == 'qwen3':
+        if self.family in ('qwen3', 'qwen3_5'):
             inputs = self.processor.apply_chat_template(
                 messages,
                 tokenize=True,
@@ -584,7 +594,7 @@ Tags:"""
             }
         ]
 
-        if self.family == 'qwen3':
+        if self.family in ('qwen3', 'qwen3_5'):
             inputs = self.processor.apply_chat_template(
                 messages,
                 tokenize=True,

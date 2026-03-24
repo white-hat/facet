@@ -31,9 +31,12 @@ from db import (
     init_database,
     get_schema_info,
     get_photo_tags_count,
+    get_vec_count,
     get_stats_cache_info,
     refresh_stats_cache,
     migrate_tags_to_lookup,
+    populate_vec_table,
+    rebuild_fts,
     optimize_database,
     vacuum_database,
     analyze_database,
@@ -233,6 +236,16 @@ def main():
         help='Username for --migrate-user-preferences'
     )
     parser.add_argument(
+        '--rebuild-fts',
+        action='store_true',
+        help='Rebuild FTS5 full-text search index from existing captions and tags'
+    )
+    parser.add_argument(
+        '--populate-vec',
+        action='store_true',
+        help='Populate photos_vec vector search table from existing CLIP/SigLIP embeddings'
+    )
+    parser.add_argument(
         '--migrate-storage-fs',
         action='store_true',
         help='Migrate thumbnails and embeddings from database BLOBs to filesystem'
@@ -271,6 +284,11 @@ def main():
         logger.info("Photo tags lookup: %d entries", tag_count)
         if tag_count == 0:
             logger.info("  Run --migrate-tags to populate for faster tag queries")
+        # Show vector search status
+        vec_count = get_vec_count(args.db)
+        logger.info("Vector search (photos_vec): %d entries", vec_count)
+        if vec_count == 0:
+            logger.info("  Run --populate-vec to populate for fast semantic search")
         # Show stats cache status
         logger.info("Statistics cache:")
         cache_info = get_stats_cache_info(args.db)
@@ -281,6 +299,10 @@ def main():
             logger.info("  %d cached stats (%d fresh)", len(cache_info), fresh_count)
     elif args.migrate_tags:
         migrate_tags_to_lookup(args.db)
+    elif args.rebuild_fts:
+        rebuild_fts(args.db)
+    elif args.populate_vec:
+        populate_vec_table(args.db)
     elif args.optimize:
         optimize_database(args.db, verbose=True)
     elif args.vacuum:

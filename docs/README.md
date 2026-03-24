@@ -44,9 +44,9 @@ python viewer.py
 | Profile | GPU VRAM | Models | Best For |
 |---------|----------|--------|----------|
 | `legacy` | No GPU | CLIP+MLP + SAMP-Net + CLIP tagging (CPU) | No GPU, 8GB+ RAM |
-| `8gb` | 6-14GB | CLIP+MLP + SAMP-Net + Qwen3-VL | Mid-range GPUs |
-| `16gb` | 16GB+ | TOPIQ + SAMP-Net + Qwen3-VL | Best aesthetic accuracy |
-| `24gb` | 24GB+ | TOPIQ + Qwen2-VL + Qwen2.5-VL-7B | Best accuracy + composition explanations |
+| `8gb` | 6-14GB | CLIP+MLP + SAMP-Net + CLIP tagging | Mid-range GPUs |
+| `16gb` | 16GB+ | TOPIQ + SAMP-Net + Qwen3.5-2B | Best aesthetic accuracy |
+| `24gb` | 24GB+ | TOPIQ + Qwen2-VL + Qwen3.5-4B | Best accuracy + composition explanations |
 
 ## Supported File Types
 

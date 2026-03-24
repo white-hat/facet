@@ -381,7 +381,7 @@ Controls which AI models are used based on VRAM.
     "supplementary_pyiqa": ["topiq_iaa", "topiq_nr_face", "liqe"],
     "saliency": {
       "enabled": false,
-      "description": "BiRefNet subject saliency detection (~2 GB VRAM)"
+      "description": "BiRefNet-dynamic subject saliency detection (~2 GB VRAM)"
     },
     "samp_net": {
       "model_path": "pretrained_models/samp_net.pth",
@@ -407,10 +407,14 @@ Controls which AI models are used based on VRAM.
 | `qwen2_5_vl_7b.model_path` | `"Qwen/Qwen2.5-VL-7B-Instruct"` | HuggingFace model path for VLM tagging |
 | `qwen2_5_vl_7b.torch_dtype` | `"bfloat16"` | Precision |
 | `qwen2_5_vl_7b.vlm_batch_size` | `2` | Images per VLM inference batch |
-| `qwen3_vl_2b.model_path` | `"Qwen/Qwen3-VL-2B-Instruct"` | HuggingFace model path for lightweight VLM tagging |
+| `qwen3_vl_2b.model_path` | `"Qwen/Qwen3-VL-2B-Instruct"` | HuggingFace model path for Qwen3-VL tagging |
 | `qwen3_vl_2b.torch_dtype` | `"bfloat16"` | Precision |
 | `qwen3_vl_2b.max_new_tokens` | `100` | Max generation tokens |
 | `qwen3_vl_2b.vlm_batch_size` | `4` | Images per VLM inference batch |
+| `qwen3_5_2b.model_path` | `"Qwen/Qwen3.5-2B"` | HuggingFace model path for Qwen3.5 tagging (16gb default) |
+| `qwen3_5_2b.vlm_batch_size` | `4` | Images per VLM inference batch |
+| `qwen3_5_4b.model_path` | `"Qwen/Qwen3.5-4B"` | HuggingFace model path for Qwen3.5 tagging (24gb default) |
+| `qwen3_5_4b.vlm_batch_size` | `2` | Images per VLM inference batch |
 | `clip.model_name` | `"ViT-SO400M-16-SigLIP2-384"` | Embedding model (SigLIP 2 NaFlex for 16gb/24gb) |
 | `clip.pretrained` | `"webli"` | Pre-trained weights |
 | `clip.embedding_dim` | `1152` | Embedding dimensions (1152 for SigLIP 2, 768 for ViT-L-14) |
@@ -420,7 +424,7 @@ Controls which AI models are used based on VRAM.
 | `florence_2_large.model_path` | `"MiaoshouAI/Florence-2-large-PromptGen-v2.0"` | Florence-2 PromptGen model for tagging |
 | `florence_2_large.vlm_batch_size` | `4` | Images per Florence-2 inference batch |
 | `supplementary_pyiqa` | `["topiq_iaa", "topiq_nr_face", "liqe"]` | Additional PyIQA models to run |
-| `saliency.enabled` | `false` | Enable BiRefNet subject saliency |
+| `saliency.enabled` | `false` | Enable BiRefNet-dynamic subject saliency |
 | `samp_net.input_size` | `384` | Image size for inference |
 
 ### VRAM Auto-Detection

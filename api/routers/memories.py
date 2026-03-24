@@ -6,6 +6,7 @@ returning the top photos by aggregate score for each year.
 """
 
 import logging
+import sqlite3
 from datetime import date
 from typing import Optional
 
@@ -69,7 +70,7 @@ async def check_memories(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to check memories")
         return {'has_memories': False}
     finally:
@@ -179,7 +180,7 @@ async def get_memories(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch memories")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:

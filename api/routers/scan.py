@@ -3,6 +3,9 @@ Scan router — trigger and monitor photo scanning.
 
 """
 
+import asyncio
+import json
+import logging
 import subprocess
 import sys
 import threading
@@ -11,11 +14,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
+from starlette.responses import StreamingResponse
 
-from api.auth import CurrentUser, require_superadmin
+from api.auth import CurrentUser, decode_access_token, require_superadmin
 from api.config import VIEWER_CONFIG, FACET_SCRIPT, get_all_scan_directories, get_user_directories
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
+logger = logging.getLogger(__name__)
 
 # Global scan state (only one scan at a time)
 _scan_lock = threading.Lock()
@@ -105,7 +110,8 @@ async def start_scan(
 
     except HTTPException:
         raise
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
+        logger.exception("Scan failed to start")
         _scan_state['running'] = False
         _scan_lock.release()
         raise HTTPException(status_code=500, detail='Scan failed to start')
@@ -120,12 +126,22 @@ async def scan_status(
     if not VIEWER_CONFIG.get('features', {}).get('show_scan_button', False):
         raise HTTPException(status_code=403, detail="Scan feature not enabled")
 
-    output_lines = _scan_state['output_lines'][-lines:]
+    return _build_scan_snapshot(lines)
 
+
+def _verify_superadmin_token(token: Optional[str]) -> None:
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    payload = decode_access_token(token)
+    if not payload or payload.get('role') != 'superadmin':
+        raise HTTPException(status_code=403, detail="Superadmin access required")
+
+
+def _build_scan_snapshot(lines: int) -> dict:
+    output_lines = _scan_state['output_lines'][-lines:]
     elapsed = None
     if _scan_state['started_at']:
         elapsed = round(time.time() - _scan_state['started_at'], 1)
-
     return {
         'running': _scan_state['running'],
         'directories': _scan_state['directories'],
@@ -133,6 +149,45 @@ async def scan_status(
         'elapsed_seconds': elapsed,
         'exit_code': _scan_state['exit_code'],
     }
+
+
+@router.get("/stream")
+async def scan_stream(
+    # JWT passed as query param because EventSource cannot set custom headers.
+    # This is a known limitation; the token is validated server-side and the
+    # endpoint is superadmin-only.
+    token: Optional[str] = Query(None),
+    lines: int = Query(20),
+):
+    if not VIEWER_CONFIG.get('features', {}).get('show_scan_button', False):
+        raise HTTPException(status_code=403, detail="Scan feature not enabled")
+    _verify_superadmin_token(token)
+
+    async def event_generator():
+        last_output_len = -1
+        was_running = None
+        while True:
+            snapshot = _build_scan_snapshot(lines)
+            current_output_len = len(_scan_state['output_lines'])
+            current_running = snapshot['running']
+            changed = current_output_len != last_output_len or current_running != was_running
+            if changed:
+                yield f"data: {json.dumps(snapshot)}\n\n"
+                last_output_len = current_output_len
+                if not current_running and was_running in (True, None):
+                    break
+                was_running = current_running
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/directories")

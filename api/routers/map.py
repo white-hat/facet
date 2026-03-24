@@ -24,7 +24,7 @@ def _get_cluster_zoom_threshold():
     try:
         from api.config import _FULL_CONFIG
         return _FULL_CONFIG.get('map', {}).get('cluster_zoom_threshold', 10)
-    except Exception:
+    except (KeyError, TypeError, ValueError):
         return 10
 
 

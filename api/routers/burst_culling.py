@@ -9,6 +9,7 @@ Groups marked as burst_reviewed=1 are skipped so confirmed decisions persist.
 import logging
 import math
 import random
+import sqlite3
 from itertools import groupby
 from typing import Literal, Optional
 
@@ -59,7 +60,7 @@ def _get_burst_weights():
             bs.get('weight_sharpness', 0.2),
             bs.get('weight_blink', 0.15),
         )
-    except Exception:
+    except (KeyError, TypeError, ValueError):
         return (0.4, 0.25, 0.2, 0.15)
 
 
@@ -193,7 +194,7 @@ async def get_burst_groups(
             'per_page': per_page,
             'total_pages': total_pages,
         }
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch burst groups")
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -257,7 +258,7 @@ async def select_burst_photos(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to select burst photos")
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -315,7 +316,7 @@ async def get_similar_groups(
             'per_page': per_page,
             'total_pages': total_pages,
         }
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch similar groups")
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -372,7 +373,7 @@ async def select_similar_photos(
 
     except HTTPException:
         raise
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to select similar photos")
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:
@@ -596,7 +597,7 @@ async def api_culling_groups(
             'per_page': per_page,
             'total_pages': total_pages,
         }
-    except Exception:
+    except sqlite3.Error:
         logger.exception("Failed to fetch culling groups")
         raise HTTPException(status_code=500, detail='Internal server error')
     finally:

@@ -8,6 +8,7 @@ import json
 import logging
 import math
 import secrets
+import sqlite3
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -254,7 +255,7 @@ def _get_first_photo_path(conn, album_row, user_id=None):
                 all_params
             ).fetchone()
             return row['path'] if row else None
-        except Exception:
+        except (sqlite3.Error, json.JSONDecodeError, KeyError, TypeError):
             logger.debug("Failed to resolve smart album cover photo", exc_info=True)
             return None
     # Manual album: get first photo from album_photos
@@ -482,7 +483,7 @@ async def add_photos_to_album(
                 )
                 row = conn.execute("SELECT changes()").fetchone()
                 added += row[0] if row else 0
-            except Exception:
+            except sqlite3.Error:
                 logger.debug("Failed to add photo %s to album %s", path, album_id, exc_info=True)
 
         # Auto-set cover if not set
@@ -718,7 +719,7 @@ async def get_shared_album(
         if is_manual and page == 1:
             try:
                 result['filter_options'] = _get_album_filter_options(conn, album['id'])
-            except Exception:
+            except sqlite3.Error:
                 logger.debug("Failed to build album filter options", exc_info=True)
 
         return result

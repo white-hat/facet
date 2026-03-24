@@ -140,6 +140,8 @@ python tag_existing.py --dry-run --threshold 0.25
 python database.py                  # Initialize/upgrade schema
 python database.py --info           # Show schema information
 python database.py --migrate-tags   # Populate photo_tags lookup table (faster tag queries)
+python database.py --rebuild-fts    # Rebuild FTS5 full-text search index from captions/tags
+python database.py --populate-vec   # Populate photos_vec table for sqlite-vec vector search
 python database.py --refresh-stats  # Refresh statistics cache for viewer performance
 python database.py --stats-info     # Show statistics cache status and age
 python database.py --vacuum         # Reclaim space and defragment the database
@@ -175,6 +177,8 @@ Python packages: `torch`, `torchvision`, `open-clip-torch`, `opencv-python`, `pi
 
 For GPU face clustering (optional): `cuml`, `cupy` (requires conda + CUDA)
 
+For vector search (optional): `sqlite-vec>=0.1.6` (enables KNN search in SQLite, replaces in-memory NumPy cache)
+
 External tool: `exiftool` (command-line, optional — `exifread` fallback handles all RAW formats)
 
 ## Architecture
@@ -206,8 +210,8 @@ External tool: `exiftool` (command-line, optional — `exifread` fallback handle
 |---------|------------|-----------|--------|----------|
 | `legacy` | CLIP ViT-L-14 | CLIP+MLP | CLIP similarity | No GPU, 8GB+ RAM |
 | `8gb` | CLIP ViT-L-14 | CLIP+MLP | CLIP similarity | 6-14GB VRAM |
-| `16gb` | SigLIP 2 NaFlex SO400M | TOPIQ | Qwen3-VL-2B | Best accuracy (~14GB) |
-| `24gb` | SigLIP 2 NaFlex SO400M | TOPIQ | Qwen2.5-VL-7B | Largest models (~18GB) |
+| `16gb` | SigLIP 2 NaFlex SO400M | TOPIQ | Qwen3.5-2B | Best accuracy (~14GB) |
+| `24gb` | SigLIP 2 NaFlex SO400M | TOPIQ | Qwen3.5-4B | Largest models (~18GB) |
 
 All profiles additionally run: SAMP-Net (composition), InsightFace (faces), supplementary PyIQA models (TOPIQ IAA, TOPIQ NR-Face, LIQE), and optionally BiRefNet (subject saliency).
 
@@ -325,6 +329,8 @@ SQLite table `photos` with columns:
 - `recommendation_history(id, run_timestamp, config_version_hash, issue_type, target_category, target_key, old_value, proposed_value, was_applied)` - Scoring recommendation audit trail
 - `user_preferences(user_id, photo_path, star_rating, is_favorite, is_rejected)` - Per-user photo ratings (multi-user mode)
 - `stats_cache(key, value, updated_at)` - Precomputed statistics with TTL
+- `photos_fts(path, caption, tags)` - FTS5 virtual table for BM25-ranked text search on captions/tags (content-sync with `photos`)
+- `photos_vec(path, embedding)` - sqlite-vec virtual table for KNN vector search on CLIP/SigLIP embeddings (requires `sqlite-vec`)
 
 ### Performance Optimizations
 
@@ -340,6 +346,10 @@ For large databases (50k+ photos), the following optimizations are available:
 The cache is stored in the `stats_cache` table with a 5-minute TTL. Run `--stats-info` to check cache freshness.
 
 **Tag Lookup Table** - Run `python database.py --migrate-tags` to populate the `photo_tags` table. This enables 10-50x faster tag filtering by replacing slow `LIKE '%tag%'` scans with indexed exact-match queries.
+
+**FTS5 Full-Text Search** - Run `python database.py --rebuild-fts` to build the `photos_fts` index from captions and tags. Enables BM25-ranked text search on AI-generated captions without loading the CLIP model. Sync triggers keep the index updated automatically.
+
+**Vector Search (sqlite-vec)** - Install `sqlite-vec` and run `python database.py --populate-vec` to populate the `photos_vec` table from existing embeddings. Replaces the in-memory NumPy embedding cache (~440MB for 100k photos) with on-disk KNN search. Falls back to NumPy if sqlite-vec is not installed.
 
 **Query Optimizations in api/:**
 - COUNT result caching (5 minute TTL) to avoid repeated full-table scans
@@ -371,7 +381,7 @@ See [docs/FACE_RECOGNITION.md](docs/FACE_RECOGNITION.md) for the complete workfl
 
 ### Viewer API Routes (New Features)
 
-**Semantic Search:** `GET /api/search?q=<text>&limit=50&threshold=0.15` — text-to-image search using stored CLIP/SigLIP embeddings.
+**Semantic Search:** `GET /api/search?q=<text>&limit=50&threshold=0.15` — hybrid text-to-image search combining CLIP/SigLIP embedding similarity (70%) with FTS5 BM25 text matching on captions/tags (30%). Uses sqlite-vec KNN when available, falls back to NumPy.
 
 **Albums:** Full CRUD via `GET|POST /api/albums`, `GET|PUT|DELETE /api/albums/{id}`, `GET|POST|DELETE /api/albums/{id}/photos`. Smart albums store filter combinations in `smart_filter_json`. Angular routes: `/albums` (list), `/album/:albumId` (gallery filtered by album).
 
@@ -393,7 +403,7 @@ See [docs/FACE_RECOGNITION.md](docs/FACE_RECOGNITION.md) for the complete workfl
 
 **Burst Culling:** `GET /api/burst-groups`, `POST /api/burst-groups/select`, `GET /api/culling-groups`, `POST /api/culling-groups/confirm` — burst and similar group culling workflow.
 
-**Scan:** `POST /api/scan/start`, `GET /api/scan/status`, `GET /api/scan/directories` — trigger and monitor scoring scans (superadmin only).
+**Scan:** `POST /api/scan/start`, `GET /api/scan/status`, `GET /api/scan/stream?token=<jwt>` (SSE), `GET /api/scan/directories` — trigger and monitor scoring scans (superadmin only). The `/stream` endpoint uses Server-Sent Events for real-time progress with automatic fallback to polling.
 
 **Face Management:** `GET /api/person/{id}/faces`, `POST /api/person/{id}/avatar`, `GET /api/photo/faces`, `POST /api/face/{id}/assign`, `POST /api/photo/assign_all_faces`, `POST /api/photo/unassign_person` — face-to-person assignment and avatar management.
 
@@ -419,9 +429,9 @@ See [docs/FACE_RECOGNITION.md](docs/FACE_RECOGNITION.md) for the complete workfl
 - **Quality:** TOPIQ (0.93 SRCC), HyperIQA (0.90), DBCNN (0.90), MUSIQ (0.87)
 - **Supplementary PyIQA:** TOPIQ IAA (aesthetic merit), TOPIQ NR-Face (face quality), LIQE (quality + distortion diagnosis)
 - **Composition:** SAMP-Net for pattern detection (14 patterns including rule_of_thirds, golden_ratio, vanishing_point)
-- **Subject saliency:** BiRefNet (`ZhengPeng7/BiRefNet`) via `transformers` — subject sharpness, prominence, placement, background separation
+- **Subject saliency:** BiRefNet-dynamic (`ZhengPeng7/BiRefNet-dynamic`) via `transformers` — subject sharpness, prominence, placement, background separation
 - **Faces:** InsightFace buffalo_l for detection with 106-point landmarks and recognition embeddings
-- **Tagging:** CLIP similarity (legacy/8gb), Qwen3-VL-2B (16gb), Qwen2.5-VL-7B (24gb)
+- **Tagging:** CLIP similarity (legacy/8gb), Qwen3.5-2B (16gb), Qwen3.5-4B (24gb)
 - Face recognition uses HDBSCAN clustering on embeddings (standalone hdbscan library)
 - Percentile normalization: scales metrics so 90th percentile maps to 10.0
 - Burst detection groups similar photos within configurable time windows

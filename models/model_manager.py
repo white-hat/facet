@@ -484,6 +484,8 @@ class ModelManager:
             'insightface': self._load_insightface,
             'vlm_tagger': lambda: self._load_vlm_tagger('qwen2_5_vl_7b'),
             'qwen3_vl_tagger': lambda: self._load_vlm_tagger('qwen3_vl_2b'),
+            'qwen3_5_tagger': lambda: self._load_vlm_tagger('qwen3_5_2b'),
+            'qwen3_5_4b_tagger': lambda: self._load_vlm_tagger('qwen3_5_4b'),
             'saliency': self._load_saliency,
             'florence_tagger': self._load_florence_tagger,
         }
@@ -549,12 +551,14 @@ class ModelManager:
             return None
 
     def _load_vlm_tagger(self, config_key: str = 'qwen2_5_vl_7b'):
-        """Load unified VLM tagger for semantic tagging.
-
-        Args:
-            config_key: Config key for model settings ('qwen2_5_vl_7b' or 'qwen3_vl_2b')
-        """
-        model_key = 'vlm_tagger' if config_key == 'qwen2_5_vl_7b' else 'qwen3_vl_tagger'
+        """Load unified VLM tagger for semantic tagging."""
+        key_map = {
+            'qwen2_5_vl_7b': 'vlm_tagger',
+            'qwen3_vl_2b': 'qwen3_vl_tagger',
+            'qwen3_5_2b': 'qwen3_5_tagger',
+            'qwen3_5_4b': 'qwen3_5_4b_tagger',
+        }
+        model_key = key_map.get(config_key, config_key)
         if model_key in self.models:
             return self.models[model_key]
 
