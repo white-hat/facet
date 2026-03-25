@@ -127,7 +127,8 @@ async def get_capsules(
             from analyzers.capsule_generator import generate_all_capsules
 
             cached = generate_all_capsules(conn, config=_FULL_CONFIG, user_id=user_id,
-                                           date_from=date_from, date_to=date_to)
+                                           date_from=date_from, date_to=date_to,
+                                           shuffle=refresh)
             _set_cached_capsules(user_id, cached, date_from=date_from, date_to=date_to)
         except (sqlite3.Error, ValueError, TypeError, KeyError):
             logger.exception("Failed to generate capsules")

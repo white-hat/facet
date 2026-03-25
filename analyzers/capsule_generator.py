@@ -95,13 +95,16 @@ def _count_tags(photos):
     return tag_counts
 
 
-def _pick_cover_photo(paths, capsule_id, top_n=5, freshness_seconds=86400):
+def _pick_cover_photo(paths, capsule_id, top_n=5, freshness_seconds=86400, capsule_config=None):
     """Pick a cover photo from top candidates with configurable rotation."""
     if not paths:
         return ""
     candidates = paths[:min(top_n, len(paths))]
-    rotation_seed = int(time.time() // freshness_seconds)
-    rng = random.Random(f"{rotation_seed}:{capsule_id}")
+    if capsule_config and capsule_config.get("_shuffle"):
+        rng = random.Random()
+    else:
+        rotation_seed = int(time.time() // freshness_seconds)
+        rng = random.Random(f"{rotation_seed}:{capsule_id}")
     return rng.choice(candidates)
 
 
@@ -254,7 +257,7 @@ def _mmr_select(conn, paths, max_photos, lambda_weight=0.5):
     return result
 
 
-def generate_all_capsules(conn, config=None, user_id=None, date_from=None, date_to=None):
+def generate_all_capsules(conn, config=None, user_id=None, date_from=None, date_to=None, shuffle=False):
     """Generate all capsule types and return a combined list.
 
     Args:
@@ -270,7 +273,7 @@ def generate_all_capsules(conn, config=None, user_id=None, date_from=None, date_
     """
     if config is None:
         config = {}
-    capsule_config = config.get("capsules", {})
+    capsule_config = {**config.get("capsules", {}), "_shuffle": shuffle}
     min_aggregate = capsule_config.get("min_aggregate", 6.0)
 
     # Initialize geocoding cache if enabled
@@ -367,7 +370,8 @@ def generate_all_capsules(conn, config=None, user_id=None, date_from=None, date_
             c["params"]["paths"] = _mmr_select(conn, paths, max_photos, mmr_lambda)
             c["photo_count"] = len(c["params"]["paths"])
             c["cover_photo_path"] = _pick_cover_photo(c["params"]["paths"], c["id"],
-                                                       freshness_seconds=freshness_seconds)
+                                                       freshness_seconds=freshness_seconds,
+                                                       capsule_config=capsule_config)
     logger.info("  MMR diversity pass: %.1fs for %d capsules", time.time() - t0, len(capsules))
 
     # Global dedup: remove capsules whose photos overlap >80% unique with a prior capsule
@@ -375,7 +379,7 @@ def generate_all_capsules(conn, config=None, user_id=None, date_from=None, date_
     capsules = _deduplicate_capsules(capsules, max_overlap)
 
     # Sort: interleave types, prioritize specialized generators over dimension combos
-    capsules = _sort_capsules(capsules)
+    capsules = _sort_capsules(capsules, shuffle=shuffle)
 
     return capsules
 
@@ -392,7 +396,7 @@ _TYPE_PRIORITY = {
 }
 
 
-def _sort_capsules(capsules):
+def _sort_capsules(capsules, shuffle=False):
     """Sort capsules: interleave types so no long runs of the same type, prioritize interesting ones."""
     # Assign priority (default 5 for cross-dimensional combos)
     for c in capsules:
@@ -402,6 +406,11 @@ def _sort_capsules(capsules):
     by_type = defaultdict(list)
     for c in capsules:
         by_type[c["type"]].append(c)
+
+    # Shuffle within each type group when refreshing
+    if shuffle:
+        for items in by_type.values():
+            random.shuffle(items)
 
     # Round-robin interleave: take one from each type in priority order, repeat
     sorted_types = sorted(by_type.keys(), key=lambda t: _TYPE_PRIORITY.get(t, 5))
@@ -574,7 +583,7 @@ def _generate_journeys(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": title_params,
             "title": title,
             "subtitle": f"{len(photo_paths)} photos",
-            "cover_photo_path": _pick_cover_photo(photo_paths, f"journey_{trip_id}"),
+            "cover_photo_path": _pick_cover_photo(photo_paths, f"journey_{trip_id}", capsule_config=capsule_config),
             "photo_count": len(photo_paths),
             "icon": "flight",
             "params": {"paths": photo_paths},
@@ -643,7 +652,7 @@ def _generate_faces_of(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": {"name": name},
             "title": f"Moments with {name}",
             "subtitle": f"{len(unique_paths)} photos",
-            "cover_photo_path": _pick_cover_photo(unique_paths, f"faces_{pid}"),
+            "cover_photo_path": _pick_cover_photo(unique_paths, f"faces_{pid}", capsule_config=capsule_config),
             "photo_count": len(unique_paths),
             "icon": "face",
             "params": {"person_id": pid, "paths": unique_paths},
@@ -698,7 +707,7 @@ def _generate_seasonal(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": {"season": season, "year": str(year)},
             "title": f"{season_title} {year}",
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, cid),
+            "cover_photo_path": _pick_cover_photo(paths, cid, capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": _SEASON_ICONS.get(season, "park"),
             "params": {"paths": paths},
@@ -759,7 +768,7 @@ def _generate_golden(conn, capsule_config, min_aggregate, vis, user_id):
         "title_params": {},
         "title": "Golden Collection",
         "subtitle": f"{len(paths)} photos",
-        "cover_photo_path": _pick_cover_photo(paths, "golden"),
+        "cover_photo_path": _pick_cover_photo(paths, "golden", capsule_config=capsule_config),
         "photo_count": len(paths),
         "icon": "diamond",
         "params": {"paths": paths},
@@ -846,7 +855,7 @@ def _generate_color_story(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": {"name": name},
             "title": name,
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, full_id),
+            "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": "palette",
             "params": {"paths": paths},
@@ -909,7 +918,7 @@ def _generate_this_week(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": {"year": str(year)},
             "title": f"This Week in {year}",
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, f"thisweek_{year}"),
+            "cover_photo_path": _pick_cover_photo(paths, f"thisweek_{year}", capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": "history",
             "params": {"paths": paths},
@@ -993,7 +1002,7 @@ def _generate_location(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": {"location": title},
             "title": title,
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, full_id),
+            "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": "location_on",
             "params": {"paths": paths},
@@ -1061,7 +1070,7 @@ def _generate_person_pairs(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": {"name1": name1, "name2": name2},
             "title": f"{name1} & {name2}",
             "subtitle": f"{len(unique_paths)} photos",
-            "cover_photo_path": _pick_cover_photo(unique_paths, full_id),
+            "cover_photo_path": _pick_cover_photo(unique_paths, full_id, capsule_config=capsule_config),
             "photo_count": len(unique_paths),
             "icon": "group",
             "params": {"paths": unique_paths},
@@ -1089,7 +1098,10 @@ def _generate_seeded(conn, capsule_config, min_aggregate, vis, user_id):
         seed_lifetime_minutes = freshness_hours * 60
 
     # Local RNG with time-bucketed seed for stability (avoids mutating global state)
-    rng = random.Random(int(time.time() // (seed_lifetime_minutes * 60)))
+    if capsule_config.get("_shuffle"):
+        rng = random.Random()
+    else:
+        rng = random.Random(int(time.time() // (seed_lifetime_minutes * 60)))
 
     # Fetch candidate high-scoring photos
     rows = conn.execute(
@@ -1320,7 +1332,7 @@ def _generate_seeded(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": axis_params,
             "title": title_map[axis_type],
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, full_id),
+            "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": "auto_awesome",
             "params": {"paths": paths},
@@ -1399,7 +1411,7 @@ def _generate_progress(conn, capsule_config, min_aggregate, vis, user_id):
         "title_params": {},
         "title": "Your Photography is Improving",
         "subtitle": f"{len(paths)} photos",
-        "cover_photo_path": _pick_cover_photo(paths, full_id),
+        "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
         "photo_count": len(paths),
         "icon": "trending_up",
         "params": {"paths": paths},
@@ -1467,7 +1479,7 @@ def _generate_color_palette(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": {"mood": mood, "date": month_key},
             "title": f"{mood} \u2014 {month_key}",
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, full_id),
+            "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": "palette",
             "params": {"paths": paths},
@@ -1506,7 +1518,7 @@ def _generate_rare_pairs(conn, capsule_config, min_aggregate, vis, user_id):
             "title_params": {"name1": name1, "name2": name2},
             "title": f"{name1} & {name2} \u2014 Rare Moment",
             "subtitle": f"{len(unique_paths)} photos",
-            "cover_photo_path": _pick_cover_photo(unique_paths, full_id),
+            "cover_photo_path": _pick_cover_photo(unique_paths, full_id, capsule_config=capsule_config),
             "photo_count": len(unique_paths),
             "icon": "people_outline",
             "params": {"paths": unique_paths},
@@ -1577,7 +1589,7 @@ def _generate_favorites_by_period(conn, capsule_config, min_aggregate, vis, user
             "title_params": {"year": str(year)},
             "title": f"Favorites of {year}",
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, full_id),
+            "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": "favorite",
             "params": {"paths": paths},
@@ -1598,7 +1610,7 @@ def _generate_favorites_by_period(conn, capsule_config, min_aggregate, vis, user
             "title_params": {"season": season, "year": str(year)},
             "title": f"Favorites — {season.title()} {year}",
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, full_id),
+            "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": "favorite",
             "params": {"paths": paths},
@@ -1686,7 +1698,7 @@ def _generate_score_per_dim(conn, capsules, capsule_config, min_aggregate,
             "title_params": {"score": score_label, "dimension": display},
             "title": title,
             "subtitle": f"{len(paths)} photos",
-            "cover_photo_path": _pick_cover_photo(paths, full_id),
+            "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
             "photo_count": len(paths),
             "icon": score_dim["icon"],
             "params": {"paths": paths},
@@ -2015,7 +2027,7 @@ def _generate_dimension_capsules(conn, capsule_config, min_aggregate, vis, user_
                     "title_params": {dim["param_name"]: dim["title_tpl"]},
                     "title": dim["title_tpl"],
                     "subtitle": f"{len(paths)} photos",
-                    "cover_photo_path": _pick_cover_photo(paths, dim_name),
+                    "cover_photo_path": _pick_cover_photo(paths, dim_name, capsule_config=capsule_config),
                     "photo_count": len(paths), "icon": dim["icon"],
                     "params": {"paths": paths},
                 })
@@ -2081,7 +2093,7 @@ def _generate_dimension_capsules(conn, capsule_config, min_aggregate, vis, user_
                 "title_params": {dim["param_name"]: display},
                 "title": display,
                 "subtitle": f"{len(paths)} photos",
-                "cover_photo_path": _pick_cover_photo(paths, full_id),
+                "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
                 "photo_count": len(paths), "icon": dim["icon"],
                 "params": {"paths": paths},
             })
@@ -2199,7 +2211,7 @@ def _generate_dimension_capsules(conn, capsule_config, min_aggregate, vis, user_
                 "title_params": {"a": disp_a, "b": disp_b},
                 "title": title,
                 "subtitle": f"{len(paths)} photos",
-                "cover_photo_path": _pick_cover_photo(paths, full_id),
+                "cover_photo_path": _pick_cover_photo(paths, full_id, capsule_config=capsule_config),
                 "photo_count": len(paths), "icon": dim_a["icon"],
                 "params": {"paths": paths},
             })
