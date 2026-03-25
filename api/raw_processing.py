@@ -76,8 +76,22 @@ async def convert_raw_darktable_async(file_path: str, profile_name: str, quality
     return await _convert_darktable_async(file_path, quality, dt_config, profile)
 
 
+def is_darktable_available() -> bool:
+    """Check whether the configured darktable-cli executable exists."""
+    dt_config = _get_raw_config().get('darktable', {})
+    executable = dt_config.get('executable', 'darktable-cli')
+    resolved = shutil.which(executable) if not os.path.isabs(executable) else executable
+    return bool(resolved and os.path.isfile(resolved))
+
+
 def get_darktable_profiles() -> list[str]:
-    """Return the list of configured darktable profile names."""
+    """Return the list of configured darktable profile names.
+
+    Returns an empty list when the darktable-cli executable is not found,
+    so that download options never advertise unavailable profiles.
+    """
+    if not is_darktable_available():
+        return []
     raw_config = _get_raw_config()
     profiles = raw_config.get('darktable', {}).get('profiles', [])
     return [p['name'] for p in profiles if 'name' in p]
@@ -157,6 +171,19 @@ def _convert_rawpy(file_path: str, quality: int) -> bytes:
     return buffer.getvalue()
 
 
+def _darktable_path(path: str) -> str:
+    """Convert a Windows path for darktable-cli.
+
+    darktable-cli interprets backslashes as escape characters, so internal
+    separators are converted to forward slashes.  UNC paths (``\\\\server\\...``)
+    keep their ``\\\\`` prefix because ``//server/...`` is not recognised as a
+    network path by all Windows subsystems.
+    """
+    if path.startswith('\\\\'):
+        return '\\\\' + path[2:].replace('\\', '/')
+    return path.replace('\\', '/')
+
+
 def _convert_darktable(file_path: str, quality: int, dt_config: dict, profile: dict) -> bytes:
     """Convert via darktable-cli using profile-specific settings."""
     executable = dt_config.get('executable', 'darktable-cli')
@@ -170,13 +197,19 @@ def _convert_darktable(file_path: str, quality: int, dt_config: dict, profile: d
     os.unlink(tmp_output)  # darktable-cli refuses to overwrite existing files
 
     try:
-        cmd: list[str] = [resolved, file_path]
+        # darktable-cli treats backslashes as escape characters on Windows,
+        # so convert paths to forward slashes — but preserve the leading \\
+        # for UNC paths (e.g. \\server\share\...) which need it.
+        dt_input = _darktable_path(file_path)
+        dt_output = _darktable_path(tmp_output)
+
+        cmd: list[str] = [resolved, dt_input]
 
         # XMP sidecar: darktable-cli accepts it as 2nd positional arg
         xmp_path = file_path + '.xmp'
-        cmd.append(xmp_path if os.path.isfile(xmp_path) else '')
+        cmd.append(_darktable_path(xmp_path) if os.path.isfile(xmp_path) else '')
 
-        cmd.append(tmp_output)
+        cmd.append(dt_output)
 
         # Profile-specific flags
         if profile.get('hq', True):
@@ -224,68 +257,11 @@ def _convert_darktable(file_path: str, quality: int, dt_config: dict, profile: d
 
 
 async def _convert_darktable_async(file_path: str, quality: int, dt_config: dict, profile: dict) -> bytes:
-    """Async version of _convert_darktable using asyncio subprocess."""
-    executable = dt_config.get('executable', 'darktable-cli')
+    """Async version of _convert_darktable.
 
-    resolved = shutil.which(executable) if not os.path.isabs(executable) else executable
-    if not resolved or not os.path.isfile(resolved):
-        raise RuntimeError(f"darktable-cli not found: {executable}")
-
-    fd, tmp_output = tempfile.mkstemp(suffix='.jpg')
-    os.close(fd)
-    os.unlink(tmp_output)
-
-    try:
-        cmd: list[str] = [resolved, file_path]
-
-        xmp_path = file_path + '.xmp'
-        cmd.append(xmp_path if os.path.isfile(xmp_path) else '')
-        cmd.append(tmp_output)
-
-        if profile.get('hq', True):
-            cmd.extend(['--hq', 'true'])
-
-        width = profile.get('width')
-        if width:
-            cmd.extend(['--width', str(int(width))])
-
-        height = profile.get('height')
-        if height:
-            cmd.extend(['--height', str(int(height))])
-
-        extra = profile.get('extra_args', [])
-        if extra and isinstance(extra, list):
-            cmd.extend(str(a) for a in extra)
-
-        cmd.extend([
-            '--core',
-            '--conf', f'plugins/imageio/format/jpeg/quality={quality}',
-        ])
-
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
-        except asyncio.TimeoutError:
-            proc.kill()
-            await proc.communicate()
-            raise RuntimeError("darktable-cli timed out (>120s)")
-
-        if proc.returncode != 0:
-            err_text = (stderr or stdout or b'').decode(errors='replace')[:500]
-            raise RuntimeError(
-                f"darktable-cli failed (exit {proc.returncode}): {err_text}"
-            )
-
-        if not os.path.isfile(tmp_output) or os.path.getsize(tmp_output) == 0:
-            raise RuntimeError("darktable-cli produced no output file")
-
-        with open(tmp_output, 'rb') as f:
-            return f.read()
-    finally:
-        if os.path.exists(tmp_output):
-            os.unlink(tmp_output)
+    Uses ``asyncio.to_thread`` to run the blocking darktable-cli subprocess
+    off the event loop.  This avoids the ``NotImplementedError`` raised by
+    ``asyncio.create_subprocess_exec`` on Windows when the event loop is not
+    a ``ProactorEventLoop``.
+    """
+    return await asyncio.to_thread(_convert_darktable, file_path, quality, dt_config, profile)
