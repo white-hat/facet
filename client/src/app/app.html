@@ -6,7 +6,7 @@
       <!-- Nav links -->
       @if (auth.isAuthenticated()) {
         <nav class="flex items-center gap-0 lg:gap-1">
-          <a mat-icon-button class="lg:!hidden" routerLink="/" routerLinkActive #rlGalleryM="routerLinkActive" [routerLinkActiveOptions]="{exact:true}" [style.color]="rlGalleryM.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.gallery' | translate">
+          <a mat-icon-button class="lg:!hidden" routerLink="/" routerLinkActive #rlGalleryM="routerLinkActive" [routerLinkActiveOptions]="{exact:true}" [style.color]="rlGalleryM.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.gallery_tooltip' | translate" (dblclick)="resetAllFilters()">
             <mat-icon>diamond</mat-icon>
           </a>
           @if (store.config()?.features?.show_albums) {
@@ -45,7 +45,7 @@
               <mat-icon>auto_awesome</mat-icon>
             </button>
           }
-          <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/" routerLinkActive #rlGallery="routerLinkActive" [routerLinkActiveOptions]="{exact:true}" [style.color]="rlGallery.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.gallery' | translate">
+          <a mat-icon-button class="!hidden lg:!inline-flex" routerLink="/" routerLinkActive #rlGallery="routerLinkActive" [routerLinkActiveOptions]="{exact:true}" [style.color]="rlGallery.isActive ? 'var(--mat-sys-primary)' : ''" [matTooltip]="'nav.gallery_tooltip' | translate" (dblclick)="resetAllFilters()">
             <mat-icon>diamond</mat-icon>
           </a>
           @if (store.config()?.features?.show_albums) {
@@ -154,15 +154,11 @@
         </mat-form-field>
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'stats.filter.date_from' | translate }}</mat-label>
-          <input matInput [matDatepicker]="fromDp" [value]="statsFilters.dateFrom()" (dateChange)="onDateFilterChange(statsFilters, 'from', $event)" />
-          <mat-datepicker-toggle matIconSuffix [for]="fromDp" />
-          <mat-datepicker #fromDp />
+          <input matInput type="date" [value]="statsFilters.dateFrom()" (change)="onDateFilterChange(statsFilters, 'from', $event)" />
         </mat-form-field>
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'stats.filter.date_to' | translate }}</mat-label>
-          <input matInput [matDatepicker]="toDp" [value]="statsFilters.dateTo()" (dateChange)="onDateFilterChange(statsFilters, 'to', $event)" />
-          <mat-datepicker-toggle matIconSuffix [for]="toDp" />
-          <mat-datepicker #toDp />
+          <input matInput type="date" [value]="statsFilters.dateTo()" (change)="onDateFilterChange(statsFilters, 'to', $event)" />
         </mat-form-field>
       }
 
@@ -195,15 +191,11 @@
       @if (auth.isAuthenticated() && isTimelineRoute()) {
         <mat-form-field class="!hidden lg:!inline-flex w-44 ml-2" subscriptSizing="dynamic">
           <mat-label>{{ 'ui.labels.from' | translate }}</mat-label>
-          <input matInput [matDatepicker]="fromDp" [value]="timelineFilters.dateFrom()" (dateChange)="onDateFilterChange(timelineFilters, 'from', $event)" />
-          <mat-datepicker-toggle matIconSuffix [for]="fromDp" />
-          <mat-datepicker #fromDp />
+          <input matInput type="date" [value]="timelineFilters.dateFrom()" (change)="onDateFilterChange(timelineFilters, 'from', $event)" />
         </mat-form-field>
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'ui.labels.to' | translate }}</mat-label>
-          <input matInput [matDatepicker]="toDp" [value]="timelineFilters.dateTo()" (dateChange)="onDateFilterChange(timelineFilters, 'to', $event)" />
-          <mat-datepicker-toggle matIconSuffix [for]="toDp" />
-          <mat-datepicker #toDp />
+          <input matInput type="date" [value]="timelineFilters.dateTo()" (change)="onDateFilterChange(timelineFilters, 'to', $event)" />
         </mat-form-field>
       }
 
@@ -211,15 +203,11 @@
       @if (auth.isAuthenticated() && isMapRoute()) {
         <mat-form-field class="!hidden lg:!inline-flex w-44 ml-2" subscriptSizing="dynamic">
           <mat-label>{{ 'map.date_from' | translate }}</mat-label>
-          <input matInput [matDatepicker]="fromDp" [value]="mapFilters.dateFrom()" (dateChange)="onDateFilterChange(mapFilters, 'from', $event)" />
-          <mat-datepicker-toggle matIconSuffix [for]="fromDp" />
-          <mat-datepicker #fromDp />
+          <input matInput type="date" [value]="mapFilters.dateFrom()" (change)="onDateFilterChange(mapFilters, 'from', $event)" />
         </mat-form-field>
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'map.date_to' | translate }}</mat-label>
-          <input matInput [matDatepicker]="toDp" [value]="mapFilters.dateTo()" (dateChange)="onDateFilterChange(mapFilters, 'to', $event)" />
-          <mat-datepicker-toggle matIconSuffix [for]="toDp" />
-          <mat-datepicker #toDp />
+          <input matInput type="date" [value]="mapFilters.dateTo()" (change)="onDateFilterChange(mapFilters, 'to', $event)" />
         </mat-form-field>
       }
 
@@ -227,15 +215,11 @@
       @if (isCapsuleRoute()) {
         <mat-form-field class="!hidden lg:!inline-flex w-44 ml-2" subscriptSizing="dynamic">
           <mat-label>{{ 'capsules.date_from' | translate }}</mat-label>
-          <input matInput [matDatepicker]="fromDp" [value]="capsuleFilters.dateFrom()" (dateChange)="onDateFilterChange(capsuleFilters, 'from', $event)" />
-          <mat-datepicker-toggle matIconSuffix [for]="fromDp" />
-          <mat-datepicker #fromDp />
+          <input matInput type="date" [value]="capsuleFilters.dateFrom()" (change)="onDateFilterChange(capsuleFilters, 'from', $event)" />
         </mat-form-field>
         <mat-form-field class="!hidden lg:!inline-flex w-44" subscriptSizing="dynamic">
           <mat-label>{{ 'capsules.date_to' | translate }}</mat-label>
-          <input matInput [matDatepicker]="toDp" [value]="capsuleFilters.dateTo()" (dateChange)="onDateFilterChange(capsuleFilters, 'to', $event)" />
-          <mat-datepicker-toggle matIconSuffix [for]="toDp" />
-          <mat-datepicker #toDp />
+          <input matInput type="date" [value]="capsuleFilters.dateTo()" (change)="onDateFilterChange(capsuleFilters, 'to', $event)" />
         </mat-form-field>
         <button class="!hidden lg:!inline-flex" mat-icon-button [disabled]="capsuleFilters.refreshing()" [matTooltip]="'capsules.regenerate' | translate" (click)="capsuleFilters.regenerate.set(capsuleFilters.regenerate() + 1)">
           <mat-icon>refresh</mat-icon>
@@ -698,15 +682,11 @@
     <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center gap-1 px-2 py-1 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] safe-area-pb">
       <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
         <mat-label>{{ 'ui.labels.from' | translate }}</mat-label>
-        <input matInput [matDatepicker]="fromDp" [value]="mapFilters.dateFrom()" (dateChange)="onDateFilterChange(mapFilters, 'from', $event)" />
-        <mat-datepicker-toggle matIconSuffix [for]="fromDp" />
-        <mat-datepicker #fromDp />
+        <input matInput type="date" [value]="mapFilters.dateFrom()" (change)="onDateFilterChange(mapFilters, 'from', $event)" />
       </mat-form-field>
       <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
         <mat-label>{{ 'ui.labels.to' | translate }}</mat-label>
-        <input matInput [matDatepicker]="toDp" [value]="mapFilters.dateTo()" (dateChange)="onDateFilterChange(mapFilters, 'to', $event)" />
-        <mat-datepicker-toggle matIconSuffix [for]="toDp" />
-        <mat-datepicker #toDp />
+        <input matInput type="date" [value]="mapFilters.dateTo()" (change)="onDateFilterChange(mapFilters, 'to', $event)" />
       </mat-form-field>
     </div>
   }
@@ -716,15 +696,11 @@
     <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center gap-1 px-2 py-1 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] safe-area-pb">
       <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
         <mat-label>{{ 'capsules.date_from' | translate }}</mat-label>
-        <input matInput [matDatepicker]="fromDp" [value]="capsuleFilters.dateFrom()" (dateChange)="onDateFilterChange(capsuleFilters, 'from', $event)" />
-        <mat-datepicker-toggle matIconSuffix [for]="fromDp" />
-        <mat-datepicker #fromDp />
+        <input matInput type="date" [value]="capsuleFilters.dateFrom()" (change)="onDateFilterChange(capsuleFilters, 'from', $event)" />
       </mat-form-field>
       <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
         <mat-label>{{ 'capsules.date_to' | translate }}</mat-label>
-        <input matInput [matDatepicker]="toDp" [value]="capsuleFilters.dateTo()" (dateChange)="onDateFilterChange(capsuleFilters, 'to', $event)" />
-        <mat-datepicker-toggle matIconSuffix [for]="toDp" />
-        <mat-datepicker #toDp />
+        <input matInput type="date" [value]="capsuleFilters.dateTo()" (change)="onDateFilterChange(capsuleFilters, 'to', $event)" />
       </mat-form-field>
       <button mat-icon-button class="!w-10 !h-10 shrink-0" [matTooltip]="'capsules.regenerate' | translate"
         (click)="capsuleFilters.regenerate.set(capsuleFilters.regenerate() + 1)">
@@ -738,15 +714,11 @@
     <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center gap-1 px-2 py-1 bg-[var(--mat-sys-surface-container)] border-t border-[var(--mat-sys-outline-variant)] safe-area-pb">
       <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
         <mat-label>{{ 'ui.labels.from' | translate }}</mat-label>
-        <input matInput [matDatepicker]="fromDp" [value]="timelineFilters.dateFrom()" (dateChange)="onDateFilterChange(timelineFilters, 'from', $event)" />
-        <mat-datepicker-toggle matIconSuffix [for]="fromDp" />
-        <mat-datepicker #fromDp />
+        <input matInput type="date" [value]="timelineFilters.dateFrom()" (change)="onDateFilterChange(timelineFilters, 'from', $event)" />
       </mat-form-field>
       <mat-form-field class="flex-1 min-w-0" subscriptSizing="dynamic">
         <mat-label>{{ 'ui.labels.to' | translate }}</mat-label>
-        <input matInput [matDatepicker]="toDp" [value]="timelineFilters.dateTo()" (dateChange)="onDateFilterChange(timelineFilters, 'to', $event)" />
-        <mat-datepicker-toggle matIconSuffix [for]="toDp" />
-        <mat-datepicker #toDp />
+        <input matInput type="date" [value]="timelineFilters.dateTo()" (change)="onDateFilterChange(timelineFilters, 'to', $event)" />
       </mat-form-field>
     </div>
   }

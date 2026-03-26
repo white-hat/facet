@@ -191,7 +191,8 @@
     "caption": "Leyenda",
     "histogram_spread": "Histograma",
     "star_rating": "Valoración",
-    "topiq_score": "TOPIQ"
+    "topiq_score": "TOPIQ",
+    "persons": "Personas"
   },
   "notifications": {
     "copied": "Copiado!",
@@ -969,6 +970,7 @@
   },
   "nav": {
     "gallery": "Galería",
+    "gallery_tooltip": "Galería (doble clic para restablecer filtros)",
     "stats": "Estadísticas",
     "persons": "Personas",
     "compare": "Ajuste de pesos",
@@ -1063,7 +1065,6 @@
     "semantic_search_info": "La búsqueda semántica carga los embeddings en la RAM en el primer uso. Esto puede tardar un momento para bibliotecas grandes.",
     "select_on_map": "Seleccionar en el mapa",
     "gps_radius": "Radio",
-    "gps_clear": "Borrar ubicación",
     "hide_rejected": "Ocultar rechazadas",
     "favorites_only": "Solo favoritas",
     "monochrome_only": "Solo monocromo",
@@ -1257,8 +1258,8 @@
       "skip_oversaturation_penalty": "Omitir penalización de sobresaturación",
       "apply_blink_penalty": "Aplicar penalización de parpadeo",
       "bonus_hint": "Desplazamiento fijo de puntuación añadido después de todos los cálculos ponderados.",
-      "noise_tolerance_hint": "Escala la penalización de ruido. 1.0 = penalización completa (por defecto), 0.0 = sin penalización, 0.3 = indulgente.",
-      "clipping_multiplier_hint": "Multiplica la penalización de recorte de altas luces. 1.0 = estándar, 1.5 = más estricto, 0 = desactivado.",
+      "noise_tolerance_hint": "Escala la penalizacion de ruido. 100% = penalizacion completa (por defecto), 0% = sin penalizacion, 30% = indulgente.",
+      "clipping_multiplier_hint": "Multiplica la penalizacion de recorte de altas luces. 100% = estandar, 150% = mas estricto, 0% = desactivado.",
       "skip_clipping_penalty_hint": "Desactiva la penalización de recorte de altas luces. Por defecto: activado para silueta.",
       "skip_oversaturation_penalty_hint": "Desactiva la penalización de sobresaturación. Por defecto: activado para nocturna, astro, concierto.",
       "apply_blink_penalty_hint": "Aplica un multiplicador de puntuación al detectar parpadeo. Por defecto: activado para categorías de retrato."
@@ -1305,8 +1306,8 @@
     },
     "validation": {
       "bonus_range": "El bonus debe estar entre -5 y 5",
-      "noise_tolerance_range": "La tolerancia al ruido debe estar entre 0 y 2",
-      "clipping_multiplier_range": "El multiplicador de recorte debe estar entre 0 y 5",
+      "noise_tolerance_range": "La tolerancia al ruido debe estar entre 0% y 200%",
+      "clipping_multiplier_range": "El multiplicador de recorte debe estar entre 0% y 500%",
       "ratio_range": "El valor debe estar entre 0,0 y 1,0",
       "non_negative": "El valor debe ser 0 o mayor",
       "shutter_range": "La velocidad de obturación debe estar entre 0 y 60 segundos",
@@ -1491,7 +1492,35 @@
       "silhouette": "silueta detectada (rostro a contraluz)",
       "tags": "etiquetas coincidentes: {tags}",
       "luminance": "luminosidad = {value} (≤ {threshold})",
-      "long_exposure": "larga exposicion detectada"
+      "long_exposure": "larga exposicion detectada",
+      "rejected_header": "{count} categorías evaluadas antes",
+      "mismatch": {
+        "required_tags": "sin etiquetas coincidentes ({tags})",
+        "excluded_tags": "etiquetas excluidas presentes ({tags})",
+        "has_face": "ningún rostro detectado",
+        "has_face_false": "rostro detectado",
+        "is_monochrome": "no es monocromática",
+        "is_monochrome_false": "es monocromática",
+        "is_silhouette": "no es una silueta",
+        "is_silhouette_false": "es una silueta",
+        "is_group_portrait": "no es un retrato grupal",
+        "is_group_portrait_false": "es un retrato grupal",
+        "face_ratio_min": "ratio facial {actual} < {required}",
+        "face_ratio_max": "ratio facial {actual} > {required}",
+        "face_count_min": "número de rostros {actual} < {required}",
+        "face_count_max": "número de rostros {actual} > {required}",
+        "luminance_min": "luminosidad {actual} < {required}",
+        "luminance_max": "luminosidad {actual} > {required}",
+        "shutter_speed_min": "velocidad de obturación muy corta",
+        "shutter_speed_max": "velocidad de obturación muy larga",
+        "iso_min": "ISO {actual} < {required}",
+        "iso_max": "ISO {actual} > {required}",
+        "focal_length_min": "distancia focal {actual} < {required}",
+        "focal_length_max": "distancia focal {actual} > {required}",
+        "f_stop_min": "apertura {actual} < {required}",
+        "f_stop_max": "apertura {actual} > {required}",
+        "no_value": "dato no disponible"
+      }
     },
     "penalty": {
       "blink": "Parpadeo detectado",
@@ -1531,7 +1560,8 @@
     "photos": "fotos",
     "threshold": "Similitud",
     "load_more": "Cargar más",
-    "view_detail": "Ver detalle"
+    "view_detail": "Ver detalle",
+    "cancel_pass": "Cancelar"
   },
   "memories": {
     "title": "En este día",
@@ -1735,7 +1765,11 @@
     "caption_edit_title": "Editar leyenda",
     "caption_error": "Error al generar la leyenda",
     "translating_caption": "Traduciendo...",
-    "location": "Ubicación"
+    "location": "Ubicación",
+    "edit_location": "Editar ubicación",
+    "add_location": "Añadir ubicación",
+    "gps_click_to_place": "Haz clic en el mapa para colocar un marcador",
+    "gps_clear": "Borrar ubicación"
   },
   "download": {
     "type_original": "Original",
