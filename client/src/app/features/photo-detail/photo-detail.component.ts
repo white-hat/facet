@@ -755,8 +755,18 @@ export class PhotoDetailComponent implements OnInit {
   protected onPanMove(e: PointerEvent): void {
     if (!this.isPanning()) return;
     const scale = this.zoomScale();
-    this.panX.set(this.panOriginX + (e.clientX - this.panStartX) / scale);
-    this.panY.set(this.panOriginY + (e.clientY - this.panStartY) / scale);
+    const rawX = this.panOriginX + (e.clientX - this.panStartX) / scale;
+    const rawY = this.panOriginY + (e.clientY - this.panStartY) / scale;
+    // Clamp pan so the image can't be dragged entirely off-screen
+    const el = this.imagePanel()?.nativeElement;
+    if (el) {
+      const limit = Math.max(el.clientWidth, el.clientHeight) / (2 * scale);
+      this.panX.set(Math.max(-limit, Math.min(limit, rawX)));
+      this.panY.set(Math.max(-limit, Math.min(limit, rawY)));
+    } else {
+      this.panX.set(rawX);
+      this.panY.set(rawY);
+    }
   }
 
   protected onPanEnd(e: PointerEvent): void {

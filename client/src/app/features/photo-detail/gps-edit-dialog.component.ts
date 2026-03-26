@@ -1,4 +1,4 @@
-import { Component, inject, signal, viewChild, ElementRef, DestroyRef } from '@angular/core';
+import { Component, inject, signal, viewChild, ElementRef, DestroyRef, afterNextRender } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
@@ -72,10 +72,7 @@ export class GpsEditDialogComponent {
     this.destroyRef.onDestroy(() => {
       if (this.map) { this.map.remove(); this.map = null; }
     });
-  }
-
-  ngAfterViewInit(): void {
-    setTimeout(() => this.initMap(), 300);
+    afterNextRender(() => this.initMap());
   }
 
   private initMap(): void {

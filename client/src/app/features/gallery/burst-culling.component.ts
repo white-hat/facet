@@ -416,6 +416,9 @@ export class BurstCullingComponent implements OnDestroy {
   protected skipGroup(group: CullingGroup): void {
     const key = this.groupKey(group);
 
+    // Clear any existing timer for this group before starting a new one
+    this.clearPassTimer(key);
+
     // Start the 5-second countdown
     this.passingGroups.update(m => {
       const next = new Map(m);
