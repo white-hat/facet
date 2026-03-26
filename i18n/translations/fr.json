@@ -1060,7 +1060,7 @@
       "semantic_search": "Recherche sémantique",
       "location": "Localisation",
       "persons": "Personnes",
-      "smart_album_filter_notice": "Les modifications des filtres ou du tri mettront à jour le filtre de cet album intelligent."
+      "smart_album_filter_notice": "Album intelligent — les filtres sont enregistrés automatiquement."
     },
     "semantic_search_info": "La recherche sémantique charge les embeddings en mémoire au premier usage. Cela peut prendre un moment pour les grandes bibliothèques.",
     "select_on_map": "Sélectionner sur la carte",
