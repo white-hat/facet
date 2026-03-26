@@ -94,13 +94,48 @@ SUGGESTIONS = {
 }
 
 
-def _build_category_reason(photo, category, config):
+def _build_category_trail(photo, matched_category, sc):
+    """Build list of interesting rejected categories evaluated before the match.
+
+    Only includes categories where the rejection is non-trivial (not just
+    'no matching tags for a tag-only category').
+    """
+    from config.category_filter import CategoryFilter
+
+    rejected = []
+    for cat in sc.get_categories():
+        name = cat.get('name')
+        if name == matched_category:
+            break
+
+        filters = cat.get('filters', {})
+        if not filters:
+            continue
+
+        cf = CategoryFilter(filters)
+        mismatch = cf.explain_mismatch(photo)
+        if mismatch is None:
+            continue
+
+        # Skip trivially irrelevant tag-only categories: if the only filters
+        # are tag-related and none of the required tags appear in the photo
+        filter_keys = set(filters.keys()) - {'tag_match_mode'}
+        is_tag_only = filter_keys <= {'required_tags', 'excluded_tags'}
+        if is_tag_only and mismatch['key'] == 'required_tags' and not mismatch.get('actual'):
+            continue
+
+        rejected.append({'category': name, 'mismatch': mismatch})
+        if len(rejected) >= 5:
+            break
+
+    return rejected
+
+
+def _build_category_reason(photo, category, sc):
     """Build structured category reason for i18n on the frontend."""
-    from config import ScoringConfig
-    sc = ScoringConfig()
     cat_config = sc.get_category_config(category)
     if not cat_config:
-        return {'reason_key': 'default', 'category': category or 'default', 'details': []}
+        return {'reason_key': 'default', 'category': category or 'default', 'details': [], 'rejected': []}
 
     filters = cat_config.get('filters', {})
     details = []
@@ -135,10 +170,13 @@ def _build_category_reason(photo, category, config):
     if 'shutter_speed_min' in filters and photo.get('shutter_speed'):
         details.append({'key': 'long_exposure'})
 
+    rejected = _build_category_trail(photo, category, sc)
+
     return {
         'reason_key': 'matched' if details else 'matched_generic',
         'category': category,
         'details': details,
+        'rejected': rejected,
     }
 
 
@@ -274,7 +312,9 @@ async def api_critique(
             'subject_sharpness', 'subject_prominence', 'subject_placement',
             'bg_separation', 'mean_saturation', 'mean_luminance',
             'face_ratio', 'face_count', 'is_monochrome', 'is_blink',
+            'is_silhouette', 'is_group_portrait',
             'highlight_clipped', 'shadow_clipped', 'tags', 'shutter_speed',
+            'focal_length', 'f_stop', 'iso',
         ]
         col_str = ', '.join(critique_cols)
         photo = conn.execute(
