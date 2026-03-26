@@ -1060,7 +1060,8 @@
       "add_filter": "Agregar filtro...",
       "semantic_search": "Búsqueda semántica",
       "location": "Ubicación",
-      "persons": "Personas"
+      "persons": "Personas",
+      "smart_album_filter_notice": "Los cambios en filtros o clasificación actualizarán el filtro guardado de este álbum inteligente."
     },
     "semantic_search_info": "La búsqueda semántica carga los embeddings en la RAM en el primer uso. Esto puede tardar un momento para bibliotecas grandes.",
     "select_on_map": "Seleccionar en el mapa",
@@ -1101,7 +1102,8 @@
     "power_point_range": "Puntos de fuerza",
     "quality_score_range": "Puntuación de calidad",
     "saturation_range": "Saturación",
-    "star_rating_range": "Valoración por estrellas"
+    "star_rating_range": "Valoración por estrellas",
+    "gps_clear": "Borrar ubicación"
   },
   "composition_patterns": {
     "none": "Ninguno",
@@ -1262,11 +1264,13 @@
       "skip_oversaturation_penalty": "Omitir penalización de sobresaturación",
       "apply_blink_penalty": "Aplicar penalización de parpadeo",
       "bonus_hint": "Desplazamiento fijo de puntuación añadido después de todos los cálculos ponderados.",
-      "noise_tolerance_hint": "Escala la penalizacion de ruido. 100% = penalizacion completa (por defecto), 0% = sin penalizacion, 30% = indulgente.",
-      "clipping_multiplier_hint": "Multiplica la penalizacion de recorte de altas luces. 100% = estandar, 150% = mas estricto, 0% = desactivado.",
+      "noise_tolerance_hint": "Escala la penalización por ruido. 100% = penalización completa (estándar), 0% = sin penalización, 30% = indulgente.",
+      "clipping_multiplier_hint": "Multiplica la penalización por recorte. 100% = estándar, 150% = más estricto, 0% = desactivado.",
       "skip_clipping_penalty_hint": "Desactiva la penalización de recorte de altas luces. Por defecto: activado para silueta.",
       "skip_oversaturation_penalty_hint": "Desactiva la penalización de sobresaturación. Por defecto: activado para nocturna, astro, concierto.",
-      "apply_blink_penalty_hint": "Aplica un multiplicador de puntuación al detectar parpadeo. Por defecto: activado para categorías de retrato."
+      "apply_blink_penalty_hint": "Aplica un multiplicador de puntuación al detectar parpadeo. Por defecto: activado para categorías de retrato.",
+      "noise_tolerance_range": "0% = sin penalización, 100% = penalización completa (estándar), 200% = doble penalización",
+      "clipping_multiplier_range": "0% = desactivado, 100% = estándar, 500% = muy estricto"
     },
     "filters": "Filtros",
     "filters_description": "Condiciones de asignación de categoría",

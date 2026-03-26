@@ -1060,7 +1060,8 @@
       "add_filter": "Aggiungi filtro...",
       "semantic_search": "Ricerca semantica",
       "location": "Posizione",
-      "persons": "Persone"
+      "persons": "Persone",
+      "smart_album_filter_notice": "Le modifiche ai filtri o all'ordinamento aggiorneranno il filtro salvato di questo album intelligente."
     },
     "semantic_search_info": "La ricerca semantica carica gli embedding nella RAM al primo utilizzo. Potrebbe richiedere un momento per le librerie di grandi dimensioni.",
     "select_on_map": "Seleziona sulla mappa",
@@ -1101,7 +1102,8 @@
     "power_point_range": "Punti di forza",
     "quality_score_range": "Punteggio qualità",
     "saturation_range": "Saturazione",
-    "star_rating_range": "Valutazione a stelle"
+    "star_rating_range": "Valutazione a stelle",
+    "gps_clear": "Rimuovi posizione"
   },
   "composition_patterns": {
     "none": "Nessuno",
@@ -1262,11 +1264,13 @@
       "skip_oversaturation_penalty": "Salta penalità di sovrasaturazione",
       "apply_blink_penalty": "Applica penalità ammiccamento",
       "bonus_hint": "Offset fisso di punteggio aggiunto dopo tutti i calcoli ponderati.",
-      "noise_tolerance_hint": "Scala la penalita del rumore. 100% = penalita piena (predefinito), 0% = nessuna penalita, 30% = indulgente.",
-      "clipping_multiplier_hint": "Moltiplica la penalita di ritaglio delle alte luci. 100% = standard, 150% = piu severo, 0% = disattivato.",
+      "noise_tolerance_hint": "Scala la penalità per rumore. 100% = penalità completa (predefinito), 0% = nessuna penalità, 30% = indulgente.",
+      "clipping_multiplier_hint": "Moltiplica la penalità di ritaglio. 100% = standard, 150% = più severo, 0% = disattivato.",
       "skip_clipping_penalty_hint": "Disattiva la penalità di ritaglio delle alte luci. Predefinito: attivo per silhouette.",
       "skip_oversaturation_penalty_hint": "Disattiva la penalità di sovrasaturazione. Predefinito: attivo per notturna, astro, concerto.",
-      "apply_blink_penalty_hint": "Applica un moltiplicatore di punteggio al rilevamento di ammiccamento. Predefinito: attivo per le categorie ritratto."
+      "apply_blink_penalty_hint": "Applica un moltiplicatore di punteggio al rilevamento di ammiccamento. Predefinito: attivo per le categorie ritratto.",
+      "noise_tolerance_range": "0% = nessuna penalità, 100% = penalità completa (predefinito), 200% = doppia penalità",
+      "clipping_multiplier_range": "0% = disattivato, 100% = standard, 500% = molto severo"
     },
     "filters": "Filtri",
     "filters_description": "Condizioni di assegnazione alla categoria",

@@ -1060,7 +1060,8 @@
       "add_filter": "Add Filter...",
       "semantic_search": "Semantic Search",
       "location": "Location",
-      "persons": "Persons"
+      "persons": "Persons",
+      "smart_album_filter_notice": "Changes to filters or sort order will update this smart album's saved filter."
     },
     "semantic_search_info": "Semantic search loads embeddings into RAM on first use. This may take a moment for large libraries.",
     "select_on_map": "Select on map",
@@ -1101,7 +1102,8 @@
     "subject_sharpness_range": "Subject Sharpness",
     "subject_prominence_range": "Subject Prominence",
     "subject_placement_range": "Subject Placement",
-    "bg_separation_range": "BG Separation"
+    "bg_separation_range": "BG Separation",
+    "gps_clear": "Clear location"
   },
   "composition_patterns": {
     "none": "None",

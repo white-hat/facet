@@ -1064,7 +1064,8 @@
       "add_filter": "Filter hinzufügen...",
       "semantic_search": "Semantische Suche",
       "location": "Standort",
-      "persons": "Personen"
+      "persons": "Personen",
+      "smart_album_filter_notice": "Änderungen an Filtern oder Sortierung aktualisieren den gespeicherten Filter dieses Smart-Albums."
     },
     "semantic_search_info": "Die semantische Suche lädt beim ersten Gebrauch Embeddings in den RAM. Bei großen Bibliotheken kann dies einen Moment dauern.",
     "select_on_map": "Auf Karte auswählen",
@@ -1105,7 +1106,8 @@
     "power_point_range": "Kraftpunkte",
     "quality_score_range": "Qualitätswert",
     "saturation_range": "Sättigung",
-    "star_rating_range": "Sternebewertung"
+    "star_rating_range": "Sternebewertung",
+    "gps_clear": "Standort entfernen"
   },
   "composition_patterns": {
     "none": "Keines",
@@ -1266,11 +1268,13 @@
       "skip_oversaturation_penalty": "Übersättigungsstrafe überspringen",
       "apply_blink_penalty": "Blinzelstrafe anwenden",
       "bonus_hint": "Fester Wertungsversatz, der nach allen gewichteten Berechnungen addiert wird.",
-      "noise_tolerance_hint": "Skaliert die Rauschstrafe. 100% = volle Strafe (Standard), 0% = keine Strafe, 30% = milde.",
-      "clipping_multiplier_hint": "Multipliziert die Uberbelichtungsstrafe. 100% = Standard, 150% = strenger, 0% = deaktiviert.",
+      "noise_tolerance_hint": "Skaliert die Rauschstrafe. 100% = volle Strafe (Standard), 0% = keine Strafe, 30% = nachsichtig.",
+      "clipping_multiplier_hint": "Multipliziert die Überbelichtungsstrafe. 100% = Standard, 150% = strenger, 0% = deaktiviert.",
       "skip_clipping_penalty_hint": "Deaktiviert die Überbelichtungsstrafe. Standard: aktiv für Silhouette.",
       "skip_oversaturation_penalty_hint": "Deaktiviert die Übersättigungsstrafe. Standard: aktiv für Nacht, Astro, Konzert.",
-      "apply_blink_penalty_hint": "Wendet einen Wertungsmultiplikator bei Blinzelerkennung an. Standard: aktiv für Porträtkategorien."
+      "apply_blink_penalty_hint": "Wendet einen Wertungsmultiplikator bei Blinzelerkennung an. Standard: aktiv für Porträtkategorien.",
+      "noise_tolerance_range": "0% = keine Strafe, 100% = volle Strafe (Standard), 200% = doppelte Strafe",
+      "clipping_multiplier_range": "0% = deaktiviert, 100% = Standard, 500% = sehr streng"
     },
     "filters": "Filter",
     "filters_description": "Bedingungen für die Kategoriezuordnung",

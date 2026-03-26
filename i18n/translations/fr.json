@@ -1059,7 +1059,8 @@
       "add_filter": "Ajouter un filtre...",
       "semantic_search": "Recherche sémantique",
       "location": "Localisation",
-      "persons": "Personnes"
+      "persons": "Personnes",
+      "smart_album_filter_notice": "Les modifications des filtres ou du tri mettront à jour le filtre de cet album intelligent."
     },
     "semantic_search_info": "La recherche sémantique charge les embeddings en mémoire au premier usage. Cela peut prendre un moment pour les grandes bibliothèques.",
     "select_on_map": "Sélectionner sur la carte",
@@ -1100,7 +1101,8 @@
     "subject_sharpness_range": "Netteté du sujet",
     "subject_prominence_range": "Proéminence du sujet",
     "subject_placement_range": "Placement du sujet",
-    "bg_separation_range": "Séparation fond"
+    "bg_separation_range": "Séparation fond",
+    "gps_clear": "Supprimer la position"
   },
   "composition_patterns": {
     "none": "Aucun",
@@ -1261,11 +1263,13 @@
       "skip_oversaturation_penalty": "Ignorer la pénalité de sursaturation",
       "apply_blink_penalty": "Appliquer la pénalité de clignement",
       "bonus_hint": "Décalage fixe du score ajouté après tous les calculs pondérés.",
-      "noise_tolerance_hint": "Echelle de la penalite de bruit. 100% = penalite complete (defaut), 0% = aucune penalite, 30% = indulgent.",
-      "clipping_multiplier_hint": "Multiplie la penalite d'ecretage des hautes lumieres. 100% = standard, 150% = plus strict, 0% = desactive.",
+      "noise_tolerance_hint": "Échelle de la pénalité de bruit. 100% = pénalité complète (défaut), 0% = aucune pénalité, 30% = indulgent.",
+      "clipping_multiplier_hint": "Multiplie la pénalité d'écrêtage des hautes lumières. 100% = standard, 150% = plus strict, 0% = désactivé.",
       "skip_clipping_penalty_hint": "Désactive la pénalité d'écrêtage des hautes lumières. Par défaut : activé pour silhouette.",
       "skip_oversaturation_penalty_hint": "Désactive la pénalité de sursaturation. Par défaut : activé pour nuit, astro, concert.",
-      "apply_blink_penalty_hint": "Applique un multiplicateur de score en cas de clignement. Par défaut : activé pour les catégories portrait."
+      "apply_blink_penalty_hint": "Applique un multiplicateur de score en cas de clignement. Par défaut : activé pour les catégories portrait.",
+      "noise_tolerance_range": "0% = pas de pénalité, 100% = pénalité complète (défaut), 200% = double pénalité",
+      "clipping_multiplier_range": "0% = désactivé, 100% = standard (défaut), 500% = très strict"
     },
     "filters": "Filtres",
     "filters_description": "Conditions d'affectation à une catégorie",

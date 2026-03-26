@@ -3,11 +3,14 @@ import { FormsModule } from '@angular/forms';
 import { MatDialogModule, MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import * as L from 'leaflet';
 import { createLeafletMap } from '../../shared/leaflet';
 import { ApiService } from '../../core/services/api.service';
+import { I18nService } from '../../core/services/i18n.service';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
+import { FixedPipe } from '../../shared/pipes/fixed.pipe';
 
 export interface GpsEditDialogData {
   path: string;
@@ -19,21 +22,21 @@ export interface GpsEditDialogData {
 @Component({
   selector: 'app-gps-edit-dialog',
   standalone: true,
-  imports: [FormsModule, MatDialogModule, MatButtonModule, MatIconModule, TranslatePipe],
+  imports: [FormsModule, MatDialogModule, MatButtonModule, MatIconModule, MatSnackBarModule, TranslatePipe, FixedPipe],
   // Leaflet requires ::ng-deep styles because its DOM is created outside Angular's view encapsulation.
   styles: [`
-    :host ::ng-deep .leaflet-container { height: 100%; width: 100%; }
+    :host ::ng-deep .leaflet-container { width: 100%; }
   `],
   template: `
-    <h2 mat-dialog-title class="flex items-center gap-2">
-      <mat-icon>location_on</mat-icon>
+    <h2 mat-dialog-title class="!flex items-center gap-2">
+      <mat-icon class="!text-xl !w-5 !h-5 !leading-5 shrink-0">location_on</mat-icon>
       <span class="truncate">{{ data.filename }}</span>
     </h2>
     <mat-dialog-content class="!p-0">
       <div #mapContainer class="w-full h-64"></div>
       <div class="px-4 py-2 text-xs text-[var(--mat-sys-on-surface-variant)]">
         @if (selectedLat() != null) {
-          {{ selectedLat()!.toFixed(6) }}, {{ selectedLng()!.toFixed(6) }}
+          {{ selectedLat()! | fixed:6 }}, {{ selectedLng()! | fixed:6 }}
         } @else {
           {{ 'photo_detail.gps_click_to_place' | translate }}
         }
@@ -52,6 +55,8 @@ export class GpsEditDialogComponent {
   private readonly api = inject(ApiService);
   private readonly dialogRef = inject(MatDialogRef<GpsEditDialogComponent>);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly snackBar = inject(MatSnackBar);
+  private readonly i18n = inject(I18nService);
   readonly data: GpsEditDialogData = inject(MAT_DIALOG_DATA);
 
   readonly mapContainer = viewChild.required<ElementRef<HTMLDivElement>>('mapContainer');
@@ -69,15 +74,8 @@ export class GpsEditDialogComponent {
     });
   }
 
-  /**
-   * Called by the dialog after the view is initialized.
-   * We use afterOpened to ensure the container has layout dimensions.
-   */
   ngAfterViewInit(): void {
-    // Wait for the dialog animation to finish and the container to have dimensions
-    this.dialogRef.afterOpened().subscribe(() => {
-      setTimeout(() => this.initMap(), 0);
-    });
+    setTimeout(() => this.initMap(), 300);
   }
 
   private initMap(): void {
@@ -129,7 +127,7 @@ export class GpsEditDialogComponent {
         gps_longitude: this.selectedLng(),
       });
     } catch {
-      // Error — dialog stays open
+      this.snackBar.open(this.i18n.t('notifications.connection_error'), '', { duration: 3000 });
     } finally {
       this.saving.set(false);
     }
