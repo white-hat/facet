@@ -5,11 +5,13 @@ Map view router — GPS-based photo browsing with clustering at low zoom levels.
 
 import logging
 import re
+import sqlite3
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
-from api.auth import CurrentUser, get_optional_user
+from api.auth import CurrentUser, get_optional_user, require_edition
 from api.database import get_db_connection
 from api.db_helpers import get_existing_columns, get_visibility_clause
 
@@ -181,5 +183,50 @@ async def api_photos_map_count(
         ).fetchone()
 
         return {'count': row['cnt']}
+    finally:
+        conn.close()
+
+
+class GpsUpdateRequest(BaseModel):
+    path: str
+    gps_latitude: Optional[float] = None
+    gps_longitude: Optional[float] = None
+
+
+@router.put("/api/photo/gps")
+async def api_update_gps(
+    body: GpsUpdateRequest,
+    user: CurrentUser = Depends(require_edition),
+):
+    """Update GPS coordinates for a photo (edition mode required)."""
+    existing_cols = get_existing_columns()
+    if 'gps_latitude' not in existing_cols or 'gps_longitude' not in existing_cols:
+        raise HTTPException(status_code=400, detail="GPS columns not available")
+
+    if (body.gps_latitude is None) != (body.gps_longitude is None):
+        raise HTTPException(status_code=400, detail="Both latitude and longitude must be set or both must be null")
+
+    conn = get_db_connection()
+    try:
+        user_id = user.user_id if user else None
+        vis_sql, vis_params = get_visibility_clause(user_id)
+
+        row = conn.execute(
+            f"SELECT path FROM photos WHERE path = ? AND {vis_sql}",
+            [body.path] + vis_params,
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Photo not found")
+
+        conn.execute(
+            f"UPDATE photos SET gps_latitude = ?, gps_longitude = ? WHERE path = ? AND {vis_sql}",
+            [body.gps_latitude, body.gps_longitude, body.path] + vis_params,
+        )
+        conn.commit()
+        return {'gps_latitude': body.gps_latitude, 'gps_longitude': body.gps_longitude}
+    except sqlite3.Error:
+        logger.exception("Database error updating GPS for photo %s", body.path)
+        conn.rollback()
+        raise HTTPException(status_code=500, detail='Internal server error')
     finally:
         conn.close()
