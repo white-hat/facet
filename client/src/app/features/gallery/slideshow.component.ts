@@ -313,12 +313,10 @@ export class SlideshowComponent implements OnDestroy {
   /** Compute the animated transition CSS for the current transitionType. */
   private getAnimateTransition(): string {
     if (this.prefersReducedMotion()) return 'opacity 150ms ease';
-    const t = this.transitionType();
-    const dur = this.slideDuration();
-    switch (t) {
+    switch (this.transitionType()) {
       case 'slide': return 'transform 500ms ease, opacity 300ms ease';
       case 'zoom': return 'transform 500ms ease, opacity 400ms ease';
-      case 'kenburns': return `transform ${dur}s ease-out, opacity 300ms ease`;
+      case 'kenburns': return 'opacity 300ms ease';
       case 'fade_black': return 'opacity 400ms ease';
       case 'blur': return 'filter 400ms ease, opacity 400ms ease';
       case 'flip': return 'transform 500ms ease, opacity 250ms ease';
@@ -368,12 +366,7 @@ export class SlideshowComponent implements OnDestroy {
         const startIdx = untracked(() => this.initialSlideIndex());
         const idx = startIdx < slides.length ? startIdx : 0;
         const slide = slides[idx];
-        untracked(() => {
-          this.currentSlideIndex.set(idx);
-          const kbPatterns = this.pickKenBurnsPatterns(slide.photos.length);
-          this.initKenBurns(this.layerAImgTransforms, this.layerAImgTransitions, kbPatterns);
-          this.animateKenBurns(this.layerAImgTransforms, this.layerAImgTransitions, kbPatterns);
-        });
+        untracked(() => this.currentSlideIndex.set(idx));
         this.layerASlide.set(slide);
         this.layerAOpacity.set(1);
         this.frontLayer.set('a');
