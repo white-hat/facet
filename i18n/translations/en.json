@@ -1156,7 +1156,11 @@
     "weather": "Weather",
     "fashion": "Fashion",
     "silhouette": "Silhouette",
-    "portrait_bw": "B&W Portrait"
+    "portrait_bw": "B&W Portrait",
+    "golden_hour": "Golden Hour",
+    "blue_hour": "Blue Hour",
+    "product": "Product",
+    "candid": "Candid"
   },
   "comparison": {
     "title": "Weight Tuning",

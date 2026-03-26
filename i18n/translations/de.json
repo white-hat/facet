@@ -1160,7 +1160,11 @@
     "weather": "Wetter",
     "fashion": "Mode",
     "silhouette": "Silhouette",
-    "portrait_bw": "S&W-Porträt"
+    "portrait_bw": "S&W-Porträt",
+    "golden_hour": "Goldene Stunde",
+    "blue_hour": "Blaue Stunde",
+    "product": "Produkt",
+    "candid": "Spontan"
   },
   "comparison": {
     "title": "Gewichtungsoptimierung",

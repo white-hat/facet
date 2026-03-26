@@ -1156,7 +1156,11 @@
     "weather": "Meteorología",
     "fashion": "Moda",
     "silhouette": "Silueta",
-    "portrait_bw": "Retrato B/N"
+    "portrait_bw": "Retrato B/N",
+    "golden_hour": "Hora dorada",
+    "blue_hour": "Hora azul",
+    "product": "Producto",
+    "candid": "Espontánea"
   },
   "comparison": {
     "title": "Ajuste de pesos",

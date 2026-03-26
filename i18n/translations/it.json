@@ -1156,7 +1156,11 @@
     "weather": "Meteo",
     "fashion": "Moda",
     "silhouette": "Silhouette",
-    "portrait_bw": "Ritratto B/N"
+    "portrait_bw": "Ritratto B/N",
+    "golden_hour": "Ora dorata",
+    "blue_hour": "Ora blu",
+    "product": "Prodotto",
+    "candid": "Spontanea"
   },
   "comparison": {
     "title": "Regolazione pesi",

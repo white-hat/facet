@@ -1155,7 +1155,11 @@
     "weather": "Meteo",
     "fashion": "Mode",
     "silhouette": "Silhouette",
-    "portrait_bw": "Portrait N&B"
+    "portrait_bw": "Portrait N&B",
+    "golden_hour": "Heure dorée",
+    "blue_hour": "Heure bleue",
+    "product": "Produit",
+    "candid": "Spontané"
   },
   "comparison": {
     "title": "Reglage des poids",
