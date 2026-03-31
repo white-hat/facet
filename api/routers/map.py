@@ -30,8 +30,8 @@ def _get_cluster_zoom_threshold():
         return 10
 
 
-def _get_clustered_photos(conn, bounds, zoom, vis_sql, vis_params, existing_cols,
-                          date_from, date_to, user_id, base_where, base_params, limit):
+def _get_clustered_photos(conn, zoom, date_from, date_to, user_id,
+                          base_where, base_params, limit):
     """Return clustered photo locations grouped into grid cells for low zoom levels."""
     effective_zoom = max(zoom, 2)
     cell_size = 180.0 / (2 ** effective_zoom)
@@ -80,8 +80,7 @@ def _get_clustered_photos(conn, bounds, zoom, vis_sql, vis_params, existing_cols
     return {'clusters': clusters, 'photos': []}
 
 
-def _get_individual_photos(conn, bounds, vis_sql, vis_params, existing_cols,
-                           base_where, base_params, limit):
+def _get_individual_photos(conn, base_where, base_params, limit):
     """Return individual photo locations for high zoom levels."""
     rows = conn.execute(
         f"SELECT path, gps_latitude AS lat, gps_longitude AS lng, "
@@ -164,13 +163,12 @@ async def api_photos_map(
 
         if zoom < _get_cluster_zoom_threshold():
             return _get_clustered_photos(
-                conn, bounds, zoom, vis_sql, vis_params, existing_cols,
-                date_from, date_to, user_id, base_where, base_params, limit,
+                conn, zoom, date_from, date_to, user_id,
+                base_where, base_params, limit,
             )
         else:
             return _get_individual_photos(
-                conn, bounds, vis_sql, vis_params, existing_cols,
-                base_where, base_params, limit,
+                conn, base_where, base_params, limit,
             )
 
     finally:

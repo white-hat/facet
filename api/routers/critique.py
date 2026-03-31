@@ -24,6 +24,7 @@ _WEAKNESS_THRESHOLD = 5.0
 # Noise thresholds
 _NOISE_CLEAN_THRESHOLD = 3.0
 _NOISE_HIGH_THRESHOLD = 8.0
+_NOISE_PENALTY_THRESHOLD = 4.0
 
 # Metric labels for human-readable output
 METRIC_LABELS = {
@@ -272,8 +273,8 @@ def _check_penalties(photo):
     penalties = {}
     if photo.get('is_blink'):
         penalties['blink'] = True
-    if photo.get('noise_sigma') and photo['noise_sigma'] > 4:
-        noise_penalty = min(1.5, max(0, (photo['noise_sigma'] - 4) * 0.3))
+    if photo.get('noise_sigma') and photo['noise_sigma'] > _NOISE_PENALTY_THRESHOLD:
+        noise_penalty = min(1.5, max(0, (photo['noise_sigma'] - _NOISE_PENALTY_THRESHOLD) * 0.3))
         if noise_penalty > 0:
             penalties['noise'] = round(-noise_penalty, 2)
     if photo.get('highlight_clipped') and photo['highlight_clipped'] > 0:
