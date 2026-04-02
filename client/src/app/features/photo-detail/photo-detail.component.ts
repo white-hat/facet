@@ -10,10 +10,9 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
 import { Photo } from '../../shared/models/photo.model';
-import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
-import { I18nService } from '../../core/services/i18n.service';
 import { PhotoActionsService } from '../../core/services/photo-actions.service';
+import { PhotoDetailBase } from '../../shared/directives/photo-detail-base.directive';
 import { FixedPipe } from '../../shared/pipes/fixed.pipe';
 import { ShutterSpeedPipe } from '../../shared/pipes/shutter-speed.pipe';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
@@ -423,27 +422,21 @@ import { createLeafletMap } from '../../shared/leaflet';
   `,
   host: { class: 'block h-full overflow-y-auto lg:overflow-y-hidden' },
 })
-export class PhotoDetailComponent implements OnInit {
+export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
   private readonly location = inject(Location);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly api = inject(ApiService);
   protected readonly auth = inject(AuthService);
   protected readonly store = inject(GalleryStore);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
-  private readonly i18n = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly photoActions = inject(PhotoActionsService);
 
-  protected readonly photo = signal<Photo | null>(null);
-  protected readonly fullImageLoaded = signal(false);
+  readonly photo = signal<Photo | null>(null);
   protected readonly downloading = signal(false);
   protected readonly downloadOptions = signal<DownloadOption[]>([]);
   protected readonly generatingCaption = signal(false);
-  protected readonly translatingCaption = signal(false);
-  protected readonly translatedCaption = signal<string | null>(null);
-  protected readonly displayCaption = computed(() => this.translatedCaption() ?? this.photo()?.caption ?? null);
   protected readonly stars: readonly number[] = [1, 2, 3, 4, 5];
 
   // Zoom & pan state
@@ -526,33 +519,8 @@ export class PhotoDetailComponent implements OnInit {
     }, 0);
   });
 
-  private readonly captionTranslationEffect = effect(() => {
-    const p = this.photo();
-    const locale = this.i18n.locale();
-    if (!p?.caption || locale === 'en') {
-      this.translatedCaption.set(null);
-      return;
-    }
-    // Use caption_translated from API response if already cached
-    if (p.caption_translated) {
-      this.translatedCaption.set(p.caption_translated);
-      return;
-    }
-    // Fetch translation on-demand
-    this.translatingCaption.set(true);
-    firstValueFrom(this.api.get<{ caption: string; lang?: string }>('/caption', { path: p.path, lang: locale }))
-      .then(res => {
-        if (res.lang) {
-          this.translatedCaption.set(res.caption);
-        } else {
-          this.translatedCaption.set(null);
-        }
-      })
-      .catch(() => this.translatedCaption.set(null))
-      .finally(() => this.translatingCaption.set(false));
-  });
-
   constructor() {
+    super();
     this.destroyRef.onDestroy(() => {
       if (this.locationMapTimeout !== null) clearTimeout(this.locationMapTimeout);
       if (this.locationMap) { this.locationMap.remove(); this.locationMap = null; }
@@ -565,17 +533,6 @@ export class PhotoDetailComponent implements OnInit {
       el.addEventListener('touchmove', (e: TouchEvent) => this.onTouchMove(e), { passive: false });
     });
   }
-
-  protected readonly fullImageUrl = computed(() => {
-    const p = this.photo();
-    return p ? this.api.imageUrl(p.path) : '';
-  });
-
-  protected readonly hasExif = computed(() => {
-    const p = this.photo();
-    if (!p) return false;
-    return !!(p.camera_model || p.lens_model || p.focal_length || p.f_stop || p.shutter_speed || p.iso);
-  });
 
   async ngOnInit(): Promise<void> {
     // Try router state (passed from gallery via navigate(..., { state }))
@@ -622,10 +579,6 @@ export class PhotoDetailComponent implements OnInit {
     } finally {
       this.downloading.set(false);
     }
-  }
-
-  protected onFullImageLoad(): void {
-    this.fullImageLoaded.set(true);
   }
 
   protected async setRating(path: string, rating: number): Promise<void> {

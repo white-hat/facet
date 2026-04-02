@@ -40,7 +40,7 @@ interface CalendarCell {
 
       <!-- Calendar grid -->
       <div class="grid grid-cols-7 gap-2">
-        @for (cell of calendarCells(); track $index) {
+        @for (cell of calendarCells(); track cell.date ?? $index) {
           @if (cell.date) {
             <button
               class="relative rounded-xl overflow-hidden transition-shadow cursor-pointer aspect-square"
