@@ -78,7 +78,7 @@ class TestHostComponent {
 
 describe('PhotoCardComponent', () => {
   let fixture: ComponentFixture<TestHostComponent>;
-  const mockI18n = { t: jest.fn((key: string) => key), currentLang: jest.fn(() => 'en') };
+  const mockI18n = { t: jest.fn((key: string) => key), currentLang: jest.fn(() => 'en'), locale: jest.fn(() => 'en') };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({

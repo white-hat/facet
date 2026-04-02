@@ -92,7 +92,8 @@ class TestSearch:
             mock.patch("api.routers.search.get_preference_columns", return_value={}),
             mock.patch("api.routers.search._load_embedding_matrix", return_value=(matrix, paths)),
             mock.patch("api.routers.search._encode_text", return_value=text_emb),
-            mock.patch("api.routers.search._fts_available", False),
+            mock.patch("api.routers.search._has_fts", return_value=False),
+            mock.patch("api.routers.search._check_vec_available", return_value=False),
             mock.patch("api.routers.search.attach_person_data"),
             mock.patch("api.routers.search.sanitize_float_values"),
         ):

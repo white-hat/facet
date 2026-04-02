@@ -78,7 +78,7 @@ class TestHostComponent {
 
 describe('PhotoTooltipComponent', () => {
   let fixture: ComponentFixture<TestHostComponent>;
-  const mockI18n = { t: (key: string) => key };
+  const mockI18n = { t: (key: string) => key, locale: jest.fn(() => 'en') };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
