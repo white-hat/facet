@@ -51,8 +51,8 @@ interface AppConfig {
       [class.md:hover:ring-[var(--mat-sys-outline-variant)]]="!isSelected()"
       [attr.aria-label]="photo().filename"
       (click)="onSelect($event)"
-      (keydown.enter)="onSelect($event)"
-      (keydown.space)="onSelect($event); $event.preventDefault()"
+      (keydown.enter)="onKeySelect($event)"
+      (keydown.space)="onKeySelect($event)"
       (dblclick)="doubleClicked.emit(photo()); $event.stopPropagation()"
       (mouseenter)="tooltipShow.emit({photo: photo(), event: $event})"
       (mouseleave)="tooltipHide.emit()"
@@ -276,6 +276,11 @@ export class PhotoCardComponent {
 
   onSelect(event: MouseEvent): void {
     this.selectionChange.emit({ photo: this.photo(), event });
+  }
+
+  onKeySelect(event: Event): void {
+    event.preventDefault();
+    this.selectionChange.emit({ photo: this.photo(), event: event as MouseEvent });
   }
   readonly tooltipShow = output<{ photo: Photo; event: MouseEvent }>();
   readonly tooltipHide = output<void>();
