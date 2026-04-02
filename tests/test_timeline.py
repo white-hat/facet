@@ -168,8 +168,10 @@ class TestTimelineEndpoint:
         body = resp.json()
         assert len(body["groups"]) == 1
 
-    def test_db_error_returns_empty(self, client):
+    def test_db_error_returns_empty(self):
         """On database exception, returns empty result instead of 500."""
+        app = create_app()
+        client = TestClient(app, raise_server_exceptions=False)
         mock_conn = mock.MagicMock()
         mock_conn.execute.side_effect = Exception("DB error")
 
@@ -227,7 +229,9 @@ class TestTimelineDates:
         body = resp.json()
         assert len(body["dates"]) == 1
 
-    def test_db_error_returns_empty_dates(self, client):
+    def test_db_error_returns_empty_dates(self):
+        app = create_app()
+        client = TestClient(app, raise_server_exceptions=False)
         mock_conn = mock.MagicMock()
         mock_conn.execute.side_effect = Exception("DB error")
 

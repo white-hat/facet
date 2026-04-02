@@ -137,7 +137,9 @@ class TestFolders:
         assert len(matching_params) > 0
         mock_conn.close.assert_called_once()
 
-    def test_db_error_returns_empty(self, client):
+    def test_db_error_returns_empty(self):
+        app = create_app()
+        client = TestClient(app, raise_server_exceptions=False)
         mock_conn = mock.MagicMock()
         mock_conn.execute.side_effect = RuntimeError("db failure")
 

@@ -234,7 +234,7 @@ class TestGalleryConnScope:
             mock.patch("api.routers.gallery.VIEWER_CONFIG", _VIEWER_CONFIG),
             mock.patch("api.db_helpers._existing_columns_cache", None),
         ):
-            resp = TestClient(app).get("/api/photos?page=1")
+            resp = TestClient(app, raise_server_exceptions=False).get("/api/photos?page=1")
         assert resp.status_code == 500
         conn_mock.close.assert_called_once()
 
