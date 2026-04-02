@@ -154,6 +154,10 @@ def create_app() -> FastAPI:
     app.include_router(capsules_router)
     app.include_router(folders_router)
 
+    # Check for plaintext passwords at startup
+    from api.auth import check_legacy_password_warnings
+    check_legacy_password_warnings()
+
     # Initialise plugin manager (global singleton + router reference)
     from plugins import init_global_plugin_manager
     from api.routers.plugins import init_plugin_manager
