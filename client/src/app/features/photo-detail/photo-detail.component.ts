@@ -568,6 +568,34 @@ export class PhotoDetailComponent extends PhotoDetailBase implements OnInit {
     this.location.back();
   }
 
+  @HostListener('document:keydown.arrowleft')
+  protected prevPhoto(): void {
+    this.navigateAdjacentPhoto(-1);
+  }
+
+  @HostListener('document:keydown.arrowright')
+  protected nextPhoto(): void {
+    this.navigateAdjacentPhoto(1);
+  }
+
+  private navigateAdjacentPhoto(delta: number): void {
+    const current = this.photo();
+    if (!current) return;
+    const photos = this.store.photos();
+    if (photos.length === 0) return;
+    const idx = photos.findIndex(p => p.path === current.path);
+    if (idx === -1) return;
+    const nextIdx = idx + delta;
+    if (nextIdx < 0 || nextIdx >= photos.length) return;
+    const next = photos[nextIdx];
+    this.router.navigate(['/photo'], {
+      queryParams: { path: next.path },
+      state: { photo: next },
+    });
+    this.photo.set(next);
+    this.fullImageLoaded.set(false);
+  }
+
   protected async download(path: string, type = 'original', profile?: string): Promise<void> {
     this.downloading.set(true);
     try {

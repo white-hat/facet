@@ -847,6 +847,8 @@ export class GalleryStore {
       params['hide_duplicates'] = String(f.hide_duplicates);
     if (f.hide_rejected !== (defaults?.hide_rejected ?? true))
       params['hide_rejected'] = String(f.hide_rejected);
+    if (f.hide_tooltip !== (defaults?.hide_tooltip ?? false))
+      params['hide_tooltip'] = String(f.hide_tooltip);
     if (f.favorites_only) params['favorites_only'] = 'true';
     if (f.is_monochrome) params['is_monochrome'] = 'true';
 
