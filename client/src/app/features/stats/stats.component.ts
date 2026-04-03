@@ -306,7 +306,7 @@ export class StatsComponent {
       const cat = this.statsFilters.filterCategory();
       const from = this.statsFilters.dateFrom();
       const to = this.statsFilters.dateTo();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const qp: any = {};
       if (cat) qp.category = cat;
       if (from) qp.date_from = from;

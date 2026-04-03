@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { I18nService } from '../../../core/services/i18n.service';
 import { PersonCardComponent, Person } from './person-card.component';
 
+/* eslint-disable @angular-eslint/component-selector */
 @Component({
   selector: 'test-host',
   standalone: true,

@@ -43,6 +43,7 @@ import { TranslatePipe } from '../../shared/pipes/translate.pipe';
               (click)="dialogRef.close(person)"
             >
               <img [src]="person.id | personThumbnailUrl"
+                   [alt]="person.name"
                    class="w-14 h-14 rounded-full object-cover border border-neutral-700" />
               <div class="flex flex-col min-w-0">
                 <span class="text-base font-medium truncate">{{ person.name }}</span>

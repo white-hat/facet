@@ -68,6 +68,7 @@ const NUMERIC_FILTER_RANGES: NumericFilterRange[] = [
 
 class SignalErrorMatcher {
   constructor(private readonly check: () => boolean) {}
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   isErrorState(_ctrl: unknown, _form: unknown): boolean { return this.check(); }
 }
 

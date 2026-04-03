@@ -66,6 +66,7 @@ const makePhoto = (overrides: Partial<Photo> = {}): Photo => ({
   ...overrides,
 });
 
+/* eslint-disable @angular-eslint/component-selector */
 @Component({
   selector: 'test-host',
   standalone: true,

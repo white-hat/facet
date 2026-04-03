@@ -291,7 +291,7 @@ export class SlideshowComponent implements OnDestroy {
   readonly layerAImgTransitions = signal<string[]>([]);
   readonly layerBImgTransitions = signal<string[]>([]);
 
-  private readonly kenBurnsPatterns: Array<{ start: string; end: string }> = [
+  private readonly kenBurnsPatterns: { start: string; end: string }[] = [
     // Zoom in + pan variations
     { start: 'scale(1.0)', end: 'scale(1.06) translate(1.5%, 0.8%)' },
     { start: 'scale(1.0)', end: 'scale(1.06) translate(-1.5%, -0.8%)' },
@@ -590,8 +590,8 @@ export class SlideshowComponent implements OnDestroy {
   }
 
   /** Pick N Ken Burns patterns from the cycle (one per image in the slide). */
-  private pickKenBurnsPatterns(count: number): Array<{ start: string; end: string }> {
-    const result: Array<{ start: string; end: string }> = [];
+  private pickKenBurnsPatterns(count: number): { start: string; end: string }[] {
+    const result: { start: string; end: string }[] = [];
     for (let i = 0; i < count; i++) {
       result.push(this.kenBurnsPatterns[this.kenBurnsPatternIndex % this.kenBurnsPatterns.length]);
       this.kenBurnsPatternIndex++;
@@ -603,7 +603,7 @@ export class SlideshowComponent implements OnDestroy {
   private initKenBurns(
     imgTransforms: WritableSignal<string[]>,
     imgTransitions: WritableSignal<string[]>,
-    patterns: Array<{ start: string; end: string }>,
+    patterns: { start: string; end: string }[],
   ): void {
     imgTransitions.set(patterns.map(() => 'none'));
     imgTransforms.set(patterns.map(p => p.start));
@@ -613,7 +613,7 @@ export class SlideshowComponent implements OnDestroy {
   private animateKenBurns(
     imgTransforms: WritableSignal<string[]>,
     imgTransitions: WritableSignal<string[]>,
-    patterns: Array<{ start: string; end: string }>,
+    patterns: { start: string; end: string }[],
   ): void {
     if (this.prefersReducedMotion()) return;
     if (this.kenburnsTimer) clearTimeout(this.kenburnsTimer);

@@ -48,6 +48,7 @@ interface CalendarCell {
               (click)="cell.count > 0 && daySelected.emit(cell.date)">
               @if (cell.hero_photo_path) {
                 <img [src]="cell.hero_photo_path | thumbnailUrl:320"
+                     alt=""
                      class="absolute inset-0 w-full h-full object-cover" loading="lazy" />
                 <div class="absolute inset-0 bg-black/30"></div>
               }
