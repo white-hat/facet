@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
 from api.auth import CurrentUser, decode_access_token, require_superadmin
-from api.config import VIEWER_CONFIG, FACET_SCRIPT, get_all_scan_directories, get_user_directories
+from api.config import VIEWER_CONFIG, FACET_SCRIPT, get_all_scan_directories, get_user_directories, _photo_types_cache, _stats_cache
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
 logger = logging.getLogger(__name__)
@@ -42,6 +42,9 @@ def _read_scan_output(proc):
     proc.wait()
     _scan_state['exit_code'] = proc.returncode
     _scan_state['running'] = False
+    # Invalidate caches after scan adds/updates photos
+    _photo_types_cache['expires'] = 0
+    _stats_cache.clear()
 
 
 class ScanStartRequest(BaseModel):

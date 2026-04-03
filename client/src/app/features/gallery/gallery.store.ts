@@ -668,7 +668,10 @@ export class GalleryStore {
       hide_rejected: defaults?.hide_rejected ?? true,
     });
     this.resetCardWidth();
-    this.setGalleryMode(defaults?.gallery_mode ?? 'grid');
+    // Preserve user's gallery mode preference from localStorage
+    if (!localStorage.getItem(GALLERY_MODE_KEY)) {
+      this.setGalleryMode(defaults?.gallery_mode ?? 'grid');
+    }
     saveDisplayOptionsToStorage(this.filters());
     this.syncUrl();
     await this.loadPhotos();
