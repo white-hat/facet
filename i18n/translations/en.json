@@ -1675,6 +1675,7 @@
     "save_as_album": "Save as album",
     "saved_as_album": "Saved as album",
     "save_album_error": "Failed to save album",
+    "load_error": "Failed to load capsule photos",
     "seeded_time_title": "Around {date}",
     "seeded_similar_title": "Visually Similar",
     "seeded_person_title": "More of {name}",

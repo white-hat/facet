@@ -1677,6 +1677,7 @@
     "save_as_album": "Salva come album",
     "saved_as_album": "Salvato come album",
     "save_album_error": "Impossibile salvare l'album",
+    "load_error": "Impossibile caricare le foto della capsula",
     "seeded_time_title": "Intorno a {date}",
     "seeded_similar_title": "Visivamente simili",
     "seeded_person_title": "Ancora {name}",

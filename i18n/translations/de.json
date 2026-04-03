@@ -1681,6 +1681,7 @@
     "save_as_album": "Als Album speichern",
     "saved_as_album": "Als Album gespeichert",
     "save_album_error": "Album konnte nicht gespeichert werden",
+    "load_error": "Kapselfotos konnten nicht geladen werden",
     "seeded_time_title": "Um {date}",
     "seeded_similar_title": "Visuell ähnlich",
     "seeded_person_title": "Mehr von {name}",

@@ -1677,6 +1677,7 @@
     "save_as_album": "Guardar como álbum",
     "saved_as_album": "Guardado como álbum",
     "save_album_error": "Error al guardar el álbum",
+    "load_error": "No se pudieron cargar las fotos de la cápsula",
     "seeded_time_title": "Alrededor de {date}",
     "seeded_similar_title": "Visualmente similares",
     "seeded_person_title": "Más de {name}",
