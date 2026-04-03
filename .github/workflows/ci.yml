@@ -17,7 +17,7 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - name: Install test dependencies
-        run: pip install pytest fastapi[standard] httpx pyjwt pillow numpy scipy scikit-learn
+        run: pip install pytest fastapi[standard] httpx pyjwt pillow numpy scipy scikit-learn opencv-python-headless tqdm
       - name: Run tests
         run: python -m pytest --tb=short -q
 
