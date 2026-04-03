@@ -91,46 +91,6 @@ def _build_type_filters():
 TYPE_FILTERS = _build_type_filters()
 del _scoring_config, _config_categories
 
-TYPE_DEFAULT_SORTS = {
-    'top_picks': [('top_picks_score', 'DESC'), ('date_taken', 'DESC')],
-    'portraits': [('face_quality', 'DESC'), ('eye_sharpness', 'DESC'), ('aesthetic', 'DESC')],
-    'people': [('aggregate', 'DESC'), ('face_quality', 'DESC')],
-    'landscapes': [('aesthetic', 'DESC'), ('tech_sharpness', 'DESC'), ('comp_score', 'DESC')],
-    'architecture': [('aesthetic', 'DESC'), ('tech_sharpness', 'DESC'), ('comp_score', 'DESC')],
-    'nature': [('aesthetic', 'DESC'), ('tech_sharpness', 'DESC'), ('color_score', 'DESC')],
-    'animals': [('aesthetic', 'DESC'), ('tech_sharpness', 'DESC')],
-    'art': [('aesthetic', 'DESC'), ('color_score', 'DESC')],
-    'bw': [('histogram_spread', 'DESC'), ('contrast_score', 'DESC')],
-    'low_light': [('exposure_score', 'DESC'), ('tech_sharpness', 'DESC')],
-    'silhouettes': [('aesthetic', 'DESC'), ('histogram_spread', 'DESC')],
-    'macro': [('tech_sharpness', 'DESC'), ('aesthetic', 'DESC'), ('isolation_bonus', 'DESC')],
-    'astro': [('aesthetic', 'DESC'), ('comp_score', 'DESC')],
-    'street': [('aesthetic', 'DESC'), ('comp_score', 'DESC'), ('face_quality', 'DESC')],
-    'long_exposure': [('shutter_speed', 'DESC'), ('aesthetic', 'DESC'), ('comp_score', 'DESC')],
-    'aerial': [('comp_score', 'DESC'), ('aesthetic', 'DESC'), ('color_score', 'DESC')],
-    'concert': [('aesthetic', 'DESC'), ('comp_score', 'DESC'), ('exposure_score', 'DESC')],
-}
-
-TYPE_TO_CATEGORY = {
-    'portraits': 'portrait',
-    'people': 'human_others',
-    'landscapes': 'others',
-    'architecture': 'architecture',
-    'nature': 'macro',
-    'animals': 'wildlife',
-    'art': 'art',
-    'bw': 'monochrome',
-    'low_light': 'night',
-    'silhouettes': 'silhouette',
-    'macro': 'macro',
-    'astro': 'astro',
-    'street': 'street',
-    'long_exposure': 'long_exposure',
-    'aerial': 'aerial',
-    'concert': 'concert',
-    'top_picks': 'portrait',
-}
-
 TYPE_LABELS = {type_id: label for type_id, label, *_ in TYPE_DEFINITIONS}
 QUALITY_MAP = VIEWER_CONFIG['quality_thresholds']
 

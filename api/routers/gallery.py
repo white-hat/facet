@@ -20,7 +20,7 @@ from api.db_helpers import (
     split_photo_tags, attach_person_data, sanitize_float_values,
     get_visibility_clause, get_photos_from_clause, get_preference_columns,
     build_photo_select_columns,
-    format_date, to_exif_date,
+    format_date, to_exif_date, paginate,
 )
 from api.top_picks import get_top_picks_score_sql, get_top_picks_threshold
 from api.types import (
@@ -377,8 +377,7 @@ def api_photos(
             where_str = f" WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
             total_count = get_cached_count(conn, where_str, all_params, from_clause=from_clause)
-            total_pages = max(1, math.ceil(total_count / per_page))
-            offset = (page - 1) * per_page
+            total_pages, offset = paginate(total_count, page, per_page)
 
             existing_cols = get_existing_columns(conn)
             pref_cols = get_preference_columns(user_id)

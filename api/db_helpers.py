@@ -246,6 +246,16 @@ def get_cached_count(conn, where_str, sql_params, from_clause="photos"):
 
 
 
+def paginate(total: int, page: int, per_page: int) -> tuple[int, int]:
+    """Calculate pagination values.
+
+    Returns (total_pages, offset).
+    """
+    total_pages = max(1, math.ceil(total / per_page))
+    offset = (page - 1) * per_page
+    return total_pages, offset
+
+
 def sanitize_float_values(data):
     """Replace NaN/Infinity with None in a list of dicts."""
     for item in data:

@@ -6,7 +6,6 @@ Albums router — user-curated photo collections and smart albums.
 import hmac
 import json
 import logging
-import math
 import secrets
 import sqlite3
 from typing import Optional
@@ -20,7 +19,7 @@ from api.database import get_db
 from api.db_helpers import (
     get_visibility_clause, get_photos_from_clause,
     build_photo_select_columns, sanitize_float_values,
-    split_photo_tags, attach_person_data, format_date,
+    split_photo_tags, attach_person_data, format_date, paginate,
 )
 from api.types import VALID_SORT_COLS, SORT_OPTIONS_GROUPED, normalize_params
 
@@ -174,7 +173,7 @@ def _fetch_album_photos(conn, album_row, user_id, page, per_page, sort_col, sort
 
     sanitize_float_values(photos)
 
-    total_pages = max(1, math.ceil(total / per_page))
+    total_pages, _ = paginate(total, page, per_page)
     return {
         'photos': photos,
         'total': total,
@@ -306,7 +305,7 @@ def list_albums(
         # photo_count sort needs a subquery since it's not a column
         if sort == 'photo_count':
             order_by = '(SELECT COUNT(*) FROM album_photos WHERE album_id = albums.id) DESC'
-        offset = (page - 1) * per_page
+        total_pages, offset = paginate(total, page, per_page)
         rows = conn.execute(
             f"SELECT * FROM albums{where_str} ORDER BY {order_by} LIMIT ? OFFSET ?",
             params + [per_page, offset]
@@ -329,8 +328,6 @@ def list_albums(
             album['photo_count'] = count_map.get(row['id'], 0)
             album['first_photo_path'] = _get_first_photo_path(conn, row, user_id)
             albums.append(album)
-
-        total_pages = max(1, math.ceil(total / per_page))
         return {
             'albums': albums,
             'total': total,

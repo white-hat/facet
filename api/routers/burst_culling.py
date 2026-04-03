@@ -7,7 +7,6 @@ Groups marked as burst_reviewed=1 are skipped so confirmed decisions persist.
 """
 
 import logging
-import math
 import random
 import sqlite3
 from itertools import groupby
@@ -18,7 +17,7 @@ from pydantic import BaseModel
 
 from api.auth import CurrentUser, get_optional_user, require_edition
 from api.database import get_db
-from api.db_helpers import get_visibility_clause
+from api.db_helpers import get_visibility_clause, paginate
 from api.similarity_groups import compute_similarity_groups
 from utils.date_utils import parse_date
 
@@ -123,8 +122,7 @@ def _query_burst_groups(conn, vis_sql, vis_params, page=None, per_page=None):
     total_groups = count_row['cnt'] if count_row else 0
 
     if page is not None and per_page is not None:
-        total_pages = max(1, math.ceil(total_groups / per_page))
-        offset = (page - 1) * per_page
+        total_pages, offset = paginate(total_groups, page, per_page)
         group_ids = conn.execute(
             f"""SELECT DISTINCT burst_group_id
                 FROM photos
@@ -287,8 +285,7 @@ def get_similar_groups(
             random.Random(seed).shuffle(shuffled)
 
             total_groups = len(shuffled)
-            total_pages = max(1, math.ceil(total_groups / per_page))
-            offset = (page - 1) * per_page
+            total_pages, offset = paginate(total_groups, page, per_page)
             page_groups = shuffled[offset:offset + per_page]
 
             # Batch-fetch all photos for this page in a single query
@@ -548,8 +545,7 @@ async def api_culling_groups(
             )
 
             total_groups = burst_count + similar_count
-            total_pages = max(1, math.ceil(total_groups / per_page))
-            offset = (page - 1) * per_page
+            total_pages, offset = paginate(total_groups, page, per_page)
 
             # Determine which groups fall in this page (bursts first, then similar)
             page_groups = []
