@@ -394,6 +394,7 @@ export class GalleryStore {
   readonly photos = signal<Photo[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);
+  private _loadSeq = 0;
   readonly hasMore = signal(false);
   readonly config = signal<ViewerConfig | null>(null);
   readonly filterDrawerOpen = signal(localStorage.getItem(DRAWER_STATE_KEY) === 'true');
@@ -521,6 +522,7 @@ export class GalleryStore {
   async loadPhotos(): Promise<void> {
     // Always load from page 1 — only nextPage() uses page > 1
     this.filters.update(current => ({ ...current, page: 1 }));
+    const seq = ++this._loadSeq;
     const prevPhotos = this.photos();
     const prevTotal = this.total();
     const prevHasMore = this.hasMore();
@@ -531,6 +533,7 @@ export class GalleryStore {
 
       if (f.similar_to) {
         const res = await this.fetchSimilarPage(f, (f.page - 1) * f.per_page);
+        if (seq !== this._loadSeq) return;
         this.photos.set(res.similar ?? []);
         this.total.set(res.total);
         this.hasMore.set(res.has_more);
@@ -545,6 +548,7 @@ export class GalleryStore {
             threshold: 0.15,
           }),
         );
+        if (seq !== this._loadSeq) return;
         this.photos.set(res.photos);
         this.total.set(res.total);
         this.hasMore.set(false);
@@ -553,16 +557,20 @@ export class GalleryStore {
 
       const params = this.buildApiParams(f);
       const res = await firstValueFrom(this.api.get<PhotosResponse>('/photos', params));
+      if (seq !== this._loadSeq) return;
       this.photos.set(res.photos);
       this.total.set(res.total);
       this.hasMore.set(res.has_more);
     } catch {
+      if (seq !== this._loadSeq) return;
       // Network error — restore previous state
       this.photos.set(prevPhotos);
       this.total.set(prevTotal);
       this.hasMore.set(prevHasMore);
     } finally {
-      this.loading.set(false);
+      if (seq === this._loadSeq) {
+        this.loading.set(false);
+      }
     }
   }
 
