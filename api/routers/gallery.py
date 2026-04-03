@@ -8,6 +8,7 @@ import math
 import sqlite3
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import ValidationError
 
 from api.auth import CurrentUser, get_optional_user
 from api.config import VIEWER_CONFIG, _FULL_CONFIG
@@ -354,7 +355,10 @@ def api_photos(
         'per_page': qp.get('per_page', str(default_per_page)),
     }
 
-    gallery_params = GalleryParams.model_validate(merged)
+    try:
+        gallery_params = GalleryParams.model_validate(merged)
+    except ValidationError as e:
+        raise HTTPException(status_code=422, detail=e.errors())
     page = max(1, gallery_params.page)
     per_page = gallery_params.per_page
     params = gallery_params.model_dump()

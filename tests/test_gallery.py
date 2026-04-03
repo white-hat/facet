@@ -232,8 +232,8 @@ class TestGalleryPhotos:
         assert len(photos) == 2
         assert all(p["category"] == "portrait" for p in photos)
 
-    def test_per_page_capped_by_pydantic(self, tmp_path):
-        """per_page > 500 triggers Pydantic ValidationError inside the handler."""
+    def test_per_page_over_limit_returns_422(self, tmp_path):
+        """per_page > 500 returns 422 validation error."""
         db_path = str(tmp_path / "test.db")
         _make_db(db_path, [_photo("/a.jpg", "2024:01:01 10:00:00")])
         app = _create_app_no_auth()
@@ -243,12 +243,8 @@ class TestGalleryPhotos:
             mock.patch("api.db_helpers._existing_columns_cache", None),
             mock.patch.dict("api.config._count_cache", {}, clear=True),
         ):
-            resp = TestClient(app, raise_server_exceptions=False).get(
-                "/api/photos?page=1&per_page=9999"
-            )
-        # GalleryParams.model_validate raises ValidationError (not caught as 422
-        # by FastAPI since it happens inside the handler, not as a query param).
-        assert resp.status_code == 500
+            resp = TestClient(app).get("/api/photos?page=1&per_page=9999")
+        assert resp.status_code == 422
 
 
 # ---------------------------------------------------------------------------
