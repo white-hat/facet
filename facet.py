@@ -4,6 +4,7 @@ Facet - AI-powered photo quality assessment system.
 
 CLI entry point. The scoring engine is in processing/scorer.py.
 """
+
 import os
 import sys
 import time
@@ -12,9 +13,11 @@ import time
 os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "0")
 import warnings
+
 warnings.filterwarnings("ignore", message=".*unauthenticated requests.*")
 
 import logging
+
 logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
@@ -36,16 +39,15 @@ try:
 except ImportError:
     # Fallback: simple pass-through iterator
     def tqdm(iterable, **kwargs):
-        desc = kwargs.get('desc', '')
+        desc = kwargs.get("desc", "")
         if desc:
             logger.info("%s...", desc)
         return iterable
 
+
 # Import config module (lightweight, no cv2/torch dependency)
 from config import ScoringConfig, PercentileNormalizer
 from utils.image_loading import RAW_EXTENSIONS, HEIF_EXTENSIONS
-
-
 
 
 # ============================================
@@ -70,9 +72,9 @@ def main():
     )
 
     parser = argparse.ArgumentParser(
-        description='Facet: AI-powered photo quality assessment',
+        description="Facet: AI-powered photo quality assessment",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
+        epilog="""
 Examples:
   python facet.py /path/to/photos              # Score photos (auto multi-pass mode)
   python facet.py /path/to/photos --single-pass  # Force single-pass (all models at once)
@@ -121,140 +123,314 @@ Model Information:
 Configuration:
   python facet.py --validate-categories        # Validate category configurations
   python facet.py --config my_config.json /path/to/photos  # Use custom config
-        '''
+        """,
     )
 
     # Positional arguments
-    parser.add_argument('photo_paths', nargs='*', help='Folders to scan for photos')
+    parser.add_argument("photo_paths", nargs="*", help="Folders to scan for photos")
 
     # Scanning options
-    scan_group = parser.add_argument_group('Scanning options')
-    scan_group.add_argument('--force', action='store_true',
-                        help='Re-scan already processed files (ignores existing DB entries)')
-    scan_group.add_argument('--single-pass', action='store_true',
-                        help='Force single-pass mode (load all models at once, requires more VRAM)')
-    scan_group.add_argument('--pass', type=str, dest='single_pass_name', metavar='NAME',
-                        choices=['quality', 'tags', 'composition', 'faces', 'embeddings',
-                                 'quality-iaa', 'quality-face', 'quality-liqe', 'saliency'],
-                        help='Run specific pass only: quality, tags, composition, faces, embeddings, '
-                             'quality-iaa, quality-face, quality-liqe, saliency')
-    scan_group.add_argument('--dry-run', action='store_true',
-                        help='Score sample photos without saving to database (preview mode)')
-    scan_group.add_argument('--dry-run-count', type=int, default=10,
-                        help='Number of photos to process in dry-run mode (default: 10, requires --dry-run)')
+    scan_group = parser.add_argument_group("Scanning options")
+    scan_group.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-scan already processed files (ignores existing DB entries)",
+    )
+    scan_group.add_argument(
+        "--single-pass",
+        action="store_true",
+        help="Force single-pass mode (load all models at once, requires more VRAM)",
+    )
+    scan_group.add_argument(
+        "--pass",
+        type=str,
+        dest="single_pass_name",
+        metavar="NAME",
+        choices=[
+            "quality",
+            "tags",
+            "composition",
+            "faces",
+            "embeddings",
+            "quality-iaa",
+            "quality-face",
+            "quality-liqe",
+            "saliency",
+        ],
+        help="Run specific pass only: quality, tags, composition, faces, embeddings, "
+        "quality-iaa, quality-face, quality-liqe, saliency",
+    )
+    scan_group.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Score sample photos without saving to database (preview mode)",
+    )
+    scan_group.add_argument(
+        "--dry-run-count",
+        type=int,
+        default=10,
+        help="Number of photos to process in dry-run mode (default: 10, requires --dry-run)",
+    )
 
     # Database operations
-    db_group = parser.add_argument_group('Database operations')
-    db_group.add_argument('--recompute-average', action='store_true',
-                        help='Update scores based on current config (uses stored embeddings)')
-    db_group.add_argument('--recompute-category', type=str, metavar='CATEGORY',
-                        help='Recompute aggregate scores for a single category only')
-    db_group.add_argument('--detect-duplicates', action='store_true',
-                        help='Detect duplicate photos using pHash comparison')
-    db_group.add_argument('--recompute-embeddings', action='store_true',
-                        help='Recompute CLIP/SigLIP embeddings for all photos (required after model switch)')
-    db_group.add_argument('--recompute-tags', action='store_true',
-                        help='Re-tag all photos using configured tagging model')
-    db_group.add_argument('--recompute-tags-vlm', action='store_true',
-                        help='Re-tag all photos using VLM model (loads images from disk, defaults to qwen3-vl-2b)')
-    db_group.add_argument('--backfill-focal-35mm', action='store_true',
-                        help='Backfill focal_length_35mm from EXIF for photos missing it')
-    db_group.add_argument('--score-topiq', action='store_true',
-                        help='Backfill TOPIQ quality scores from stored thumbnails (requires GPU)')
-    db_group.add_argument('--recompute-iqa', action='store_true',
-                        help='Recompute supplementary IQA metrics (TOPIQ IAA, NR-Face, LIQE) from stored thumbnails')
-    db_group.add_argument('--compute-recommendations', action='store_true',
-                        help='Analyze database and show scoring recommendations')
-    db_group.add_argument('--apply-recommendations', action='store_true',
-                        help='Apply scoring recommendations to config (requires --compute-recommendations)')
-    db_group.add_argument('--simulate', action='store_true',
-                        help='Preview projected score changes without modifying config (use with --compute-recommendations)')
-    db_group.add_argument('--verbose', '-v', action='store_true',
-                        help='Show detailed statistics (use with --compute-recommendations)')
+    db_group = parser.add_argument_group("Database operations")
+    db_group.add_argument(
+        "--recompute-average",
+        action="store_true",
+        help="Update scores based on current config (uses stored embeddings)",
+    )
+    db_group.add_argument(
+        "--recompute-category",
+        type=str,
+        metavar="CATEGORY",
+        help="Recompute aggregate scores for a single category only",
+    )
+    db_group.add_argument(
+        "--detect-duplicates",
+        action="store_true",
+        help="Detect duplicate photos using pHash comparison",
+    )
+    db_group.add_argument(
+        "--delete-rejected",
+        action="store_true",
+        help="Delete rejected photos from disk and database (use --dry-run to preview)",
+    )
+    db_group.add_argument(
+        "--recompute-embeddings",
+        action="store_true",
+        help="Recompute CLIP/SigLIP embeddings for all photos (required after model switch)",
+    )
+    db_group.add_argument(
+        "--recompute-tags",
+        action="store_true",
+        help="Re-tag all photos using configured tagging model",
+    )
+    db_group.add_argument(
+        "--recompute-tags-vlm",
+        action="store_true",
+        help="Re-tag all photos using VLM model (loads images from disk, defaults to qwen3-vl-2b)",
+    )
+    db_group.add_argument(
+        "--backfill-focal-35mm",
+        action="store_true",
+        help="Backfill focal_length_35mm from EXIF for photos missing it",
+    )
+    db_group.add_argument(
+        "--score-topiq",
+        action="store_true",
+        help="Backfill TOPIQ quality scores from stored thumbnails (requires GPU)",
+    )
+    db_group.add_argument(
+        "--recompute-iqa",
+        action="store_true",
+        help="Recompute supplementary IQA metrics (TOPIQ IAA, NR-Face, LIQE) from stored thumbnails",
+    )
+    db_group.add_argument(
+        "--compute-recommendations",
+        action="store_true",
+        help="Analyze database and show scoring recommendations",
+    )
+    db_group.add_argument(
+        "--apply-recommendations",
+        action="store_true",
+        help="Apply scoring recommendations to config (requires --compute-recommendations)",
+    )
+    db_group.add_argument(
+        "--simulate",
+        action="store_true",
+        help="Preview projected score changes without modifying config (use with --compute-recommendations)",
+    )
+    db_group.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        help="Show detailed statistics (use with --compute-recommendations)",
+    )
 
     # Face recognition
-    face_group = parser.add_argument_group('Face recognition')
-    face_group.add_argument('--extract-faces-gpu-incremental', action='store_true',
-                        help='Extract faces only for photos not yet processed (requires GPU)')
-    face_group.add_argument('--extract-faces-gpu-force', action='store_true',
-                        help='Delete all faces and re-extract from all photos (requires GPU)')
-    face_group.add_argument('--cluster-faces-incremental', action='store_true',
-                        help='Run HDBSCAN clustering preserving all existing persons')
-    face_group.add_argument('--cluster-faces-incremental-named', action='store_true',
-                        help='Run HDBSCAN clustering preserving only named persons (deletes unnamed)')
-    face_group.add_argument('--cluster-faces-force', action='store_true',
-                        help='Full re-clustering, deleting all persons including named ones')
-    face_group.add_argument('--refill-face-thumbnails-incremental', action='store_true',
-                        help='Generate thumbnails only for faces missing them')
-    face_group.add_argument('--refill-face-thumbnails-force', action='store_true',
-                        help='Clear and regenerate ALL face thumbnails from original images')
-    face_group.add_argument('--recompute-blinks', action='store_true',
-                        help='Recompute blink detection using stored landmarks (CPU only, fast)')
-    face_group.add_argument('--recompute-burst', action='store_true',
-                        help='Recompute burst detection groups')
-    face_group.add_argument('--suggest-person-merges', action='store_true',
-                        help='Analyze persons and suggest potential merges based on centroid similarity')
-    face_group.add_argument('--merge-threshold', type=float, default=0.6,
-                        help='Similarity threshold for merge suggestions (default: 0.6)')
+    face_group = parser.add_argument_group("Face recognition")
+    face_group.add_argument(
+        "--extract-faces-gpu-incremental",
+        action="store_true",
+        help="Extract faces only for photos not yet processed (requires GPU)",
+    )
+    face_group.add_argument(
+        "--extract-faces-gpu-force",
+        action="store_true",
+        help="Delete all faces and re-extract from all photos (requires GPU)",
+    )
+    face_group.add_argument(
+        "--cluster-faces-incremental",
+        action="store_true",
+        help="Run HDBSCAN clustering preserving all existing persons",
+    )
+    face_group.add_argument(
+        "--cluster-faces-incremental-named",
+        action="store_true",
+        help="Run HDBSCAN clustering preserving only named persons (deletes unnamed)",
+    )
+    face_group.add_argument(
+        "--cluster-faces-force",
+        action="store_true",
+        help="Full re-clustering, deleting all persons including named ones",
+    )
+    face_group.add_argument(
+        "--refill-face-thumbnails-incremental",
+        action="store_true",
+        help="Generate thumbnails only for faces missing them",
+    )
+    face_group.add_argument(
+        "--refill-face-thumbnails-force",
+        action="store_true",
+        help="Clear and regenerate ALL face thumbnails from original images",
+    )
+    face_group.add_argument(
+        "--recompute-blinks",
+        action="store_true",
+        help="Recompute blink detection using stored landmarks (CPU only, fast)",
+    )
+    face_group.add_argument(
+        "--recompute-burst",
+        action="store_true",
+        help="Recompute burst detection groups",
+    )
+    face_group.add_argument(
+        "--suggest-person-merges",
+        action="store_true",
+        help="Analyze persons and suggest potential merges based on centroid similarity",
+    )
+    face_group.add_argument(
+        "--merge-threshold",
+        type=float,
+        default=0.6,
+        help="Similarity threshold for merge suggestions (default: 0.6)",
+    )
 
     # Thumbnail management
-    thumb_group = parser.add_argument_group('Thumbnail management')
-    thumb_group.add_argument('--fix-thumbnail-rotation', action='store_true',
-                        help='Fix rotation of existing thumbnails using EXIF orientation data')
+    thumb_group = parser.add_argument_group("Thumbnail management")
+    thumb_group.add_argument(
+        "--fix-thumbnail-rotation",
+        action="store_true",
+        help="Fix rotation of existing thumbnails using EXIF orientation data",
+    )
 
     # Composition analysis
-    comp_group = parser.add_argument_group('Composition analysis')
-    comp_group.add_argument('--recompute-composition-cpu', action='store_true',
-                        help='Recompute composition scores using rule-based analysis (CPU only, fast)')
-    comp_group.add_argument('--recompute-composition-gpu', action='store_true',
-                        help='Recompute composition scores using SAMP-Net neural network (requires GPU)')
-    comp_group.add_argument('--recompute-saliency', action='store_true',
-                        help='Recompute subject saliency metrics using BiRefNet (requires GPU)')
+    comp_group = parser.add_argument_group("Composition analysis")
+    comp_group.add_argument(
+        "--recompute-composition-cpu",
+        action="store_true",
+        help="Recompute composition scores using rule-based analysis (CPU only, fast)",
+    )
+    comp_group.add_argument(
+        "--recompute-composition-gpu",
+        action="store_true",
+        help="Recompute composition scores using SAMP-Net neural network (requires GPU)",
+    )
+    comp_group.add_argument(
+        "--recompute-saliency",
+        action="store_true",
+        help="Recompute subject saliency metrics using BiRefNet (requires GPU)",
+    )
 
     # Weight optimization
-    weight_group = parser.add_argument_group('Weight optimization')
-    weight_group.add_argument('--comparison-stats', action='store_true',
-                        help='Show pairwise comparison statistics')
-    weight_group.add_argument('--optimize-weights', action='store_true',
-                        help='Optimize and save scoring weights based on pairwise comparisons')
+    weight_group = parser.add_argument_group("Weight optimization")
+    weight_group.add_argument(
+        "--comparison-stats",
+        action="store_true",
+        help="Show pairwise comparison statistics",
+    )
+    weight_group.add_argument(
+        "--optimize-weights",
+        action="store_true",
+        help="Optimize and save scoring weights based on pairwise comparisons",
+    )
 
     # Model information
-    model_group = parser.add_argument_group('Model information')
-    model_group.add_argument('--list-models', action='store_true',
-                        help='Show available models and their VRAM requirements')
-    model_group.add_argument('--doctor', action='store_true',
-                        help='Run diagnostic checks (Python, GPU, dependencies, config)')
-    model_group.add_argument('--simulate-gpu', type=str, default=None, metavar='NAME',
-                        help='Simulate GPU for --doctor (e.g., "RTX 5070 Ti")')
-    model_group.add_argument('--simulate-vram', type=float, default=None, metavar='GB',
-                        help='Simulate VRAM in GB for --doctor (e.g., 16)')
+    model_group = parser.add_argument_group("Model information")
+    model_group.add_argument(
+        "--list-models",
+        action="store_true",
+        help="Show available models and their VRAM requirements",
+    )
+    model_group.add_argument(
+        "--doctor",
+        action="store_true",
+        help="Run diagnostic checks (Python, GPU, dependencies, config)",
+    )
+    model_group.add_argument(
+        "--simulate-gpu",
+        type=str,
+        default=None,
+        metavar="NAME",
+        help='Simulate GPU for --doctor (e.g., "RTX 5070 Ti")',
+    )
+    model_group.add_argument(
+        "--simulate-vram",
+        type=float,
+        default=None,
+        metavar="GB",
+        help="Simulate VRAM in GB for --doctor (e.g., 16)",
+    )
 
     # Export
-    export_group = parser.add_argument_group('Export')
-    export_group.add_argument('--export-csv', type=str, nargs='?', const='auto',
-                        help='Export database to CSV file (optional: specify filename)')
-    export_group.add_argument('--export-json', type=str, nargs='?', const='auto',
-                        help='Export database to JSON file (optional: specify filename)')
+    export_group = parser.add_argument_group("Export")
+    export_group.add_argument(
+        "--export-csv",
+        type=str,
+        nargs="?",
+        const="auto",
+        help="Export database to CSV file (optional: specify filename)",
+    )
+    export_group.add_argument(
+        "--export-json",
+        type=str,
+        nargs="?",
+        const="auto",
+        help="Export database to JSON file (optional: specify filename)",
+    )
 
     # AI features
-    ai_group = parser.add_argument_group('AI features')
-    ai_group.add_argument('--generate-captions', action='store_true',
-                        help='Generate AI captions for photos without one (requires VLM)')
-    ai_group.add_argument('--translate-captions', action='store_true',
-                        help='Translate English captions to the configured target language (CPU, MarianMT)')
-    ai_group.add_argument('--extract-gps', action='store_true',
-                        help='Backfill GPS coordinates from EXIF data for photos missing GPS')
-    ai_group.add_argument('--rescan-gps', action='store_true',
-                        help='Re-extract GPS coordinates from EXIF for ALL photos (overwrites existing)')
+    ai_group = parser.add_argument_group("AI features")
+    ai_group.add_argument(
+        "--generate-captions",
+        action="store_true",
+        help="Generate AI captions for photos without one (requires VLM)",
+    )
+    ai_group.add_argument(
+        "--translate-captions",
+        action="store_true",
+        help="Translate English captions to the configured target language (CPU, MarianMT)",
+    )
+    ai_group.add_argument(
+        "--extract-gps",
+        action="store_true",
+        help="Backfill GPS coordinates from EXIF data for photos missing GPS",
+    )
+    ai_group.add_argument(
+        "--rescan-gps",
+        action="store_true",
+        help="Re-extract GPS coordinates from EXIF for ALL photos (overwrites existing)",
+    )
 
     # Configuration
-    config_group = parser.add_argument_group('Configuration')
-    config_group.add_argument('--config', type=str, default=None,
-                        help='Path to custom scoring config JSON file')
-    config_group.add_argument('--db', type=str, default='photo_scores_pro.db',
-                        help='Path to database file (default: photo_scores_pro.db)')
-    config_group.add_argument('--validate-categories', action='store_true',
-                        help='Validate category configurations')
+    config_group = parser.add_argument_group("Configuration")
+    config_group.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to custom scoring config JSON file",
+    )
+    config_group.add_argument(
+        "--db",
+        type=str,
+        default="photo_scores_pro.db",
+        help="Path to database file (default: photo_scores_pro.db)",
+    )
+    config_group.add_argument(
+        "--validate-categories",
+        action="store_true",
+        help="Validate category configurations",
+    )
 
     args = parser.parse_args()
 
@@ -274,33 +450,42 @@ Configuration:
 
     # Category validation mode (lightweight - no GPU needed)
     if args.validate_categories:
-        config_path = args.config or 'scoring_config.json'
+        config_path = args.config or "scoring_config.json"
         config = ScoringConfig(config_path, validate=False)
         config.validate_categories(verbose=True)
         logger.info("Categories in priority order:")
         for cat in config.get_categories():
-            filters = cat.get('filters', {})
-            filter_desc = ', '.join(f"{k}={v}" for k, v in filters.items()) or 'fallback'
-            logger.info("  %3d. %-20s [%s]", cat['priority'], cat['name'], filter_desc)
+            filters = cat.get("filters", {})
+            filter_desc = (
+                ", ".join(f"{k}={v}" for k, v in filters.items()) or "fallback"
+            )
+            logger.info("  %3d. %-20s [%s]", cat["priority"], cat["name"], filter_desc)
         exit()
 
     # Doctor mode (lightweight - no GPU needed)
     if args.doctor:
         from diagnostics import run_doctor
-        run_doctor(config_path=args.config, db_path=args.db,
-                   simulate_gpu=args.simulate_gpu, simulate_vram=args.simulate_vram)
+
+        run_doctor(
+            config_path=args.config,
+            db_path=args.db,
+            simulate_gpu=args.simulate_gpu,
+            simulate_vram=args.simulate_vram,
+        )
         exit()
 
     # Comparison statistics mode (lightweight - no GPU needed)
     if args.comparison_stats:
         from optimization import print_comparison_stats
+
         print_comparison_stats(args.db)
         exit()
 
     # Weight optimization mode (lightweight - no GPU needed)
     if args.optimize_weights:
         from optimization import run_weight_optimization
-        config_path = args.config or 'scoring_config.json'
+
+        config_path = args.config or "scoring_config.json"
         run_weight_optimization(
             db_path=args.db,
             config_path=config_path,
@@ -310,54 +495,110 @@ Configuration:
     # List models mode (lightweight - no GPU needed)
     if args.list_models:
         from processing.multi_pass import list_available_models
+
         list_available_models()
         exit()
 
     # Detect duplicate photos (lightweight - no GPU needed)
     if args.detect_duplicates:
         from utils.duplicate import detect_duplicates
+
         init_database(args.db)
         detect_duplicates(args.db, config_path=args.config)
         exit()
 
+    # Delete rejected photos from disk and database
+    if getattr(args, "delete_rejected", False):
+        init_database(args.db)
+        dry_run = getattr(args, "dry_run", False)
+        with get_connection(args.db) as conn:
+            cursor = conn.execute("SELECT path FROM photos WHERE is_rejected = 1")
+            rejected = [row["path"] for row in cursor.fetchall()]
+
+            if not rejected:
+                logger.info("No rejected photos to delete")
+                exit()
+
+            logger.info(f"Found {len(rejected)} rejected photos")
+            if dry_run:
+                logger.info("DRY RUN - would delete:")
+                for path in rejected[:20]:
+                    logger.info(f"  {path}")
+                if len(rejected) > 20:
+                    logger.info(f"  ... and {len(rejected) - 20} more")
+                logger.info("Run without --dry-run to actually delete")
+                exit()
+
+            deleted = 0
+            missing = 0
+            for path in rejected:
+                try:
+                    if os.path.exists(path):
+                        os.remove(path)
+                        deleted += 1
+                    else:
+                        missing += 1
+                except OSError as e:
+                    logger.warning(f"Failed to delete {path}: {e}")
+
+            conn.execute("DELETE FROM photos WHERE is_rejected = 1")
+            conn.commit()
+
+            logger.info(f"Deleted {deleted} files from disk")
+            logger.info(f"Removed {len(rejected)} records from database")
+            if missing:
+                logger.info(f"{missing} files were already missing from disk")
+        exit()
+
     # Import scorer (deferred to avoid loading heavy modules for --help)
     from processing.scorer import (
-        Facet, process_bursts, process_single_photo,
-        _load_image_modules, backup_database,
+        Facet,
+        process_bursts,
+        process_single_photo,
+        _load_image_modules,
+        backup_database,
     )
 
     # Compute recommendations mode (lightweight - no GPU needed)
     if args.compute_recommendations:
         scorer = Facet(db_path=args.db, config_path=args.config, lightweight=True)
         norm_settings = scorer.config.get_normalization_settings()
-        target_pct = norm_settings.get('percentile_target', 95) if norm_settings else 95
-        per_category = norm_settings.get('per_category', False) if norm_settings else False
-        category_min_samples = norm_settings.get('category_min_samples', 50) if norm_settings else 50
+        target_pct = norm_settings.get("percentile_target", 95) if norm_settings else 95
+        per_category = (
+            norm_settings.get("per_category", False) if norm_settings else False
+        )
+        category_min_samples = (
+            norm_settings.get("category_min_samples", 50) if norm_settings else 50
+        )
         normalizer = PercentileNormalizer(
             scorer.db_path,
             target_pct,
             per_category=per_category,
-            category_min_samples=category_min_samples
+            category_min_samples=category_min_samples,
         )
         normalizer.compute_percentiles()
 
         # Get recommendations if applying or simulating, otherwise just print stats
-        apply_recs = getattr(args, 'apply_recommendations', False)
-        simulate = getattr(args, 'simulate', False)
-        verbose = getattr(args, 'verbose', False)
+        apply_recs = getattr(args, "apply_recommendations", False)
+        simulate = getattr(args, "simulate", False)
+        verbose = getattr(args, "verbose", False)
         recommendations = normalizer.print_database_statistics(
             config=scorer.config,
             return_recommendations=apply_recs or simulate,
-            verbose=verbose
+            verbose=verbose,
         )
 
         if simulate and recommendations:
-            normalizer.simulate_recommendations(recommendations, scorer, conn_factory=get_connection)
+            normalizer.simulate_recommendations(
+                recommendations, scorer, conn_factory=get_connection
+            )
         elif apply_recs and recommendations:
             logger.info("Applying recommendations...")
             backup = normalizer.apply_recommendations(recommendations, scorer.config)
             if backup:
-                logger.info("Run 'python facet.py --recompute-average' to apply new weights to scores.")
+                logger.info(
+                    "Run 'python facet.py --recompute-average' to apply new weights to scores."
+                )
         elif apply_recs:
             logger.info("No recommendations to apply.")
 
@@ -366,12 +607,13 @@ Configuration:
     # Backfill focal_length_35mm from EXIF (lightweight - no GPU needed)
     if args.backfill_focal_35mm:
         from exiftool import get_exif_batch
+
         init_database(args.db)
         with get_connection(args.db) as conn:
             cursor = conn.execute(
                 "SELECT path FROM photos WHERE focal_length_35mm IS NULL AND focal_length IS NOT NULL"
             )
-            paths = [row['path'] for row in cursor.fetchall()]
+            paths = [row["path"] for row in cursor.fetchall()]
 
         if not paths:
             logger.info("No photos need focal_length_35mm backfill.")
@@ -385,11 +627,11 @@ Configuration:
             for path in paths:
                 resolved = str(Path(path).resolve())
                 exif = raw_results.get(resolved, {})
-                val = exif.get('focal_length_35mm')
+                val = exif.get("focal_length_35mm")
                 if val is not None:
                     conn.execute(
                         "UPDATE photos SET focal_length_35mm = ? WHERE path = ?",
-                        (val, path)
+                        (val, path),
                     )
                     updated += 1
             conn.commit()
@@ -398,12 +640,19 @@ Configuration:
         exit()
 
     # Cluster faces mode (lightweight - no GPU needed)
-    if args.cluster_faces_incremental or args.cluster_faces_incremental_named or args.cluster_faces_force:
+    if (
+        args.cluster_faces_incremental
+        or args.cluster_faces_incremental_named
+        or args.cluster_faces_force
+    ):
         from faces import run_face_clustering
+
         config = ScoringConfig(args.config)
         force = args.cluster_faces_force
         preserve_named_only = args.cluster_faces_incremental_named
-        run_face_clustering(args.db, config, force=force, preserve_named_only=preserve_named_only)
+        run_face_clustering(
+            args.db, config, force=force, preserve_named_only=preserve_named_only
+        )
         logger.info("Face clustering complete.")
         exit()
 
@@ -414,17 +663,17 @@ Configuration:
         import socket
 
         threshold = args.merge_threshold
-        port = int(os.environ.get('PORT', 5000))
+        port = int(os.environ.get("PORT", 5000))
         url = f"http://localhost:{port}/suggest_merges?threshold={threshold}"
 
         def is_port_in_use(p):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                return s.connect_ex(('localhost', p)) == 0
+                return s.connect_ex(("localhost", p)) == 0
 
         if not is_port_in_use(port):
             logger.info("Starting web viewer...")
             viewer_process = subprocess.Popen(
-                [sys.executable, 'viewer.py'],
+                [sys.executable, "viewer.py"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -447,6 +696,7 @@ Configuration:
     # Refill face thumbnails mode
     if args.refill_face_thumbnails_incremental or args.refill_face_thumbnails_force:
         from faces import refill_face_thumbnails
+
         init_database(args.db)  # Ensure schema is up to date
         config = ScoringConfig(args.config)
         force = args.refill_face_thumbnails_force
@@ -457,6 +707,7 @@ Configuration:
     # Fix thumbnail rotation using EXIF data (CPU only, fast)
     if args.fix_thumbnail_rotation:
         from processing.scorer import fix_thumbnail_rotation
+
         init_database(args.db)  # Ensure schema is up to date
         fix_thumbnail_rotation(args.db)
         exit()
@@ -470,6 +721,7 @@ Configuration:
     # Extract faces mode (needs GPU for face analysis)
     if args.extract_faces_gpu_incremental or args.extract_faces_gpu_force:
         from faces import extract_faces_from_existing
+
         scorer = Facet(db_path=args.db, config_path=args.config)
         force = args.extract_faces_gpu_force
         extract_faces_from_existing(scorer, force=force)
@@ -486,7 +738,7 @@ Configuration:
     if args.recompute_composition_gpu:
         _load_image_modules()  # Load cv2, PIL, numpy
         scorer = Facet(db_path=args.db, config_path=args.config, lightweight=True)
-        batch_size = scorer.config.get_processing_settings().get('gpu_batch_size', 16)
+        batch_size = scorer.config.get_processing_settings().get("gpu_batch_size", 16)
         scorer.rescan_samp_composition(batch_size=batch_size)
         exit()
 
@@ -503,16 +755,18 @@ Configuration:
 
         with get_connection(args.db) as conn:
             cursor = conn.execute("SELECT path FROM photos")
-            paths = [row['path'] for row in cursor.fetchall()]
+            paths = [row["path"] for row in cursor.fetchall()]
 
         if not paths:
             logger.info("No photos in database.")
             exit()
 
         logger.info("Recomputing saliency for %d photos...", len(paths))
-        processed = run_single_pass(paths, 'saliency', scorer, model_manager)
+        processed = run_single_pass(paths, "saliency", scorer, model_manager)
         logger.info("Recomputed saliency for %d photos.", processed)
-        logger.info("Run --recompute-average to update aggregate scores with saliency metrics.")
+        logger.info(
+            "Run --recompute-average to update aggregate scores with saliency metrics."
+        )
         exit()
 
     # Score TOPIQ from stored thumbnails (requires GPU)
@@ -523,7 +777,7 @@ Configuration:
         from models.pyiqa_scorer import PyIQAScorer
 
         init_database(args.db)
-        scorer_model = PyIQAScorer('topiq')
+        scorer_model = PyIQAScorer("topiq")
         scorer_model.load()
 
         with get_connection(args.db) as conn:
@@ -543,13 +797,13 @@ Configuration:
             for i, score in enumerate(scores):
                 conn.execute(
                     "UPDATE photos SET topiq_score = ? WHERE path = ?",
-                    (round(score, 2), batch_paths[i])
+                    (round(score, 2), batch_paths[i]),
                 )
             return len(scores)
 
         with get_connection(args.db) as conn:
             for row in tqdm(rows, desc="TOPIQ scoring"):
-                thumbnail_blob = row['thumbnail']
+                thumbnail_blob = row["thumbnail"]
                 if not thumbnail_blob:
                     continue
 
@@ -564,17 +818,21 @@ Configuration:
                 img_rgb = cv2.cvtColor(img_cv, cv2.COLOR_BGR2RGB)
                 pil_img = Image.fromarray(img_rgb)
 
-                batch_paths.append(row['path'])
+                batch_paths.append(row["path"])
                 batch_images.append(pil_img)
 
                 if len(batch_images) >= batch_size:
-                    updated += _flush_topiq_batch(conn, scorer_model, batch_paths, batch_images)
+                    updated += _flush_topiq_batch(
+                        conn, scorer_model, batch_paths, batch_images
+                    )
                     batch_paths = []
                     batch_images = []
 
             # Flush remaining
             if batch_images:
-                updated += _flush_topiq_batch(conn, scorer_model, batch_paths, batch_images)
+                updated += _flush_topiq_batch(
+                    conn, scorer_model, batch_paths, batch_images
+                )
 
             conn.commit()
 
@@ -585,6 +843,7 @@ Configuration:
     # Recompute supplementary IQA metrics from thumbnails (requires GPU)
     if args.recompute_iqa:
         from processing.scorer import Facet
+
         facet = Facet(db_path=args.db, config_path=args.config, lightweight=True)
         facet.recompute_iqa_from_thumbnails()
         exit()
@@ -598,37 +857,59 @@ Configuration:
 
     # Generate AI captions
     if args.generate_captions:
-        from models.vlm_tagger import VLMTagger
         from PIL import Image
         from tqdm import tqdm
         import io
 
         config = ScoringConfig(args.config)
         models_config = config.get_model_config()
-        tag_model = config.get_model_for_task('tagging')
-        model_key_map = {
-            'qwen3-vl-2b': 'qwen3_vl_2b',
-            'qwen2.5-vl-7b': 'qwen2_5_vl_7b',
-            'qwen3.5-2b': 'qwen3_5_2b',
-            'qwen3.5-4b': 'qwen3_5_4b',
-        }
-        config_key = model_key_map.get(tag_model)
-        if not config_key or config_key not in models_config:
-            logger.error("VLM tagger not available for profile %s (tagging_model=%s)",
-                         models_config.get('vram_profile', 'legacy'), tag_model)
-            sys.exit(1)
-        vlm = VLMTagger(models_config[config_key], config)
+
+        # Check for remote VLM first
+        remote_config = models_config.get("vlm_remote", {})
+        if remote_config.get("enabled"):
+            from models.vlm_tagger_api import VLMTaggerAPI
+
+            vlm = VLMTaggerAPI(remote_config, config)
+        else:
+            from models.vlm_tagger import VLMTagger
+
+            tag_model = config.get_model_for_task("tagging")
+            model_key_map = {
+                "qwen3-vl-2b": "qwen3_vl_2b",
+                "qwen2.5-vl-7b": "qwen2_5_vl_7b",
+                "qwen3.5-2b": "qwen3_5_2b",
+                "qwen3.5-4b": "qwen3_5_4b",
+            }
+            config_key = model_key_map.get(tag_model)
+            if not config_key or config_key not in models_config:
+                logger.error(
+                    "VLM tagger not available for profile %s (tagging_model=%s)",
+                    models_config.get("vram_profile", "legacy"),
+                    tag_model,
+                )
+                sys.exit(1)
+            vlm = VLMTagger(models_config[config_key], config)
 
         with get_connection(args.db) as conn:
-            cols = {row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()}
-            if 'caption' not in cols:
-                print("Error: 'caption' column not found. Run 'python database.py' to migrate the schema first.")
+            cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()
+            }
+            if "caption" not in cols:
+                print(
+                    "Error: 'caption' column not found. Run 'python database.py' to migrate the schema first."
+                )
                 sys.exit(1)
 
-            total = conn.execute("SELECT COUNT(*) FROM photos WHERE caption IS NULL").fetchone()[0]
-            logger.info("Generating captions for %d photos...", total)
+            has_tags_col = "tags" in cols
+
+            total = conn.execute(
+                "SELECT COUNT(*) FROM photos WHERE caption IS NULL"
+            ).fetchone()[0]
+            logger.info("Generating captions+tags for %d photos...", total)
             vlm.load()
-            cursor = conn.execute("SELECT path, thumbnail FROM photos WHERE caption IS NULL")
+            cursor = conn.execute(
+                "SELECT path, thumbnail FROM photos WHERE caption IS NULL"
+            )
             batch_size = 100
             with tqdm(total=total, desc="Captioning") as pbar:
                 while True:
@@ -637,27 +918,46 @@ Configuration:
                         break
                     for row in rows:
                         try:
-                            if row['thumbnail']:
-                                img = Image.open(io.BytesIO(row['thumbnail'])).convert('RGB')
+                            if row["thumbnail"]:
+                                img = Image.open(io.BytesIO(row["thumbnail"])).convert(
+                                    "RGB"
+                                )
                             else:
-                                path = row['path']
+                                path = row["path"]
                                 ext = os.path.splitext(path)[1].lower()
                                 if ext in RAW_EXTENSIONS:
                                     import rawpy
+
                                     with rawpy.imread(path) as raw:
                                         rgb = raw.postprocess()
-                                    img = Image.fromarray(rgb).convert('RGB')
+                                    img = Image.fromarray(rgb).convert("RGB")
                                 else:
-                                    img = Image.open(path).convert('RGB')
+                                    img = Image.open(path).convert("RGB")
                                 img.thumbnail((640, 640))
-                            caption = vlm.generate(img, "Describe this photo in one concise sentence.", max_new_tokens=100)
-                            conn.execute("UPDATE photos SET caption = ? WHERE path = ?", (caption.strip(), row['path']))
+                            result = vlm.generate_caption_and_tags(
+                                img, max_tags=5, max_new_tokens=150
+                            )
+                            caption = result.get("caption", "")
+                            tags = result.get("tags", [])
+                            if has_tags_col and tags:
+                                from utils import tags_to_string
+
+                                tag_str = tags_to_string(tags)
+                                conn.execute(
+                                    "UPDATE photos SET caption = ?, tags = ? WHERE path = ?",
+                                    (caption.strip(), tag_str, row["path"]),
+                                )
+                            else:
+                                conn.execute(
+                                    "UPDATE photos SET caption = ? WHERE path = ?",
+                                    (caption.strip(), row["path"]),
+                                )
                         except Exception as e:
-                            logger.warning("Caption failed for %s: %s", row['path'], e)
+                            logger.warning("Caption failed for %s: %s", row["path"], e)
                         pbar.update(1)
                     conn.commit()
             vlm.unload()
-        logger.info("Caption generation complete.")
+        logger.info("Caption+tag generation complete.")
         exit()
 
     # Translate existing captions
@@ -666,20 +966,29 @@ Configuration:
         from tqdm import tqdm
 
         config = ScoringConfig(args.config)
-        target_lang = config.config.get('translation', {}).get('target_language', '')
+        target_lang = config.config.get("translation", {}).get("target_language", "")
         if not target_lang:
-            logger.error("No target_language configured in scoring_config.json → translation section.")
+            logger.error(
+                "No target_language configured in scoring_config.json → translation section."
+            )
             sys.exit(1)
         if target_lang not in LANG_MODELS:
-            logger.error("Unsupported target language: %r. Supported: %s",
-                         target_lang, ', '.join(sorted(LANG_MODELS)))
+            logger.error(
+                "Unsupported target language: %r. Supported: %s",
+                target_lang,
+                ", ".join(sorted(LANG_MODELS)),
+            )
             sys.exit(1)
 
         with get_connection(args.db) as conn:
-            cols = {row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()}
-            if 'caption' not in cols or 'caption_translated' not in cols:
-                print("Error: caption/caption_translated columns not found. "
-                      "Run 'python database.py' to migrate the schema first.")
+            cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()
+            }
+            if "caption" not in cols or "caption_translated" not in cols:
+                print(
+                    "Error: caption/caption_translated columns not found. "
+                    "Run 'python database.py' to migrate the schema first."
+                )
                 sys.exit(1)
 
             total = conn.execute(
@@ -703,13 +1012,15 @@ Configuration:
                         break
                     for row in rows:
                         try:
-                            translated = translator.translate(row['caption'])
+                            translated = translator.translate(row["caption"])
                             conn.execute(
                                 "UPDATE photos SET caption_translated = ? WHERE path = ?",
-                                (translated, row['path']),
+                                (translated, row["path"]),
                             )
                         except Exception as e:
-                            logger.warning("Translation failed for %s: %s", row['path'], e)
+                            logger.warning(
+                                "Translation failed for %s: %s", row["path"], e
+                            )
                         pbar.update(1)
                     conn.commit()
             translator.unload()
@@ -722,9 +1033,13 @@ Configuration:
         from tqdm import tqdm
 
         with get_connection(args.db) as conn:
-            cols = {row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()}
-            if 'gps_latitude' not in cols or 'gps_longitude' not in cols:
-                print("Error: GPS columns not found. Run 'python database.py' to migrate the schema first.")
+            cols = {
+                row[1] for row in conn.execute("PRAGMA table_info(photos)").fetchall()
+            }
+            if "gps_latitude" not in cols or "gps_longitude" not in cols:
+                print(
+                    "Error: GPS columns not found. Run 'python database.py' to migrate the schema first."
+                )
                 sys.exit(1)
 
             # Re-scans photos without GPS each run (idempotent). Photos lacking
@@ -733,17 +1048,17 @@ Configuration:
             rows = conn.execute(
                 "SELECT path FROM photos WHERE gps_latitude IS NULL"
             ).fetchall()
-            paths = [r['path'] for r in rows]
+            paths = [r["path"] for r in rows]
             logger.info("Extracting GPS for %d photos...", len(paths))
             exif_data = get_exif_batch(paths)
             updated = 0
             for path, exif in tqdm(exif_data.items(), desc="GPS extraction"):
-                lat = exif.get('gps_latitude')
-                lng = exif.get('gps_longitude')
+                lat = exif.get("gps_latitude")
+                lng = exif.get("gps_longitude")
                 if lat is not None and lng is not None:
                     conn.execute(
                         "UPDATE photos SET gps_latitude = ?, gps_longitude = ? WHERE path = ?",
-                        (lat, lng, path)
+                        (lat, lng, path),
                     )
                     updated += 1
             conn.commit()
@@ -765,35 +1080,50 @@ Configuration:
         # Get all photos from database
         with get_connection(args.db) as conn:
             cursor = conn.execute("SELECT path FROM photos")
-            paths = [row['path'] for row in cursor.fetchall()]
+            paths = [row["path"] for row in cursor.fetchall()]
 
         if not paths:
             logger.info("No photos in database.")
             exit()
 
         logger.info("Recomputing embeddings for %d photos...", len(paths))
-        processed = run_single_pass(paths, 'embeddings', scorer, model_manager)
+        processed = run_single_pass(paths, "embeddings", scorer, model_manager)
         logger.info("Recomputed embeddings for %d photos.", processed)
-        logger.info("Run --recompute-tags and --recompute-average to update tags and scores.")
+        logger.info(
+            "Run --recompute-tags and --recompute-average to update tags and scores."
+        )
         exit()
 
     # Recompute tags using VLM model (loads images from disk)
     if args.recompute_tags_vlm:
-        from models.model_manager import ModelManager
-
         config = ScoringConfig(args.config)
-        config.check_vram_profile_compatibility(verbose=True)
+        models_config = config.get_model_config()
 
-        # Use configured VLM or default to qwen3-vl-2b
-        tag_model = config.get_model_for_task('tagging')
-        if tag_model == 'qwen2.5-vl-7b':
-            model_key = 'vlm_tagger'
-        elif tag_model == 'florence-2':
-            model_key = 'florence_tagger'
+        # Check for remote VLM first
+        remote_config = models_config.get("vlm_remote", {})
+        if remote_config.get("enabled"):
+            from models.vlm_tagger_api import VLMTaggerAPI
+
+            tagger = VLMTaggerAPI(remote_config, config)
+            logger.info("Using remote VLM at %s", remote_config.get("base_url"))
         else:
-            model_key = 'qwen3_vl_tagger'
+            from models.model_manager import ModelManager
 
-        model_manager = ModelManager(config)
+            config.check_vram_profile_compatibility(verbose=True)
+
+            tag_model = config.get_model_for_task("tagging")
+            if tag_model == "qwen2.5-vl-7b":
+                model_key = "vlm_tagger"
+            elif tag_model == "florence-2":
+                model_key = "florence_tagger"
+            else:
+                model_key = "qwen3_vl_tagger"
+
+            model_manager = ModelManager(config)
+            tagger = model_manager.load_model_only(model_key)
+            if not tagger:
+                logger.error("Failed to load VLM tagger")
+                exit(1)
 
         # Get all photos from database
         init_database(args.db)
@@ -801,47 +1131,45 @@ Configuration:
             cursor = conn.execute("SELECT path FROM photos")
             photos = cursor.fetchall()
 
-        logger.info("Re-tagging %d photos using VLM (%s)...", len(photos), model_key)
-
-        tagger = model_manager.load_model_only(model_key)
-        if not tagger:
-            logger.error("Failed to load VLM tagger")
-            exit(1)
+        logger.info("Re-tagging %d photos using VLM...", len(photos))
 
         from utils import load_image_from_path, _rawpy_lock, tags_to_string
+
         tagging_settings = config.get_tagging_settings()
-        max_tags = tagging_settings.get('max_tags', 5)
+        max_tags = tagging_settings.get("max_tags", 5)
         batch_size = tagger.batch_size
         updated = 0
 
         with get_connection(args.db) as conn:
             for i in tqdm(range(0, len(photos), batch_size), desc="VLM tagging"):
-                batch = photos[i:i + batch_size]
+                batch = photos[i : i + batch_size]
                 images = []
                 paths = []
 
                 for row in batch:
                     try:
-                        pil_img, _ = load_image_from_path(row['path'], lock=_rawpy_lock)
+                        pil_img, _ = load_image_from_path(row["path"], lock=_rawpy_lock)
                         if pil_img:
                             images.append(pil_img)
-                            paths.append(row['path'])
+                            paths.append(row["path"])
                     except Exception as e:
-                        logger.warning("Failed to load %s: %s", row['path'], e)
+                        logger.warning("Failed to load %s: %s", row["path"], e)
 
                 if images:
                     tags_batch = tagger.tag_batch(images, max_tags=max_tags)
                     for path, tag_list in zip(paths, tags_batch):
                         tags = tags_to_string(tag_list) if tag_list else None
                         conn.execute(
-                            "UPDATE photos SET tags = ? WHERE path = ?",
-                            (tags, path)
+                            "UPDATE photos SET tags = ? WHERE path = ?", (tags, path)
                         )
                         updated += 1
 
             conn.commit()
 
-        model_manager.unload_all()
+        if remote_config.get("enabled"):
+            tagger.unload()
+        else:
+            model_manager.unload_all()
         logger.info("Updated tags for %d photos", updated)
         exit()
 
@@ -852,7 +1180,7 @@ Configuration:
 
         config = ScoringConfig(args.config)
         config.check_vram_profile_compatibility(verbose=True)  # Resolve 'auto' profile
-        tag_model = config.get_model_for_task('tagging')
+        tag_model = config.get_model_for_task("tagging")
 
         logger.info("Re-tagging photos using model: %s", tag_model)
 
@@ -867,51 +1195,59 @@ Configuration:
 
         logger.info("Found %d photos to re-tag", photo_count)
 
-        if tag_model == 'clip':
+        if tag_model == "clip":
             # Use CLIP embeddings for tagging
             scorer = Facet(db_path=args.db, config_path=args.config)
             clip_settings = config.get_clip_settings()
             tagging_settings = config.get_tagging_settings()
             threshold, max_tags = (
-                clip_settings.get('similarity_threshold_percent', 22) / 100,
-                tagging_settings.get('max_tags', 5)
+                clip_settings.get("similarity_threshold_percent", 22) / 100,
+                tagging_settings.get("max_tags", 5),
             )
 
             updated = 0
             with get_connection(args.db) as conn:
                 from utils import tags_to_string
+
                 cursor = conn.execute(
                     "SELECT path, clip_embedding FROM photos WHERE clip_embedding IS NOT NULL"
                 )
                 for row in tqdm(cursor, desc="Tagging", total=photo_count):
-                    if row['clip_embedding']:
+                    if row["clip_embedding"]:
                         tag_list = scorer.tagger.get_tags_from_embedding(
-                            row['clip_embedding'], threshold=threshold, max_tags=max_tags
+                            row["clip_embedding"],
+                            threshold=threshold,
+                            max_tags=max_tags,
                         )
                         tags = tags_to_string(tag_list) if tag_list else None
                         conn.execute(
                             "UPDATE photos SET tags = ? WHERE path = ?",
-                            (tags, row['path'])
+                            (tags, row["path"]),
                         )
                         updated += 1
                 conn.commit()
             logger.info("Updated tags for %d photos", updated)
 
-        elif tag_model in ('ram++', 'qwen2.5-vl-7b', 'qwen3-vl-2b'):
+        elif tag_model in ("ram++", "qwen2.5-vl-7b", "qwen3-vl-2b"):
             # Need to load images for VLM/RAM++ tagging
             logger.info("Loading %s model...", tag_model)
-            model_key = {'ram++': 'ram_tagger', 'qwen2.5-vl-7b': 'vlm_tagger', 'qwen3-vl-2b': 'qwen3_vl_tagger'}[tag_model]
+            model_key = {
+                "ram++": "ram_tagger",
+                "qwen2.5-vl-7b": "vlm_tagger",
+                "qwen3-vl-2b": "qwen3_vl_tagger",
+            }[tag_model]
             tagger = model_manager.load_model_only(model_key)
             if not tagger:
                 logger.error("Failed to load %s", tag_model)
                 exit(1)
 
             from utils import tags_to_string
+
             tagging_settings = config.get_tagging_settings()
-            max_tags = tagging_settings.get('max_tags', 5)
+            max_tags = tagging_settings.get("max_tags", 5)
             updated = 0
 
-            if tag_model == 'ram++':
+            if tag_model == "ram++":
                 # RAM++ uses stored thumbnails to avoid loading full-res images
                 # (RAM++ needs ~5 GB+ at full resolution).
                 from PIL import Image
@@ -921,46 +1257,55 @@ Configuration:
                     cursor = conn.execute(
                         "SELECT path, thumbnail FROM photos WHERE clip_embedding IS NOT NULL"
                     )
-                    for row in tqdm(cursor, desc="Tagging (thumbnail)", total=photo_count):
-                        thumb_blob = row['thumbnail']
+                    for row in tqdm(
+                        cursor, desc="Tagging (thumbnail)", total=photo_count
+                    ):
+                        thumb_blob = row["thumbnail"]
                         if not thumb_blob:
                             continue
                         try:
-                            pil_img = Image.open(BytesIO(thumb_blob)).convert('RGB')
+                            pil_img = Image.open(BytesIO(thumb_blob)).convert("RGB")
                         except Exception as e:
-                            logger.warning("Failed to decode thumbnail for %s: %s", row['path'], e)
+                            logger.warning(
+                                "Failed to decode thumbnail for %s: %s", row["path"], e
+                            )
                             continue
 
                         tag_list = tagger.tag_image(pil_img, max_tags=max_tags)
                         tags = tags_to_string(tag_list) if tag_list else None
                         conn.execute(
                             "UPDATE photos SET tags = ? WHERE path = ?",
-                            (tags, row['path'])
+                            (tags, row["path"]),
                         )
                         updated += 1
                     conn.commit()
             else:
                 # VLM taggers load full images from disk
                 from utils import load_image_from_path, _rawpy_lock
+
                 batch_size = 16
 
                 with get_connection(args.db) as conn:
                     photos = conn.execute(
                         "SELECT path FROM photos WHERE clip_embedding IS NOT NULL"
                     ).fetchall()
-                    for i in tqdm(range(0, len(photos), batch_size), desc="Tagging batches"):
-                        batch = photos[i:i + batch_size]
+                    for i in tqdm(
+                        range(0, len(photos), batch_size), desc="Tagging batches"
+                    ):
+                        batch = photos[i : i + batch_size]
                         images = []
                         paths = []
 
                         for row in batch:
                             try:
-                                pil_img, _ = load_image_from_path(row['path'], lock=_rawpy_lock)
+                                pil_img, _ = load_image_from_path(
+                                    row["path"], lock=_rawpy_lock
+                                )
                                 if pil_img:
                                     images.append(pil_img)
-                                    paths.append(row['path'])
+                                    paths.append(row["path"])
                             except Exception as e:
-                                logger.warning("Failed to load %s: %s", row['path'], e)
+                                logger.warning("Failed to load %s: %s", row["path"], e)
 
                         if images:
                             tags_batch = tagger.tag_batch(images, max_tags=max_tags)
@@ -968,7 +1313,7 @@ Configuration:
                                 tags = tags_to_string(tag_list) if tag_list else None
                                 conn.execute(
                                     "UPDATE photos SET tags = ? WHERE path = ?",
-                                    (tags, path)
+                                    (tags, path),
                                 )
                                 updated += 1
 
@@ -984,15 +1329,15 @@ Configuration:
         scorer = Facet(db_path=args.db, config_path=args.config, lightweight=True)
         normalizer = None
         norm_settings = scorer.config.get_normalization_settings()
-        if norm_settings.get('method') == 'percentile':
+        if norm_settings.get("method") == "percentile":
             logger.info("Computing percentiles for normalization...")
-            per_category = norm_settings.get('per_category', False)
-            category_min_samples = norm_settings.get('category_min_samples', 50)
+            per_category = norm_settings.get("per_category", False)
+            category_min_samples = norm_settings.get("category_min_samples", 50)
             normalizer = PercentileNormalizer(
                 scorer.db_path,
-                target_percentile=norm_settings.get('percentile_target', 95),
+                target_percentile=norm_settings.get("percentile_target", 95),
                 per_category=per_category,
-                category_min_samples=category_min_samples
+                category_min_samples=category_min_samples,
             )
             normalizer.compute_percentiles()
 
@@ -1009,8 +1354,9 @@ Configuration:
     # Export CSV mode (lightweight - no GPU needed)
     if args.export_csv:
         import csv
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        if args.export_csv == 'auto':
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if args.export_csv == "auto":
             output_file = f"facet_export_{timestamp}.csv"
         else:
             output_file = args.export_csv
@@ -1024,28 +1370,53 @@ Configuration:
                 ORDER BY aggregate DESC
             """)
 
-            with open(output_file, 'w', newline='', encoding='utf-8') as f:
+            with open(output_file, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow([
-                    'path', 'filename', 'date_taken', 'category', 'aggregate',
-                    'aesthetic', 'comp_score', 'face_quality', 'tech_sharpness',
-                    'exposure_score', 'color_score', 'tags', 'camera_model', 'lens_model'
-                ])
+                writer.writerow(
+                    [
+                        "path",
+                        "filename",
+                        "date_taken",
+                        "category",
+                        "aggregate",
+                        "aesthetic",
+                        "comp_score",
+                        "face_quality",
+                        "tech_sharpness",
+                        "exposure_score",
+                        "color_score",
+                        "tags",
+                        "camera_model",
+                        "lens_model",
+                    ]
+                )
                 for row in cursor:
-                    writer.writerow([
-                        row['path'], row['filename'], row['date_taken'], row['category'],
-                        row['aggregate'], row['aesthetic'], row['comp_score'],
-                        row['face_quality'], row['tech_sharpness'], row['exposure_score'],
-                        row['color_score'], row['tags'], row['camera_model'], row['lens_model']
-                    ])
-        row_count = sum(1 for _ in open(output_file, encoding='utf-8')) - 1
+                    writer.writerow(
+                        [
+                            row["path"],
+                            row["filename"],
+                            row["date_taken"],
+                            row["category"],
+                            row["aggregate"],
+                            row["aesthetic"],
+                            row["comp_score"],
+                            row["face_quality"],
+                            row["tech_sharpness"],
+                            row["exposure_score"],
+                            row["color_score"],
+                            row["tags"],
+                            row["camera_model"],
+                            row["lens_model"],
+                        ]
+                    )
+        row_count = sum(1 for _ in open(output_file, encoding="utf-8")) - 1
         logger.info("Exported %d photos to %s", row_count, output_file)
         exit()
 
     # Export JSON mode (lightweight - no GPU needed)
     if args.export_json:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        if args.export_json == 'auto':
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if args.export_json == "auto":
             output_file = f"facet_export_{timestamp}.json"
         else:
             output_file = args.export_json
@@ -1061,27 +1432,29 @@ Configuration:
 
             photos = []
             for row in cursor:
-                photos.append({
-                    'path': row['path'],
-                    'filename': row['filename'],
-                    'date_taken': row['date_taken'],
-                    'category': row['category'],
-                    'scores': {
-                        'aggregate': row['aggregate'],
-                        'aesthetic': row['aesthetic'],
-                        'comp_score': row['comp_score'],
-                        'face_quality': row['face_quality'],
-                        'tech_sharpness': row['tech_sharpness'],
-                        'exposure_score': row['exposure_score'],
-                        'color_score': row['color_score'],
-                    },
-                    'tags': row['tags'],
-                    'camera_model': row['camera_model'],
-                    'lens_model': row['lens_model'],
-                })
+                photos.append(
+                    {
+                        "path": row["path"],
+                        "filename": row["filename"],
+                        "date_taken": row["date_taken"],
+                        "category": row["category"],
+                        "scores": {
+                            "aggregate": row["aggregate"],
+                            "aesthetic": row["aesthetic"],
+                            "comp_score": row["comp_score"],
+                            "face_quality": row["face_quality"],
+                            "tech_sharpness": row["tech_sharpness"],
+                            "exposure_score": row["exposure_score"],
+                            "color_score": row["color_score"],
+                        },
+                        "tags": row["tags"],
+                        "camera_model": row["camera_model"],
+                        "lens_model": row["lens_model"],
+                    }
+                )
 
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump({'photos': photos, 'count': len(photos)}, f, indent=2)
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump({"photos": photos, "count": len(photos)}, f, indent=2)
 
         logger.info("Exported %d photos to %s", len(photos), output_file)
         exit()
@@ -1094,19 +1467,24 @@ Configuration:
 
     # Initialise plugin manager for scoring events
     from plugins import init_global_plugin_manager
+
     init_global_plugin_manager(config=scorer.config.config)
 
     if not args.photo_paths:
-        logger.error("photo_paths is required unless using --recompute-average or --compute-percentiles")
+        logger.error(
+            "photo_paths is required unless using --recompute-average or --compute-percentiles"
+        )
         parser.print_help()
         exit(1)
 
     # 1. Gather files recursively from subfolders (or single files)
-    valid_suffixes = {'.jpg', '.jpeg'} | HEIF_EXTENSIONS | RAW_EXTENSIONS
+    valid_suffixes = {".jpg", ".jpeg"} | HEIF_EXTENSIONS | RAW_EXTENSIONS
     all_files = []
 
     # Get scanning settings
-    skip_hidden = scorer.config.get_scanning_settings().get('skip_hidden_directories', True)
+    skip_hidden = scorer.config.get_scanning_settings().get(
+        "skip_hidden_directories", True
+    )
 
     for path_str in args.photo_paths:
         base_path = Path(path_str).resolve()
@@ -1124,7 +1502,7 @@ Configuration:
             for root, dirs, files in os.walk(base_path):
                 # Prune hidden directories if configured
                 if skip_hidden:
-                    dirs[:] = [d for d in dirs if not d.startswith('.')]
+                    dirs[:] = [d for d in dirs if not d.startswith(".")]
 
                 # Add matching files
                 for f in files:
@@ -1136,15 +1514,21 @@ Configuration:
     all_files = list({f.resolve(): f for f in all_files}.values())
 
     # Identify JPEGs to avoid double-processing if RAW+JPEG pairs exist
-    jpeg_like = {'.jpg', '.jpeg'} | HEIF_EXTENSIONS
+    jpeg_like = {".jpg", ".jpeg"} | HEIF_EXTENSIONS
     jpegs_stems = {f.stem.lower() for f in all_files if f.suffix.lower() in jpeg_like}
     scanned_set = set() if args.force else scorer.get_already_scanned_set()
 
     # Filter the list to only include new or un-scanned files
-    todo_list = [f for f in all_files if str(f.resolve()) not in scanned_set
-                 and not (f.suffix.lower() in RAW_EXTENSIONS and f.stem.lower() in jpegs_stems)]
+    todo_list = [
+        f
+        for f in all_files
+        if str(f.resolve()) not in scanned_set
+        and not (f.suffix.lower() in RAW_EXTENSIONS and f.stem.lower() in jpegs_stems)
+    ]
 
-    logger.info("Found %d total, processing %d new files.", len(all_files), len(todo_list))
+    logger.info(
+        "Found %d total, processing %d new files.", len(all_files), len(todo_list)
+    )
 
     if not todo_list:
         logger.info("No new files to process.")
@@ -1155,7 +1539,10 @@ Configuration:
         sample_count = min(args.dry_run_count, len(todo_list))
         sample_files = todo_list[:sample_count]
         logger.info("=" * 80)
-        logger.info("DRY RUN MODE - Scoring %d sample photos (not saving to database)", sample_count)
+        logger.info(
+            "DRY RUN MODE - Scoring %d sample photos (not saving to database)",
+            sample_count,
+        )
         logger.info("=" * 80)
 
         results = []
@@ -1164,15 +1551,17 @@ Configuration:
             try:
                 result, _ = process_single_photo(photo_path, scorer)
                 if result:
-                    results.append({
-                        'filename': photo_path.name,
-                        'category': result.get('category', 'unknown'),
-                        'aesthetic': result.get('aesthetic', 0),
-                        'comp_score': result.get('comp_score', 0),
-                        'aggregate': result.get('aggregate', 0),
-                        'face_quality': result.get('face_quality', 0),
-                    })
-                    logger.info("OK (aggregate: %.2f)", result.get('aggregate', 0))
+                    results.append(
+                        {
+                            "filename": photo_path.name,
+                            "category": result.get("category", "unknown"),
+                            "aesthetic": result.get("aesthetic", 0),
+                            "comp_score": result.get("comp_score", 0),
+                            "aggregate": result.get("aggregate", 0),
+                            "face_quality": result.get("face_quality", 0),
+                        }
+                    )
+                    logger.info("OK (aggregate: %.2f)", result.get("aggregate", 0))
                 else:
                     logger.warning("FAILED")
             except Exception as e:
@@ -1181,18 +1570,39 @@ Configuration:
         # Print results table
         if results:
             logger.info("=" * 80)
-            logger.info("%-40s %-15s %6s %6s %6s %6s", "Filename", "Category", "Aes", "Comp", "Face", "Aggr")
-            logger.info("%s %s %s %s %s %s", "-" * 40, "-" * 15, "-" * 6, "-" * 6, "-" * 6, "-" * 6)
+            logger.info(
+                "%-40s %-15s %6s %6s %6s %6s",
+                "Filename",
+                "Category",
+                "Aes",
+                "Comp",
+                "Face",
+                "Aggr",
+            )
+            logger.info(
+                "%s %s %s %s %s %s",
+                "-" * 40,
+                "-" * 15,
+                "-" * 6,
+                "-" * 6,
+                "-" * 6,
+                "-" * 6,
+            )
             for r in results:
-                logger.info("%-40s %-15s %6.2f %6.2f %6.2f %6.2f",
-                            r['filename'][:39], r['category'][:14],
-                            r['aesthetic'], r['comp_score'],
-                            r['face_quality'], r['aggregate'])
+                logger.info(
+                    "%-40s %-15s %6.2f %6.2f %6.2f %6.2f",
+                    r["filename"][:39],
+                    r["category"][:14],
+                    r["aesthetic"],
+                    r["comp_score"],
+                    r["face_quality"],
+                    r["aggregate"],
+                )
             logger.info("=" * 80)
 
             # Summary stats
-            avg_agg = sum(r['aggregate'] for r in results) / len(results)
-            avg_aes = sum(r['aesthetic'] for r in results) / len(results)
+            avg_agg = sum(r["aggregate"] for r in results) / len(results)
+            avg_aes = sum(r["aesthetic"] for r in results) / len(results)
             logger.info("Summary: %d photos scored", len(results))
             logger.info("  Average aggregate: %.2f", avg_agg)
             logger.info("  Average aesthetic: %.2f", avg_aes)
@@ -1208,8 +1618,12 @@ Configuration:
 
             model_manager = ModelManager(scorer.config)
             todo_paths = [str(f) for f in todo_list]
-            processed = run_single_pass(todo_paths, args.single_pass_name, scorer, model_manager)
-            logger.info("Processed %d photos with %s pass", processed, args.single_pass_name)
+            processed = run_single_pass(
+                todo_paths, args.single_pass_name, scorer, model_manager
+            )
+            logger.info(
+                "Processed %d photos with %s pass", processed, args.single_pass_name
+            )
 
         elif args.single_pass:
             # Force single-pass mode (old --batch behavior - all models loaded at once)
@@ -1217,26 +1631,29 @@ Configuration:
             from config import recalculate_batch_settings
 
             proc_settings = scorer.config.get_processing_settings()
-            auto_tuning = proc_settings.get('auto_tuning', {})
-            tuning_interval = auto_tuning.get('tuning_interval_images', 50)
+            auto_tuning = proc_settings.get("auto_tuning", {})
+            tuning_interval = auto_tuning.get("tuning_interval_images", 50)
 
             # Start with config defaults
             current_settings = {
-                'batch_size': proc_settings.get('gpu_batch_size', 16),
-                'num_workers': proc_settings.get('num_workers', 4),
-                'auto_tuning': auto_tuning,
+                "batch_size": proc_settings.get("gpu_batch_size", 16),
+                "num_workers": proc_settings.get("num_workers", 4),
+                "auto_tuning": auto_tuning,
             }
 
-            tuning_enabled = auto_tuning.get('enabled', True)
+            tuning_enabled = auto_tuning.get("enabled", True)
             todo_paths = [str(f) for f in todo_list]
 
-            logger.info("Single-pass mode: %d batch, %d workers",
-                        current_settings['batch_size'], current_settings['num_workers'])
+            logger.info(
+                "Single-pass mode: %d batch, %d workers",
+                current_settings["batch_size"],
+                current_settings["num_workers"],
+            )
 
             processor = BatchProcessor(
                 scorer,
-                batch_size=current_settings['batch_size'],
-                num_workers=current_settings['num_workers']
+                batch_size=current_settings["batch_size"],
+                num_workers=current_settings["num_workers"],
             )
 
             calibration_done = [False]
@@ -1244,41 +1661,47 @@ Configuration:
             def calibration_callback(metrics):
                 if calibration_done[0]:
                     return False
-                old_workers = current_settings['num_workers']
+                old_workers = current_settings["num_workers"]
                 new_settings = recalculate_batch_settings(metrics, current_settings)
                 current_settings.update(new_settings)
                 calibration_done[0] = True
-                if current_settings['num_workers'] != old_workers:
-                    logger.info("  Calibrated: %d workers", current_settings['num_workers'])
+                if current_settings["num_workers"] != old_workers:
+                    logger.info(
+                        "  Calibrated: %d workers", current_settings["num_workers"]
+                    )
                     return True
                 return False
 
             def tuning_callback(metrics):
-                old_batch_size = current_settings['batch_size']
+                old_batch_size = current_settings["batch_size"]
                 new_settings = recalculate_batch_settings(metrics, current_settings)
                 current_settings.update(new_settings)
-                if current_settings['batch_size'] != old_batch_size:
-                    processor.batch_size = current_settings['batch_size']
+                if current_settings["batch_size"] != old_batch_size:
+                    processor.batch_size = current_settings["batch_size"]
 
             remaining_paths = processor.process_stream(
-                iter(todo_paths), len(todo_paths),
+                iter(todo_paths),
+                len(todo_paths),
                 tuning_callback=tuning_callback if tuning_enabled else None,
                 tuning_interval=tuning_interval,
-                calibration_callback=calibration_callback if tuning_enabled else None
+                calibration_callback=calibration_callback if tuning_enabled else None,
             )
 
             if remaining_paths:
                 processor = BatchProcessor(
                     scorer,
-                    batch_size=current_settings['batch_size'],
-                    num_workers=current_settings['num_workers'],
-                    prefetch_multiplier=current_settings.get('prefetch_queue_multiplier', 2)
+                    batch_size=current_settings["batch_size"],
+                    num_workers=current_settings["num_workers"],
+                    prefetch_multiplier=current_settings.get(
+                        "prefetch_queue_multiplier", 2
+                    ),
                 )
                 processor.process_stream(
-                    iter(remaining_paths), len(remaining_paths),
+                    iter(remaining_paths),
+                    len(remaining_paths),
                     tuning_callback=tuning_callback if tuning_enabled else None,
                     tuning_interval=tuning_interval,
-                    calibration_callback=None
+                    calibration_callback=None,
                 )
 
         else:
@@ -1291,9 +1714,9 @@ Configuration:
 
             # Check processing mode from config
             proc_settings = scorer.config.get_processing_settings()
-            mode = proc_settings.get('mode', 'auto')
+            mode = proc_settings.get("mode", "auto")
 
-            if mode != 'single-pass':
+            if mode != "single-pass":
                 processor = ChunkedMultiPassProcessor(
                     scorer, model_manager, scorer.config.config
                 )
@@ -1304,8 +1727,8 @@ Configuration:
 
                 processor = BatchProcessor(
                     scorer,
-                    batch_size=proc_settings.get('gpu_batch_size', 16),
-                    num_workers=proc_settings.get('num_workers', 4)
+                    batch_size=proc_settings.get("gpu_batch_size", 16),
+                    num_workers=proc_settings.get("num_workers", 4),
                 )
                 processor.process_files(todo_paths)
 
@@ -1324,10 +1747,16 @@ Configuration:
     from models.tagger import CLIPTagger
 
     # Use existing tagger if available, or create one with scorer's model
-    tagger = scorer.tagger if scorer.tagger else CLIPTagger(
-        scorer.model, scorer.device, config=scorer.config,
-        model_name=scorer._clip_model_name,
-        backend=scorer._clip_backend
+    tagger = (
+        scorer.tagger
+        if scorer.tagger
+        else CLIPTagger(
+            scorer.model,
+            scorer.device,
+            config=scorer.config,
+            model_name=scorer._clip_model_name,
+            backend=scorer._clip_backend,
+        )
     )
 
     tagged = run_tagging(scorer.db_path, tagger, scorer.config)
@@ -1339,5 +1768,5 @@ Configuration:
     logger.info("All tasks complete.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
